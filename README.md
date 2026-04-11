@@ -1,6 +1,6 @@
 # launcher
 <p align="center">
-  <img src="[URL_BANNER_PRINCIPA](https://github.com/nisojestudio/launcher/blob/main/assets/banner.png)L" width="700"/>
+ <img src="assets/banner.png" " width="700"/>
 </p>
 
 <h1 align="center">🚀 Panel Live</h1>
