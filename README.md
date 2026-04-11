@@ -1,6 +1,6 @@
 # launcher
 <p align="center">
- <img src="assets/banner.png" " width="700"/>
+ <img src="assets/banner.png" " width="300"/>
 </p>
 
 <h1 align="center">🚀 Panel Live</h1>
