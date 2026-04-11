@@ -35,7 +35,7 @@ Tu comunidad deja de ser espectadora…
 ## 🎮 Juegos disponibles
 
 <p align="center">
-  <img src="URL_IMAGEN_JUEGO_1" width="600"/>
+  <img src="assets/juego1.png" width="600"/>
 </p>
 
 * 🌍 Modo conquista por equipos
@@ -47,7 +47,7 @@ Tu comunidad deja de ser espectadora…
 ## ⚡ Interacción en vivo
 
 <p align="center">
-  <img src="URL_IMAGEN_JUEGO_2" width="600"/>
+   <img src="assets/juego2.png" width="600"/>
 </p>
 
 * 💬 Comentarios que afectan el juego
@@ -85,7 +85,7 @@ Tu comunidad deja de ser espectadora…
 ## ❤️ Creado por
 
 <p align="center">
-  <img src="URL_LOGO" width="200"/>
+   <img src="assets/logo.png" width="200"/>
 </p>
 
 **Nisoje Studio**
