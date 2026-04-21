@@ -1,0 +1,85 @@
+{
+  "panel_name": "Nisoje Studio",
+  "default_game_id": "arena_live",
+  "bridge_mode": "external",
+  "external_target_user": "curmita01",
+  "external_ws_port": 8765,
+  "embedded_ui_enabled": true,
+  "embedded_ui_fallback_to_browser": true,
+  "embedded_ui_devtools": false,
+  "embedded_ui_url": "http://127.0.0.1:18913/",
+  "embedded_ui_startup_timeout_ms": 8000,
+  "host_energy_level": "balanced",
+  "host_tone_style": "warm",
+  "auth": {
+    "required": false,
+    "firebase_api_key": "AIzaSyBWRMoHbPNkOw0zvflcPb_dv9G1Bgg1uLc",
+    "firebase_project_id": "nisoje-studio",
+    "firebase_auth_domain": "nisoje-studio.firebaseapp.com",
+    "nisoje_api_base": "https://nisoje-api.nisojestudio.workers.dev",
+    "me_licenses_path": "/api/me/licenses",
+    "me_games_catalog_path": "/api/me/games/catalog"
+  },
+  "bridge": {
+    "enabled": true,
+    "stub_mode": false,
+    "emit_chat_events": true,
+    "emit_like_events": true,
+    "emit_gift_events": true,
+    "emit_follow_events": true,
+    "emit_share_events": true,
+    "emit_viewer_join_events": true,
+    "emit_viewer_count_events": true,
+    "emit_live_start_events": true,
+    "emit_live_end_events": true,
+    "emit_moderation_events": true,
+    "emit_custom_raw_events": true,
+    "passthrough_avatar_url": true,
+    "source_name": "tiktok-external"
+  },
+  "tts_runtime": {
+    "enabled": true,
+    "max_queue_size": 0,
+    "backend_queue_size": 0,
+    "max_dispatch_per_tick": 1,
+    "max_text_length": 160,
+    "drop_oldest_on_overflow": false,
+    "selected_voice_id": "spanish-female",
+    "selected_language": "es",
+    "frequency": "normal"
+  },
+  "tts": {
+    "allow_chat_messages": true,
+    "allow_scheduled_messages": true,
+    "allow_manual_messages": true,
+    "include_actor_name_for_chat": false,
+    "min_text_length": 1,
+    "chat_filter_mode": "everyone",
+    "chat_cooldown_ms": 0,
+    "chat_message_template": "{message}"
+  },
+  "automation": {
+    "enable_gift_thanks_tts": true,
+    "enable_follow_thanks_tts": true,
+    "enable_like_thanks_tts": false,
+    "enable_subscriber_thanks_tts": false,
+    "enable_share_thanks_tts": false,
+    "gift_thanks_cooldown_ms": 2000,
+    "follow_thanks_cooldown_ms": 4000,
+    "like_thanks_cooldown_ms": 3000,
+    "subscriber_thanks_cooldown_ms": 3000,
+    "share_thanks_cooldown_ms": 4000,
+    "gift_thanks_template": "Gracias por tu apoyo al canal.",
+    "follow_thanks_template": "Bienvenido a la comunidad.",
+    "like_thanks_template": "Gracias {user} por enviar {count} likes",
+    "subscriber_thanks_template": "",
+    "share_thanks_template": ""
+  },
+  "periodic_tts": {
+    "enabled": true,
+    "interval_ms": 120000,
+    "messages": [
+      "Con taptap haces crecer tu avatar y con regalitos comienzas con los ataques, unete a la batalla!"
+    ]
+  }
+}

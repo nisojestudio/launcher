@@ -1,0 +1,47 @@
+connection_mode: tiktok_live
+
+connection:
+  username: ""
+  room_id: ""
+  connect_timeout_sec: 20
+  heartbeat_interval_sec: 15
+  heartbeat_warning_after_sec: 60
+
+retry_policy:
+  enabled: true
+  base_delay_sec: 2
+  max_delay_sec: 45
+  not_live_delay_sec: 20
+  max_attempts: 0
+
+buffer:
+  size: 8192
+  batch_size: 64
+  overflow_policy: drop_oldest
+
+output:
+  panel_ws_url: ws://127.0.0.1:8765
+  output_jsonl: ""
+  inbox_dir: ""
+  session_name: tiktok-live
+  broadcast_ws_enabled: true
+  broadcast_ws_host: 127.0.0.1
+  broadcast_ws_port: 8766
+  control_host: 127.0.0.1
+  control_port: 8770
+  auto_emit_session_status: true
+
+replay:
+  enabled: false
+  jsonl_path: ""
+  preserve_timing: true
+  speed: 1.0
+  loop: false
+
+logging:
+  level: INFO
+  log_path: tools/bridge_py/logs/bridge.jsonl
+
+legacy_bridge_root: ""
+max_events: 0
+max_seconds: 0

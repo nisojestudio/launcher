@@ -1,0 +1,403 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Nisoje Studio</title>
+  <link rel="icon" href="data:,">
+  <link rel="stylesheet" href="/app.css">
+</head>
+<body>
+  <div class="app-shell">
+    <header class="app-titlebar" id="app-titlebar">
+      <div class="titlebar-drag-region" id="titlebar-drag-region">
+        <img
+          class="brand-logo"
+          src="data:image/png;base64,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"
+          alt="Nisoje Studio logo">
+        <div class="brand-copy">
+          <strong>Nisoje Studio</strong>
+        </div>
+      </div>
+
+      <div class="titlebar-actions">
+        <div class="titlebar-status-group">
+          <div class="titlebar-metric" id="titlebar-latency-pill">
+            <span>Latencia</span>
+            <strong id="status-latency">Sin se&ntilde;al</strong>
+          </div>
+
+          <div class="titlebar-metric titlebar-metric-wide" id="connection-pill">
+            <span>Conexi&oacute;n</span>
+            <strong id="connection-status-text">Sin cuenta conectada</strong>
+            <small id="connection-status-meta">Bridge en espera</small>
+          </div>
+
+          <div class="titlebar-metric titlebar-clock">
+            <span>Hora</span>
+            <strong id="titlebar-clock-text">--:--:--</strong>
+          </div>
+        </div>
+
+        <div class="window-controls">
+          <button class="window-control-button" id="window-minimize-button" type="button" aria-label="Minimizar" title="Minimizar">&#8722;</button>
+          <button class="window-control-button" id="window-maximize-button" type="button" aria-label="Expandir o restaurar" title="Expandir o restaurar">&#9723;</button>
+          <button class="window-control-button window-control-button-danger" id="window-close-button" type="button" aria-label="Cerrar" title="Cerrar">&#10005;</button>
+        </div>
+      </div>
+    </header>
+
+    <div class="dashboard hero-card">
+      <div class="dashboard-column dashboard-column-left">
+        <aside class="panel games-panel" aria-labelledby="games-title">
+        <header class="panel-header">
+          <div class="panel-title-group">
+            <p class="panel-kicker">Juego interactivo</p>
+            <h1 id="games-title">Juegos</h1>
+          </div>
+          <span class="header-chip" id="games-count">0 juegos</span>
+        </header>
+
+          <div class="games-list" id="games-list"></div>
+        </aside>
+      </div>
+
+      <div class="dashboard-column dashboard-column-center">
+        <section class="panel connection-panel" aria-labelledby="connection-title">
+          <header class="panel-header">
+            <div class="panel-title-group">
+              <p class="panel-kicker">TikTok</p>
+              <h2 id="connection-title">Conexi&oacute;n</h2>
+            </div>
+          </header>
+
+          <form class="panel-form connection-form" id="connect-form">
+            <label class="field">
+              <span>Usuario de TikTok</span>
+              <input id="tiktok-user" type="text" autocomplete="off" spellcheck="false" placeholder="@tuusuario">
+            </label>
+
+            <div class="info-grid connection-info-grid">
+              <article class="info-tile">
+                <span class="info-label">Cuenta conectada</span>
+                <strong id="connection-target-user">Sin cuenta conectada</strong>
+              </article>
+              <article class="info-tile">
+                <span class="info-label">Sala del live</span>
+                <strong class="mono" id="live-room">Sala no disponible</strong>
+              </article>
+            </div>
+
+            <div class="button-row">
+              <button class="primary-button" id="connect-button" type="submit">Conectar</button>
+              <button class="secondary-button" id="disconnect-button" type="button" hidden>Desconectar</button>
+            </div>
+          </form>
+        </section>
+
+        <section class="panel activity-panel" aria-labelledby="activity-title">
+          <header class="panel-header panel-header-compact">
+            <div class="panel-title-group">
+              <p class="panel-kicker">Monitor</p>
+              <h2 id="activity-title">Actividad del live</h2>
+            </div>
+            <div class="panel-header-actions">
+              <span class="summary-note" id="activity-updated">Esperando</span>
+              <button class="secondary-button activity-clear-button" id="activity-clear-button" type="button">Limpiar eventos</button>
+            </div>
+          </header>
+
+          <div class="activity-feed-meta">
+            <span>Usuario: <strong id="activity-feed-user">@-</strong></span>
+            <span>&Uacute;ltimo: <strong id="activity-feed-last-type">-</strong></span>
+          </div>
+
+          <div class="recent-activity-list activity-monitor-log" id="recent-activity-list"></div>
+
+          <p class="activity-help-copy" hidden aria-hidden="true">Usa estos controles para probar el live sin conexi&oacute;n real.</p>
+
+          <div class="activity-control-shell" hidden aria-hidden="true">
+            <div class="activity-chat-row">
+              <input id="activity-chat-input" type="text" autocomplete="off" spellcheck="false" placeholder="Chat...">
+              <button class="icon-action-button" id="activity-chat-button" type="button" title="Enviar chat" aria-label="Enviar chat">&#128172;</button>
+            </div>
+
+            <div class="activity-action-row">
+              <details class="gift-picker" id="activity-gift-picker">
+                <summary class="gift-picker-toggle">
+                  <span class="gift-picker-icon" id="activity-selected-gift-icon">&#127801;</span>
+                  <span class="gift-picker-label" id="activity-selected-gift-name">ROSE (1 coin)</span>
+                  <span class="gift-picker-caret">&#9662;</span>
+                </summary>
+                <div class="gift-picker-menu" id="activity-gift-menu"></div>
+              </details>
+
+              <button class="icon-action-button icon-action-accent" id="activity-gift-button" type="button" title="Enviar regalo" aria-label="Enviar regalo">&#127873;</button>
+              <button class="icon-action-button" id="activity-share-button" type="button" title="Enviar compartido" aria-label="Enviar compartido">&#8599;</button>
+              <button class="icon-action-button" id="activity-follow-button" type="button" title="Enviar seguidor" aria-label="Enviar seguidor">&#10133;</button>
+
+              <label class="like-count-field">
+                <span>Likes</span>
+                <input id="activity-like-count" type="number" min="1" step="1" value="15">
+              </label>
+
+              <button class="icon-action-button icon-action-like" id="activity-like-button" type="button" title="Enviar likes" aria-label="Enviar likes">&#128150;</button>
+            </div>
+          </div>
+        </section>
+
+        <section class="panel metrics-panel" aria-labelledby="metrics-title">
+          <header class="panel-header panel-header-compact">
+            <div class="panel-title-group">
+              <p class="panel-kicker">Live</p>
+              <h2 id="metrics-title">M&eacute;tricas</h2>
+            </div>
+            <div class="panel-header-actions">
+              <button class="secondary-button metrics-reset-button" id="metrics-reset-button" type="button">Reiniciar conteo</button>
+            </div>
+          </header>
+
+          <div class="metric-grid metric-grid-expanded">
+            <article class="metric-card">
+              <span class="metric-label">Espectadores</span>
+              <strong class="metric-value" id="metric-viewers">--</strong>
+            </article>
+            <article class="metric-card">
+              <span class="metric-label">Likes</span>
+              <strong class="metric-value" id="metric-likes">--</strong>
+            </article>
+            <article class="metric-card">
+              <span class="metric-label">Comentarios</span>
+              <strong class="metric-value" id="metric-messages">--</strong>
+            </article>
+            <article class="metric-card">
+              <span class="metric-label">Regalos</span>
+              <strong class="metric-value" id="metric-gifts">--</strong>
+            </article>
+            <article class="metric-card">
+              <span class="metric-label">Seguidores</span>
+              <strong class="metric-value" id="metric-followers">--</strong>
+            </article>
+            <article class="metric-card">
+              <span class="metric-label">Compartidos</span>
+              <strong class="metric-value" id="metric-shares">--</strong>
+            </article>
+          </div>
+        </section>
+      </div>
+
+      <div class="dashboard-column dashboard-column-right">
+
+        <section class="panel voice-panel" aria-labelledby="voice-title">
+          <header class="panel-header">
+            <div class="panel-title-group">
+              <p class="panel-kicker">Voz</p>
+              <h2 id="voice-title">Asistente de voz</h2>
+            </div>
+            <label class="toggle-chip">
+              <input id="voice-enabled" type="checkbox">
+              <span>Activada</span>
+            </label>
+          </header>
+
+          <form class="panel-form" id="voice-form">
+            <div class="voice-grid">
+              <label class="field">
+                <span>Voz</span>
+                <select id="voice-profile">
+                  <option value="spanish-female">Espa&ntilde;ol femenina</option>
+                  <option value="spanish-male">Espa&ntilde;ol masculina</option>
+                  <option value="spanish-neutral">Espa&ntilde;ol neutra</option>
+                  <option value="english-female">Ingl&eacute;s femenina</option>
+                  <option value="english-male">Ingl&eacute;s masculina</option>
+                </select>
+              </label>
+
+              <label class="field">
+                <span>Idioma</span>
+                <select id="voice-language">
+                  <option value="es">Espa&ntilde;ol</option>
+                  <option value="en">Ingl&eacute;s</option>
+                </select>
+              </label>
+            </div>
+
+            <div class="voice-chat-row">
+              <label class="option-chip option-chip-wide">
+                <input id="voice-read-chat-visible" type="checkbox">
+                <span>Leer mensajes del chat</span>
+              </label>
+
+              <label class="field compact-field field-stateful chat-scope-field" id="chat-reading-row-visible">
+                <span>Leer chat de</span>
+                <select id="chat-reading-scope-visible">
+                  <option value="everyone">Todos</option>
+                  <option value="followers_only">Solo seguidores</option>
+                  <option value="subscribers_only">Solo suscriptores</option>
+                  <option value="moderators_only">Solo moderadores</option>
+                </select>
+              </label>
+            </div>
+
+            <section class="notice-builder" aria-labelledby="voice-notices-title">
+              <header class="notice-builder-header">
+                <div>
+                  <p class="panel-kicker panel-kicker-subtle">Mensajes</p>
+                  <h3 id="voice-notices-title">Mensajes autom&aacute;ticos</h3>
+                </div>
+                <div class="notice-builder-actions">
+                  <span class="summary-note" id="template-summary-text">Sin mensajes</span>
+                  <button class="secondary-button notice-add-button" id="voice-add-notice" type="button">+ Crear mensaje</button>
+                </div>
+              </header>
+
+              <div class="voice-notices-list" id="voice-notices-list"></div>
+            </section>
+
+            <div class="legacy-voice-bridge" hidden aria-hidden="true">
+              <input id="voice-read-gifts" type="checkbox">
+              <input id="voice-read-follows" type="checkbox">
+              <input id="voice-read-likes" type="checkbox">
+              <input id="voice-read-subscribers" type="checkbox">
+              <input id="voice-read-shares" type="checkbox">
+              <input id="voice-read-chat" type="checkbox">
+
+              <label class="field">
+                <span>Frecuencia</span>
+                <select id="voice-frequency">
+                  <option value="low">Baja</option>
+                  <option value="normal">Normal</option>
+                  <option value="high">Alta</option>
+                </select>
+              </label>
+
+              <label class="field">
+                <span>Recordatorio cada</span>
+                <select id="voice-periodic-interval">
+                  <option value="30000">30 seg</option>
+                  <option value="60000">60 seg</option>
+                  <option value="120000">120 seg</option>
+                </select>
+              </label>
+
+              <label class="field compact-field field-stateful" id="chat-reading-row">
+                <span>Leer chat de</span>
+                <select id="chat-reading-scope">
+                  <option value="everyone">Todos</option>
+                  <option value="followers_only">Solo seguidores</option>
+                  <option value="subscribers_only">Solo suscriptores</option>
+                  <option value="moderators_only">Solo moderadores</option>
+                </select>
+              </label>
+
+              <input id="message-gift-template" type="text">
+              <input id="message-follow-template" type="text">
+              <input id="message-like-template" type="text">
+              <input id="message-subscriber-template" type="text">
+              <input id="message-share-template" type="text">
+              <input id="message-chat-template" type="text">
+              <textarea id="message-periodic-list" rows="4"></textarea>
+            </div>
+
+            <div class="button-row button-row-end">
+              <button class="secondary-button" id="voice-speak-button" type="button">Probar voz</button>
+              <button class="primary-button" type="submit">Guardar</button>
+            </div>
+          </form>
+        </section>
+      </div>
+    </div>
+  </div>
+
+  <div class="auth-gate" id="auth-gate" hidden>
+    <div class="auth-gate-backdrop" aria-hidden="true"></div>
+
+    <section
+      class="auth-dialog"
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="auth-title"
+      aria-describedby="auth-subtitle">
+      <div class="auth-brand-panel">
+        <div class="auth-brand-copy-group">
+          <p class="auth-kicker">Acceso remoto</p>
+          <h2 id="auth-title">Activa tu acceso al panel</h2>
+          <p id="auth-subtitle" class="auth-copy">
+            Valida tu cuenta y tu licencia para habilitar TikTok, voz y herramientas del live
+            en este equipo.
+          </p>
+        </div>
+
+        <div class="auth-presence-card">
+          <span class="auth-state-pill" id="auth-state-pill">Bloqueado</span>
+          <strong id="auth-server-message">Ingresa tus credenciales para continuar.</strong>
+          <div class="auth-meta-grid" id="auth-meta-grid" hidden>
+            <article class="auth-meta-item">
+              <span>Cuenta</span>
+              <strong id="auth-account-label">Sin validar</strong>
+            </article>
+            <article class="auth-meta-item">
+              <span>Licencia</span>
+              <strong id="auth-license-label">Pendiente</strong>
+            </article>
+            <article class="auth-meta-item">
+              <span>&Uacute;ltima validaci&oacute;n</span>
+              <strong id="auth-validated-at">Nunca</strong>
+            </article>
+          </div>
+        </div>
+      </div>
+
+      <form class="auth-form" id="auth-form">
+        <div class="auth-form-body">
+          <label class="field">
+            <span>Usuario / correo</span>
+            <input
+              id="auth-email"
+              type="email"
+              autocomplete="username"
+              autocapitalize="off"
+              spellcheck="false"
+              placeholder="tu-correo@dominio.com">
+          </label>
+
+          <label class="field">
+            <span>Contrase&ntilde;a</span>
+            <input
+              id="auth-password"
+              type="password"
+              autocomplete="current-password"
+              placeholder="Tu contrase&ntilde;a de acceso">
+          </label>
+
+          <label class="field auth-field-wide">
+            <span>Licencia</span>
+            <input
+              id="auth-license-key"
+              type="text"
+              autocomplete="off"
+              autocapitalize="characters"
+              spellcheck="false"
+              placeholder="XXXX-XXXX-XXXX">
+          </label>
+
+          <p class="auth-feedback" id="auth-feedback">
+            Valida tus datos para habilitar este equipo.
+          </p>
+        </div>
+
+        <div class="auth-actions">
+          <button class="secondary-button auth-support-button" id="auth-support-button" type="button">
+            Exportar soporte
+          </button>
+          <button class="primary-button auth-submit-button" id="auth-submit-button" type="submit">
+            Validar acceso
+          </button>
+        </div>
+      </form>
+    </section>
+  </div>
+
+  <script src="/app.js"></script>
+</body>
+</html>

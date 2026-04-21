@@ -1,0 +1,3 @@
+#include "app_resource.h"
+
+IDI_NLP3_APP_ICON ICON "../../assets/branding/panel_live.ico"

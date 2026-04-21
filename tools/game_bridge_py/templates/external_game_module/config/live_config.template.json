@@ -1,0 +1,20 @@
+{
+  "global": {
+    "audio": {
+      "master": 0.7,
+      "sfx": 1.0,
+      "music": 0.5,
+      "mute": false
+    },
+    "tts": {
+      "enabled": false
+    }
+  },
+  "game": {},
+  "liveMeta": {
+    "manifest": {
+      "id": "replace_me_game_id",
+      "displayName": "Replace Me Live"
+    }
+  }
+}

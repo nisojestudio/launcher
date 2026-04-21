@@ -1,0 +1,46 @@
+# Build and package outputs
+/build/
+/dist/
+/output/
+/vcpkg_installed/
+
+# Local diagnostics and agent temp data
+/.codex_tmp/
+/.nisoje-support/
+**/.codex_tmp/
+**/.wrangler/
+
+# Local Python environments
+/.venv/
+# `tools/bridge_py/.venv` remains intentionally supportable as bridge runtime.
+
+# Native build artifacts
+*.obj
+*.o
+*.pdb
+*.ilk
+*.idb
+*.exe
+*.dll
+*.lib
+
+# Python caches
+__pycache__/
+*.pyc
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+
+# Bridge runtime data
+/tools/bridge_py/logs/
+/tools/bridge_py/live_inbox/
+
+# Local tool caches
+/.playwright-cli/
+
+# Temporary workspace outputs
+/tmp_*
+/nlp3_app_output.txt
+/panel_console_demo_output.txt
+/runtime_bridge.obj
+/runtime_bridge_check.obj

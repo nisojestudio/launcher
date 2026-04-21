@@ -1,0 +1,5 @@
+{"kind":"join","user":{"id":"viewer-1","name":"Viewer One","avatarUrl":"https://example.com/viewer-1.png"},"data":{"message":"viewer_join"},"ts":1}
+{"kind":"chat","user":{"id":"viewer-2","name":"Viewer Two","avatarUrl":"https://example.com/viewer-2.png"},"data":{"message":"hola arena","comment":"hola arena"},"ts":2}
+{"kind":"like","user":{"id":"viewer-3","name":"Viewer Three","avatarUrl":"https://example.com/viewer-3.png"},"data":{"count":5},"ts":3}
+{"kind":"gift","user":{"id":"viewer-4","name":"Viewer Four","avatarUrl":"https://example.com/viewer-4.png"},"data":{"giftName":"Rose","count":3,"diamond":30,"coins":30},"ts":4}
+{"kind":"join","user":{"id":"viewer-5","name":"Viewer Five","avatarUrl":"https://example.com/viewer-5.png"},"data":{"avatarUpdate":true,"message":"avatar update"},"ts":5}

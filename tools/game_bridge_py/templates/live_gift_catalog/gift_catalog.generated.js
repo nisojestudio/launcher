@@ -1,0 +1,4843 @@
+(function giftCatalogBootstrap(root, factory) {
+    if (typeof module === 'object' && module.exports) {
+        module.exports = factory();
+        return;
+    }
+    root.NLP3GiftCatalog = factory();
+})(typeof globalThis !== 'undefined' ? globalThis : this, function giftCatalogFactory() {
+    'use strict';
+
+    // Generated from Panel Live v2 gift catalog and Arena Live power tiers.
+    return Object.freeze({
+    "1st Anniversary": {
+        "giftName": "1st Anniversary",
+        "valor": 5000,
+        "accion": "nuclear overdrive"
+    },
+    "2025": {
+        "giftName": "2025",
+        "valor": 1,
+        "accion": "disparos"
+    },
+    "2025 Glasses": {
+        "giftName": "2025 Glasses",
+        "valor": 225,
+        "accion": "nuclear"
+    },
+    "2025 JoyLens": {
+        "giftName": "2025 JoyLens",
+        "valor": 225,
+        "accion": "nuclear"
+    },
+    "2025 Love": {
+        "giftName": "2025 Love",
+        "valor": 1,
+        "accion": "disparos"
+    },
+    "2026": {
+        "giftName": "2026",
+        "valor": 1,
+        "accion": "disparos"
+    },
+    "2nd Anniversary": {
+        "giftName": "2nd Anniversary",
+        "valor": 7000,
+        "accion": "nuclear overdrive"
+    },
+    "3rd Anniversary": {
+        "giftName": "3rd Anniversary",
+        "valor": 12000,
+        "accion": "nuclear overdrive"
+    },
+    "A Bubbly Time": {
+        "giftName": "A Bubbly Time",
+        "valor": 150,
+        "accion": "cazador"
+    },
+    "A Treat for My Lion": {
+        "giftName": "A Treat for My Lion",
+        "valor": 1500,
+        "accion": "nuclear overdrive"
+    },
+    "Adam’s Dream": {
+        "giftName": "Adam’s Dream",
+        "valor": 25999,
+        "accion": "nuclear overdrive"
+    },
+    "Adventure": {
+        "giftName": "Adventure",
+        "valor": 30,
+        "accion": "laser"
+    },
+    "Air Dancer": {
+        "giftName": "Air Dancer",
+        "valor": 300,
+        "accion": "nuclear"
+    },
+    "Alien Buddy": {
+        "giftName": "Alien Buddy",
+        "valor": 399,
+        "accion": "nuclear"
+    },
+    "Alien Pet": {
+        "giftName": "Alien Pet",
+        "valor": 1,
+        "accion": "disparos"
+    },
+    "American Eagle": {
+        "giftName": "American Eagle",
+        "valor": 19999,
+        "accion": "nuclear overdrive"
+    },
+    "Amusement Park": {
+        "giftName": "Amusement Park",
+        "valor": 17000,
+        "accion": "nuclear overdrive"
+    },
+    "Animal Band": {
+        "giftName": "Animal Band",
+        "valor": 2500,
+        "accion": "nuclear overdrive"
+    },
+    "Applause": {
+        "giftName": "Applause",
+        "valor": 9,
+        "accion": "disparos"
+    },
+    "Aquarius": {
+        "giftName": "Aquarius",
+        "valor": 9999,
+        "accion": "nuclear overdrive"
+    },
+    "Arabian Stallion": {
+        "giftName": "Arabian Stallion",
+        "valor": 15000,
+        "accion": "nuclear overdrive"
+    },
+    "Arcade Game": {
+        "giftName": "Arcade Game",
+        "valor": 1200,
+        "accion": "nuclear overdrive"
+    },
+    "Arnold the Warrior": {
+        "giftName": "Arnold the Warrior",
+        "valor": 42999,
+        "accion": "nuclear overdrive"
+    },
+    "ASMR Starter Kit": {
+        "giftName": "ASMR Starter Kit",
+        "valor": 1599,
+        "accion": "nuclear overdrive"
+    },
+    "ASMR Time": {
+        "giftName": "ASMR Time",
+        "valor": 10,
+        "accion": "disparos"
+    },
+    "Astrobear": {
+        "giftName": "Astrobear",
+        "valor": 1500,
+        "accion": "nuclear overdrive"
+    },
+    "Astronaut Koala": {
+        "giftName": "Astronaut Koala",
+        "valor": 399,
+        "accion": "nuclear"
+    },
+    "Auld Lang Syne": {
+        "giftName": "Auld Lang Syne",
+        "valor": 6202,
+        "accion": "nuclear overdrive"
+    },
+    "Aurora": {
+        "giftName": "Aurora",
+        "valor": 12000,
+        "accion": "nuclear overdrive"
+    },
+    "Autumn Leaves": {
+        "giftName": "Autumn Leaves",
+        "valor": 500,
+        "accion": "nuclear overdrive"
+    },
+    "Autumn Picnic": {
+        "giftName": "Autumn Picnic",
+        "valor": 1300,
+        "accion": "nuclear overdrive"
+    },
+    "Baby Dragon": {
+        "giftName": "Baby Dragon",
+        "valor": 2000,
+        "accion": "nuclear overdrive"
+    },
+    "Backing Monkey": {
+        "giftName": "Backing Monkey",
+        "valor": 349,
+        "accion": "nuclear"
+    },
+    "Bagel": {
+        "giftName": "Bagel",
+        "valor": 35,
+        "accion": "laser"
+    },
+    "Bairam Gift Box": {
+        "giftName": "Bairam Gift Box",
+        "valor": 399,
+        "accion": "nuclear"
+    },
+    "Balloon Crown": {
+        "giftName": "Balloon Crown",
+        "valor": 149,
+        "accion": "cazador"
+    },
+    "Balloon Gift Box": {
+        "giftName": "Balloon Gift Box",
+        "valor": 100,
+        "accion": "cazador"
+    },
+    "Balloons": {
+        "giftName": "Balloons",
+        "valor": 200,
+        "accion": "nuclear"
+    },
+    "Banana": {
+        "giftName": "Banana",
+        "valor": 10,
+        "accion": "disparos"
+    },
+    "Basketball": {
+        "giftName": "Basketball",
+        "valor": 1,
+        "accion": "disparos"
+    },
+    "Basketball Trophy": {
+        "giftName": "Basketball Trophy",
+        "valor": 700,
+        "accion": "nuclear overdrive"
+    },
+    "Bat Headwear": {
+        "giftName": "Bat Headwear",
+        "valor": 299,
+        "accion": "nuclear"
+    },
+    "Batting Cutie": {
+        "giftName": "Batting Cutie",
+        "valor": 449,
+        "accion": "nuclear"
+    },
+    "Battle Champion": {
+        "giftName": "Battle Champion",
+        "valor": 15000,
+        "accion": "nuclear overdrive"
+    },
+    "Batwing Hat": {
+        "giftName": "Batwing Hat",
+        "valor": 349,
+        "accion": "nuclear"
+    },
+    "Beach Cabin": {
+        "giftName": "Beach Cabin",
+        "valor": 1999,
+        "accion": "nuclear overdrive"
+    },
+    "Beach Day": {
+        "giftName": "Beach Day",
+        "valor": 2999,
+        "accion": "nuclear overdrive"
+    },
+    "Beach Maracas": {
+        "giftName": "Beach Maracas",
+        "valor": 349,
+        "accion": "nuclear"
+    },
+    "Bear Blind Box": {
+        "giftName": "Bear Blind Box",
+        "valor": 800,
+        "accion": "nuclear overdrive"
+    },
+    "Bear skiing": {
+        "giftName": "Bear skiing",
+        "valor": 2200,
+        "accion": "nuclear overdrive"
+    },
+    "Bear with Rose": {
+        "giftName": "Bear with Rose",
+        "valor": 400,
+        "accion": "nuclear"
+    },
+    "Beating Heart": {
+        "giftName": "Beating Heart",
+        "valor": 449,
+        "accion": "nuclear"
+    },
+    "Become Kitten": {
+        "giftName": "Become Kitten",
+        "valor": 349,
+        "accion": "nuclear"
+    },
+    "Become Santa": {
+        "giftName": "Become Santa",
+        "valor": 500,
+        "accion": "nuclear overdrive"
+    },
+    "Benny the Calf": {
+        "giftName": "Benny the Calf",
+        "valor": 4999,
+        "accion": "nuclear overdrive"
+    },
+    "Berlin": {
+        "giftName": "Berlin",
+        "valor": 15000,
+        "accion": "nuclear overdrive"
+    },
+    "Berlin Bear": {
+        "giftName": "Berlin Bear",
+        "valor": 1800,
+        "accion": "nuclear overdrive"
+    },
+    "Big Ben": {
+        "giftName": "Big Ben",
+        "valor": 15000,
+        "accion": "nuclear overdrive"
+    },
+    "Big Guy's Ride": {
+        "giftName": "Big Guy's Ride",
+        "valor": 10000,
+        "accion": "nuclear overdrive"
+    },
+    "Big Potato": {
+        "giftName": "Big Potato",
+        "valor": 500,
+        "accion": "nuclear overdrive"
+    },
+    "Big Shout Out": {
+        "giftName": "Big Shout Out",
+        "valor": 149,
+        "accion": "cazador"
+    },
+    "Birds": {
+        "giftName": "Birds",
+        "valor": 600,
+        "accion": "nuclear overdrive"
+    },
+    "Birthday Cake": {
+        "giftName": "Birthday Cake",
+        "valor": 1,
+        "accion": "disparos"
+    },
+    "Birthday Crown": {
+        "giftName": "Birthday Crown",
+        "valor": 99,
+        "accion": "laser"
+    },
+    "Birthday Glasses": {
+        "giftName": "Birthday Glasses",
+        "valor": 199,
+        "accion": "cazador"
+    },
+    "Birthday Party": {
+        "giftName": "Birthday Party",
+        "valor": 6999,
+        "accion": "nuclear overdrive"
+    },
+    "Blessed New Year": {
+        "giftName": "Blessed New Year",
+        "valor": 2026,
+        "accion": "nuclear overdrive"
+    },
+    "Blissful Together": {
+        "giftName": "Blissful Together",
+        "valor": 6202,
+        "accion": "nuclear overdrive"
+    },
+    "Blooming Heart": {
+        "giftName": "Blooming Heart",
+        "valor": 1599,
+        "accion": "nuclear overdrive"
+    },
+    "Blooming Ribbons": {
+        "giftName": "Blooming Ribbons",
+        "valor": 1000,
+        "accion": "nuclear overdrive"
+    },
+    "Blow a kiss": {
+        "giftName": "Blow a kiss",
+        "valor": 1,
+        "accion": "disparos"
+    },
+    "Blow Rosie Kisses": {
+        "giftName": "Blow Rosie Kisses",
+        "valor": 2199,
+        "accion": "nuclear overdrive"
+    },
+    "Blowing Bubbles": {
+        "giftName": "Blowing Bubbles",
+        "valor": 199,
+        "accion": "cazador"
+    },
+    "Blue Heart": {
+        "giftName": "Blue Heart",
+        "valor": 1,
+        "accion": "disparos"
+    },
+    "Boiling Cauldron": {
+        "giftName": "Boiling Cauldron",
+        "valor": 399,
+        "accion": "nuclear"
+    },
+    "Boo": {
+        "giftName": "Boo",
+        "valor": 10,
+        "accion": "disparos"
+    },
+    "Boo Crew": {
+        "giftName": "Boo Crew",
+        "valor": 6000,
+        "accion": "nuclear overdrive"
+    },
+    "Boo Town": {
+        "giftName": "Boo Town",
+        "valor": 15000,
+        "accion": "nuclear overdrive"
+    },
+    "Boo's Town": {
+        "giftName": "Boo's Town",
+        "valor": 15000,
+        "accion": "nuclear overdrive"
+    },
+    "Bounce Speakers": {
+        "giftName": "Bounce Speakers",
+        "valor": 400,
+        "accion": "nuclear"
+    },
+    "Bouquet": {
+        "giftName": "Bouquet",
+        "valor": 500,
+        "accion": "nuclear overdrive"
+    },
+    "Bouquet Flower": {
+        "giftName": "Bouquet Flower",
+        "valor": 30,
+        "accion": "laser"
+    },
+    "Bowknot": {
+        "giftName": "Bowknot",
+        "valor": 149,
+        "accion": "cazador"
+    },
+    "Bowl of Plov": {
+        "giftName": "Bowl of Plov",
+        "valor": 20,
+        "accion": "ola"
+    },
+    "Bowtiful Crown": {
+        "giftName": "Bowtiful Crown",
+        "valor": 199,
+        "accion": "cazador"
+    },
+    "Boxing Glove": {
+        "giftName": "Boxing Glove",
+        "valor": 1999,
+        "accion": "nuclear overdrive"
+    },
+    "Boxing Gloves": {
+        "giftName": "Boxing Gloves",
+        "valor": 299,
+        "accion": "nuclear"
+    },
+    "Brat": {
+        "giftName": "Brat",
+        "valor": 1,
+        "accion": "disparos"
+    },
+    "Brave Wing": {
+        "giftName": "Brave Wing",
+        "valor": 999,
+        "accion": "nuclear overdrive"
+    },
+    "Bravo!": {
+        "giftName": "Bravo!",
+        "valor": 15,
+        "accion": "disparos"
+    },
+    "Bread": {
+        "giftName": "Bread",
+        "valor": 5,
+        "accion": "disparos"
+    },
+    "Breakthrough Celebration": {
+        "giftName": "Breakthrough Celebration",
+        "valor": 1500,
+        "accion": "nuclear overdrive"
+    },
+    "Breakthrough Star": {
+        "giftName": "Breakthrough Star",
+        "valor": 99,
+        "accion": "laser"
+    },
+    "Bubble Gum": {
+        "giftName": "Bubble Gum",
+        "valor": 99,
+        "accion": "laser"
+    },
+    "Bubble Headphones": {
+        "giftName": "Bubble Headphones",
+        "valor": 249,
+        "accion": "nuclear"
+    },
+    "Bubbles": {
+        "giftName": "Bubbles",
+        "valor": 500,
+        "accion": "nuclear overdrive"
+    },
+    "Bubbly Kiss": {
+        "giftName": "Bubbly Kiss",
+        "valor": 530,
+        "accion": "nuclear overdrive"
+    },
+    "Budding Heart": {
+        "giftName": "Budding Heart",
+        "valor": 299,
+        "accion": "nuclear"
+    },
+    "Bull": {
+        "giftName": "Bull",
+        "valor": 2999,
+        "accion": "nuclear overdrive"
+    },
+    "Bunny Crown": {
+        "giftName": "Bunny Crown",
+        "valor": 500,
+        "accion": "nuclear overdrive"
+    },
+    "Bunny Hat": {
+        "giftName": "Bunny Hat",
+        "valor": 500,
+        "accion": "nuclear overdrive"
+    },
+    "Butterfly": {
+        "giftName": "Butterfly",
+        "valor": 88,
+        "accion": "laser"
+    },
+    "Butterfly for You": {
+        "giftName": "Butterfly for You",
+        "valor": 299,
+        "accion": "nuclear"
+    },
+    "By the Glaziers": {
+        "giftName": "By the Glaziers",
+        "valor": 2380,
+        "accion": "nuclear overdrive"
+    },
+    "Cable Car": {
+        "giftName": "Cable Car",
+        "valor": 1999,
+        "accion": "nuclear overdrive"
+    },
+    "Cake Slice": {
+        "giftName": "Cake Slice",
+        "valor": 1,
+        "accion": "disparos"
+    },
+    "Calcaldan": {
+        "giftName": "Calcaldan",
+        "valor": 349,
+        "accion": "nuclear"
+    },
+    "Camel's Love": {
+        "giftName": "Camel's Love",
+        "valor": 4999,
+        "accion": "nuclear overdrive"
+    },
+    "Candy Bouquet": {
+        "giftName": "Candy Bouquet",
+        "valor": 349,
+        "accion": "nuclear"
+    },
+    "Candy Cane": {
+        "giftName": "Candy Cane",
+        "valor": 1,
+        "accion": "disparos"
+    },
+    "Candy Loot": {
+        "giftName": "Candy Loot",
+        "valor": 449,
+        "accion": "nuclear"
+    },
+    "Candy Party": {
+        "giftName": "Candy Party",
+        "valor": 3999,
+        "accion": "nuclear overdrive"
+    },
+    "Candy Puffs": {
+        "giftName": "Candy Puffs",
+        "valor": 1030,
+        "accion": "nuclear overdrive"
+    },
+    "Cap": {
+        "giftName": "Cap",
+        "valor": 99,
+        "accion": "laser"
+    },
+    "Captured Vocals": {
+        "giftName": "Captured Vocals",
+        "valor": 449,
+        "accion": "nuclear"
+    },
+    "Capybara": {
+        "giftName": "Capybara",
+        "valor": 30,
+        "accion": "laser"
+    },
+    "Car Drifting": {
+        "giftName": "Car Drifting",
+        "valor": 3000,
+        "accion": "nuclear overdrive"
+    },
+    "Carnival Fantasy": {
+        "giftName": "Carnival Fantasy",
+        "valor": 6999,
+        "accion": "nuclear overdrive"
+    },
+    "Carnival Music": {
+        "giftName": "Carnival Music",
+        "valor": 999,
+        "accion": "nuclear overdrive"
+    },
+    "Carnival Queen": {
+        "giftName": "Carnival Queen",
+        "valor": 6000,
+        "accion": "nuclear overdrive"
+    },
+    "Carnival Wagon": {
+        "giftName": "Carnival Wagon",
+        "valor": 20000,
+        "accion": "nuclear overdrive"
+    },
+    "Carousel": {
+        "giftName": "Carousel",
+        "valor": 1999,
+        "accion": "nuclear overdrive"
+    },
+    "Castle Fantasy": {
+        "giftName": "Castle Fantasy",
+        "valor": 20000,
+        "accion": "nuclear overdrive"
+    },
+    "Cat": {
+        "giftName": "Cat",
+        "valor": 222,
+        "accion": "nuclear"
+    },
+    "Caterpillar Chaos": {
+        "giftName": "Caterpillar Chaos",
+        "valor": 149,
+        "accion": "cazador"
+    },
+    "Catrina": {
+        "giftName": "Catrina",
+        "valor": 149,
+        "accion": "cazador"
+    },
+    "Celebrate 2025": {
+        "giftName": "Celebrate 2025",
+        "valor": 2025,
+        "accion": "nuclear overdrive"
+    },
+    "Celebration Hat": {
+        "giftName": "Celebration Hat",
+        "valor": 450,
+        "accion": "nuclear"
+    },
+    "Celebration Time": {
+        "giftName": "Celebration Time",
+        "valor": 6999,
+        "accion": "nuclear overdrive"
+    },
+    "Center Stage": {
+        "giftName": "Center Stage",
+        "valor": 1799,
+        "accion": "nuclear overdrive"
+    },
+    "Charge me up": {
+        "giftName": "Charge me up",
+        "valor": 1,
+        "accion": "disparos"
+    },
+    "Charging Battery": {
+        "giftName": "Charging Battery",
+        "valor": 1,
+        "accion": "disparos"
+    },
+    "Charmer Bow": {
+        "giftName": "Charmer Bow",
+        "valor": 99,
+        "accion": "laser"
+    },
+    "Chasing the Dream": {
+        "giftName": "Chasing the Dream",
+        "valor": 1500,
+        "accion": "nuclear overdrive"
+    },
+    "Chatting Popcorn": {
+        "giftName": "Chatting Popcorn",
+        "valor": 149,
+        "accion": "cazador"
+    },
+    "Cheeky Boo": {
+        "giftName": "Cheeky Boo",
+        "valor": 500,
+        "accion": "nuclear overdrive"
+    },
+    "Cheeky Wiggly": {
+        "giftName": "Cheeky Wiggly",
+        "valor": 500,
+        "accion": "nuclear overdrive"
+    },
+    "Cheer Bonbon": {
+        "giftName": "Cheer Bonbon",
+        "valor": 7,
+        "accion": "disparos"
+    },
+    "Cheer For You": {
+        "giftName": "Cheer For You",
+        "valor": 199,
+        "accion": "cazador"
+    },
+    "Cheer Mic": {
+        "giftName": "Cheer Mic",
+        "valor": 249,
+        "accion": "nuclear"
+    },
+    "Cheer You Up": {
+        "giftName": "Cheer You Up",
+        "valor": 9,
+        "accion": "disparos"
+    },
+    "Cheering Crab": {
+        "giftName": "Cheering Crab",
+        "valor": 199,
+        "accion": "cazador"
+    },
+    "Cherry Blossom Bunny": {
+        "giftName": "Cherry Blossom Bunny",
+        "valor": 10,
+        "accion": "disparos"
+    },
+    "Chilli Pepper": {
+        "giftName": "Chilli Pepper",
+        "valor": 1,
+        "accion": "disparos"
+    },
+    "Chirpy Kisses": {
+        "giftName": "Chirpy Kisses",
+        "valor": 199,
+        "accion": "cazador"
+    },
+    "Choc Chip Cookie": {
+        "giftName": "Choc Chip Cookie",
+        "valor": 5,
+        "accion": "disparos"
+    },
+    "Choco Strawberries": {
+        "giftName": "Choco Strawberries",
+        "valor": 30,
+        "accion": "laser"
+    },
+    "Chocolate": {
+        "giftName": "Chocolate",
+        "valor": 10,
+        "accion": "disparos"
+    },
+    "Chocolate Box": {
+        "giftName": "Chocolate Box",
+        "valor": 299,
+        "accion": "nuclear"
+    },
+    "Christmas Carousel": {
+        "giftName": "Christmas Carousel",
+        "valor": 2000,
+        "accion": "nuclear overdrive"
+    },
+    "Christmas in London": {
+        "giftName": "Christmas in London",
+        "valor": 20000,
+        "accion": "nuclear overdrive"
+    },
+    "Christmas Market": {
+        "giftName": "Christmas Market",
+        "valor": 2000,
+        "accion": "nuclear overdrive"
+    },
+    "Christmas Prawn": {
+        "giftName": "Christmas Prawn",
+        "valor": 199,
+        "accion": "cazador"
+    },
+    "Christmas Wreath": {
+        "giftName": "Christmas Wreath",
+        "valor": 10,
+        "accion": "disparos"
+    },
+    "Chrono Rewinder": {
+        "giftName": "Chrono Rewinder",
+        "valor": 14999,
+        "accion": "nuclear overdrive"
+    },
+    "City Pop": {
+        "giftName": "City Pop",
+        "valor": 450,
+        "accion": "nuclear"
+    },
+    "Clapperboard": {
+        "giftName": "Clapperboard",
+        "valor": 1,
+        "accion": "disparos"
+    },
+    "Club": {
+        "giftName": "Club",
+        "valor": 2000,
+        "accion": "nuclear overdrive"
+    },
+    "Club Cheers": {
+        "giftName": "Club Cheers",
+        "valor": 1,
+        "accion": "disparos"
+    },
+    "Club Power": {
+        "giftName": "Club Power",
+        "valor": 9,
+        "accion": "disparos"
+    },
+    "Club Victory": {
+        "giftName": "Club Victory",
+        "valor": 99,
+        "accion": "laser"
+    },
+    "Coconut": {
+        "giftName": "Coconut",
+        "valor": 199,
+        "accion": "cazador"
+    },
+    "Coconut Juice": {
+        "giftName": "Coconut Juice",
+        "valor": 199,
+        "accion": "cazador"
+    },
+    "Coffee Bean": {
+        "giftName": "Coffee Bean",
+        "valor": 5,
+        "accion": "disparos"
+    },
+    "Coffee Magic": {
+        "giftName": "Coffee Magic",
+        "valor": 199,
+        "accion": "cazador"
+    },
+    "Colorful Trailing": {
+        "giftName": "Colorful Trailing",
+        "valor": 349,
+        "accion": "nuclear"
+    },
+    "Colorful Wings": {
+        "giftName": "Colorful Wings",
+        "valor": 700,
+        "accion": "nuclear overdrive"
+    },
+    "Community Celebration": {
+        "giftName": "Community Celebration",
+        "valor": 2999,
+        "accion": "nuclear overdrive"
+    },
+    "Community Crown": {
+        "giftName": "Community Crown",
+        "valor": 99,
+        "accion": "laser"
+    },
+    "Community Fest": {
+        "giftName": "Community Fest",
+        "valor": 1,
+        "accion": "disparos"
+    },
+    "Community Gift": {
+        "giftName": "Community Gift",
+        "valor": 1,
+        "accion": "disparos"
+    },
+    "Community Support": {
+        "giftName": "Community Support",
+        "valor": 15000,
+        "accion": "nuclear overdrive"
+    },
+    "Compact": {
+        "giftName": "Compact",
+        "valor": 100,
+        "accion": "cazador"
+    },
+    "Concert": {
+        "giftName": "Concert",
+        "valor": 2888,
+        "accion": "nuclear overdrive"
+    },
+    "Confetti": {
+        "giftName": "Confetti",
+        "valor": 100,
+        "accion": "cazador"
+    },
+    "Confetti Bear": {
+        "giftName": "Confetti Bear",
+        "valor": 399,
+        "accion": "nuclear"
+    },
+    "Convertible Car": {
+        "giftName": "Convertible Car",
+        "valor": 12000,
+        "accion": "nuclear overdrive"
+    },
+    "Cool": {
+        "giftName": "Cool",
+        "valor": 1,
+        "accion": "disparos"
+    },
+    "Cooper Flies Home": {
+        "giftName": "Cooper Flies Home",
+        "valor": 1999,
+        "accion": "nuclear overdrive"
+    },
+    "Coral": {
+        "giftName": "Coral",
+        "valor": 499,
+        "accion": "nuclear"
+    },
+    "Corgi": {
+        "giftName": "Corgi",
+        "valor": 299,
+        "accion": "nuclear"
+    },
+    "Cotton the Seal": {
+        "giftName": "Cotton the Seal",
+        "valor": 399,
+        "accion": "nuclear"
+    },
+    "Couch Potato": {
+        "giftName": "Couch Potato",
+        "valor": 500,
+        "accion": "nuclear overdrive"
+    },
+    "Countdown to Joy": {
+        "giftName": "Countdown to Joy",
+        "valor": 2026,
+        "accion": "nuclear overdrive"
+    },
+    "Cozy Xmas Set": {
+        "giftName": "Cozy Xmas Set",
+        "valor": 500,
+        "accion": "nuclear overdrive"
+    },
+    "Creator's Cap": {
+        "giftName": "Creator's Cap",
+        "valor": 1,
+        "accion": "disparos"
+    },
+    "Crescent Chain": {
+        "giftName": "Crescent Chain",
+        "valor": 99,
+        "accion": "laser"
+    },
+    "Crescent Lanterns": {
+        "giftName": "Crescent Lanterns",
+        "valor": 899,
+        "accion": "nuclear overdrive"
+    },
+    "Crocodile": {
+        "giftName": "Crocodile",
+        "valor": 15000,
+        "accion": "nuclear overdrive"
+    },
+    "Crown World": {
+        "giftName": "Crown World",
+        "valor": 14999,
+        "accion": "nuclear overdrive"
+    },
+    "Crystal Crown": {
+        "giftName": "Crystal Crown",
+        "valor": 2000,
+        "accion": "nuclear overdrive"
+    },
+    "Crystal Dreams": {
+        "giftName": "Crystal Dreams",
+        "valor": 400,
+        "accion": "nuclear"
+    },
+    "Crystal Heart": {
+        "giftName": "Crystal Heart",
+        "valor": 14999,
+        "accion": "nuclear overdrive"
+    },
+    "Cub on Clouds": {
+        "giftName": "Cub on Clouds",
+        "valor": 5888,
+        "accion": "nuclear overdrive"
+    },
+    "Cuddle with Me": {
+        "giftName": "Cuddle with Me",
+        "valor": 500,
+        "accion": "nuclear overdrive"
+    },
+    "Cupid Koala": {
+        "giftName": "Cupid Koala",
+        "valor": 450,
+        "accion": "nuclear"
+    },
+    "Cupid’s Bow": {
+        "giftName": "Cupid’s Bow",
+        "valor": 99,
+        "accion": "laser"
+    },
+    "Cyber Roar": {
+        "giftName": "Cyber Roar",
+        "valor": 25999,
+        "accion": "nuclear overdrive"
+    },
+    "Dancing Bears": {
+        "giftName": "Dancing Bears",
+        "valor": 3000,
+        "accion": "nuclear overdrive"
+    },
+    "Dancing Capybaras": {
+        "giftName": "Dancing Capybaras",
+        "valor": 2200,
+        "accion": "nuclear overdrive"
+    },
+    "Dancing Flower": {
+        "giftName": "Dancing Flower",
+        "valor": 299,
+        "accion": "nuclear"
+    },
+    "Dancing Hands": {
+        "giftName": "Dancing Hands",
+        "valor": 199,
+        "accion": "cazador"
+    },
+    "Daruma": {
+        "giftName": "Daruma",
+        "valor": 299,
+        "accion": "nuclear"
+    },
+    "Day of the dead": {
+        "giftName": "Day of the dead",
+        "valor": 300,
+        "accion": "nuclear"
+    },
+    "Desert Glory": {
+        "giftName": "Desert Glory",
+        "valor": 9999,
+        "accion": "nuclear overdrive"
+    },
+    "Desert Wolf": {
+        "giftName": "Desert Wolf",
+        "valor": 5500,
+        "accion": "nuclear overdrive"
+    },
+    "Devoted Heart": {
+        "giftName": "Devoted Heart",
+        "valor": 5999,
+        "accion": "nuclear overdrive"
+    },
+    "Diamond": {
+        "giftName": "Diamond",
+        "valor": 1099,
+        "accion": "nuclear overdrive"
+    },
+    "Diamond Crown": {
+        "giftName": "Diamond Crown",
+        "valor": 1499,
+        "accion": "nuclear overdrive"
+    },
+    "Diamond flight": {
+        "giftName": "Diamond flight",
+        "valor": 18000,
+        "accion": "nuclear overdrive"
+    },
+    "Diamond Gun": {
+        "giftName": "Diamond Gun",
+        "valor": 5000,
+        "accion": "nuclear overdrive"
+    },
+    "Diamond Microphone": {
+        "giftName": "Diamond Microphone",
+        "valor": 500,
+        "accion": "nuclear overdrive"
+    },
+    "Diamond Ring": {
+        "giftName": "Diamond Ring",
+        "valor": 1500,
+        "accion": "nuclear overdrive"
+    },
+    "Diamond Shield": {
+        "giftName": "Diamond Shield",
+        "valor": 7999,
+        "accion": "nuclear overdrive"
+    },
+    "Diamond Stage": {
+        "giftName": "Diamond Stage",
+        "valor": 15000,
+        "accion": "nuclear overdrive"
+    },
+    "Diamond Tree": {
+        "giftName": "Diamond Tree",
+        "valor": 1088,
+        "accion": "nuclear overdrive"
+    },
+    "Diamond Trophy": {
+        "giftName": "Diamond Trophy",
+        "valor": 5000,
+        "accion": "nuclear overdrive"
+    },
+    "Dino cap": {
+        "giftName": "Dino cap",
+        "valor": 200,
+        "accion": "nuclear"
+    },
+    "Dinosaur": {
+        "giftName": "Dinosaur",
+        "valor": 25999,
+        "accion": "nuclear overdrive"
+    },
+    "Dinosaur footprint": {
+        "giftName": "Dinosaur footprint",
+        "valor": 1,
+        "accion": "disparos"
+    },
+    "Disco ball": {
+        "giftName": "Disco ball",
+        "valor": 1000,
+        "accion": "nuclear overdrive"
+    },
+    "DJ Alien": {
+        "giftName": "DJ Alien",
+        "valor": 5000,
+        "accion": "nuclear overdrive"
+    },
+    "DJ Glasses": {
+        "giftName": "DJ Glasses",
+        "valor": 500,
+        "accion": "nuclear overdrive"
+    },
+    "Doll New Year Greeting": {
+        "giftName": "Doll New Year Greeting",
+        "valor": 1999,
+        "accion": "nuclear overdrive"
+    },
+    "Dolphin": {
+        "giftName": "Dolphin",
+        "valor": 20000,
+        "accion": "nuclear overdrive"
+    },
+    "Dombra": {
+        "giftName": "Dombra",
+        "valor": 20,
+        "accion": "ola"
+    },
+    "Doughnut": {
+        "giftName": "Doughnut",
+        "valor": 30,
+        "accion": "laser"
+    },
+    "Down We Squish!": {
+        "giftName": "Down We Squish!",
+        "valor": 6000,
+        "accion": "nuclear overdrive"
+    },
+    "Dragon Crown": {
+        "giftName": "Dragon Crown",
+        "valor": 500,
+        "accion": "nuclear overdrive"
+    },
+    "Dragon Flame": {
+        "giftName": "Dragon Flame",
+        "valor": 26999,
+        "accion": "nuclear overdrive"
+    },
+    "Dream Big": {
+        "giftName": "Dream Big",
+        "valor": 3350,
+        "accion": "nuclear overdrive"
+    },
+    "Dream Team": {
+        "giftName": "Dream Team",
+        "valor": 500,
+        "accion": "nuclear overdrive"
+    },
+    "Dreamy Strings": {
+        "giftName": "Dreamy Strings",
+        "valor": 249,
+        "accion": "nuclear"
+    },
+    "Drum": {
+        "giftName": "Drum",
+        "valor": 10,
+        "accion": "disparos"
+    },
+    "Drums": {
+        "giftName": "Drums",
+        "valor": 1000,
+        "accion": "nuclear overdrive"
+    },
+    "Dune Car": {
+        "giftName": "Dune Car",
+        "valor": 7700,
+        "accion": "nuclear overdrive"
+    },
+    "Dynamic Music": {
+        "giftName": "Dynamic Music",
+        "valor": 4888,
+        "accion": "nuclear overdrive"
+    },
+    "Earth": {
+        "giftName": "Earth",
+        "valor": 9999,
+        "accion": "nuclear overdrive"
+    },
+    "Eid Sheep": {
+        "giftName": "Eid Sheep",
+        "valor": 500,
+        "accion": "nuclear overdrive"
+    },
+    "Elephant Nature Reserve": {
+        "giftName": "Elephant Nature Reserve",
+        "valor": 6000,
+        "accion": "nuclear overdrive"
+    },
+    "Elephant trunk": {
+        "giftName": "Elephant trunk",
+        "valor": 299,
+        "accion": "nuclear"
+    },
+    "Elf": {
+        "giftName": "Elf",
+        "valor": 1,
+        "accion": "disparos"
+    },
+    "Elf’s hat": {
+        "giftName": "Elf’s hat",
+        "valor": 299,
+        "accion": "nuclear"
+    },
+    "Ellie in the Wild": {
+        "giftName": "Ellie in the Wild",
+        "valor": 6000,
+        "accion": "nuclear overdrive"
+    },
+    "Ellie the Elephant": {
+        "giftName": "Ellie the Elephant",
+        "valor": 5000,
+        "accion": "nuclear overdrive"
+    },
+    "Embroidered Heart": {
+        "giftName": "Embroidered Heart",
+        "valor": 5,
+        "accion": "disparos"
+    },
+    "Enchanted Guitar": {
+        "giftName": "Enchanted Guitar",
+        "valor": 999,
+        "accion": "nuclear overdrive"
+    },
+    "Encore Clap": {
+        "giftName": "Encore Clap",
+        "valor": 449,
+        "accion": "nuclear"
+    },
+    "Enjoy Music": {
+        "giftName": "Enjoy Music",
+        "valor": 1,
+        "accion": "disparos"
+    },
+    "Espresso": {
+        "giftName": "Espresso",
+        "valor": 5,
+        "accion": "disparos"
+    },
+    "EWC": {
+        "giftName": "EWC",
+        "valor": 10,
+        "accion": "disparos"
+    },
+    "EWC Trophy": {
+        "giftName": "EWC Trophy",
+        "valor": 1500,
+        "accion": "nuclear overdrive"
+    },
+    "Exclusive Spark": {
+        "giftName": "Exclusive Spark",
+        "valor": 1099,
+        "accion": "nuclear overdrive"
+    },
+    "Extravaganza 2025": {
+        "giftName": "Extravaganza 2025",
+        "valor": 2025,
+        "accion": "nuclear overdrive"
+    },
+    "Eye See You": {
+        "giftName": "Eye See You",
+        "valor": 199,
+        "accion": "cazador"
+    },
+    "Face-pulling": {
+        "giftName": "Face-pulling",
+        "valor": 249,
+        "accion": "nuclear"
+    },
+    "Fairy Locket": {
+        "giftName": "Fairy Locket",
+        "valor": 399,
+        "accion": "nuclear"
+    },
+    "Fairy Mask": {
+        "giftName": "Fairy Mask",
+        "valor": 450,
+        "accion": "nuclear"
+    },
+    "Fairy Wings": {
+        "giftName": "Fairy Wings",
+        "valor": 1000,
+        "accion": "nuclear overdrive"
+    },
+    "Falcon": {
+        "giftName": "Falcon",
+        "valor": 12000,
+        "accion": "nuclear overdrive"
+    },
+    "Fame Stairs": {
+        "giftName": "Fame Stairs",
+        "valor": 2999,
+        "accion": "nuclear overdrive"
+    },
+    "Family": {
+        "giftName": "Family",
+        "valor": 90,
+        "accion": "laser"
+    },
+    "Fate Sphere": {
+        "giftName": "Fate Sphere",
+        "valor": 14999,
+        "accion": "nuclear overdrive"
+    },
+    "Feather Flock": {
+        "giftName": "Feather Flock",
+        "valor": 1000,
+        "accion": "nuclear overdrive"
+    },
+    "Feather Mask": {
+        "giftName": "Feather Mask",
+        "valor": 300,
+        "accion": "nuclear"
+    },
+    "Feather Tiara": {
+        "giftName": "Feather Tiara",
+        "valor": 149,
+        "accion": "cazador"
+    },
+    "Fest Celebration": {
+        "giftName": "Fest Celebration",
+        "valor": 2999,
+        "accion": "nuclear overdrive"
+    },
+    "Fest Cheers": {
+        "giftName": "Fest Cheers",
+        "valor": 299,
+        "accion": "nuclear"
+    },
+    "Fest Gear": {
+        "giftName": "Fest Gear",
+        "valor": 99,
+        "accion": "laser"
+    },
+    "Fest Party": {
+        "giftName": "Fest Party",
+        "valor": 2999,
+        "accion": "nuclear overdrive"
+    },
+    "Fest Pop": {
+        "giftName": "Fest Pop",
+        "valor": 1,
+        "accion": "disparos"
+    },
+    "Festival Flags": {
+        "giftName": "Festival Flags",
+        "valor": 10000,
+        "accion": "nuclear overdrive"
+    },
+    "Festive Bear": {
+        "giftName": "Festive Bear",
+        "valor": 199,
+        "accion": "cazador"
+    },
+    "Festive Potato": {
+        "giftName": "Festive Potato",
+        "valor": 10,
+        "accion": "disparos"
+    },
+    "Festive Tiny Diny": {
+        "giftName": "Festive Tiny Diny",
+        "valor": 15,
+        "accion": "disparos"
+    },
+    "Fiery Dragon": {
+        "giftName": "Fiery Dragon",
+        "valor": 4888,
+        "accion": "nuclear overdrive"
+    },
+    "Finger Heart": {
+        "giftName": "Finger Heart",
+        "valor": 5,
+        "accion": "disparos"
+    },
+    "Fire Phoenix": {
+        "giftName": "Fire Phoenix",
+        "valor": 41999,
+        "accion": "nuclear overdrive"
+    },
+    "Fire up": {
+        "giftName": "Fire up",
+        "valor": 399,
+        "accion": "nuclear"
+    },
+    "Firecracker": {
+        "giftName": "Firecracker",
+        "valor": 200,
+        "accion": "nuclear"
+    },
+    "Firelight Beast": {
+        "giftName": "Firelight Beast",
+        "valor": 4000,
+        "accion": "nuclear overdrive"
+    },
+    "Fireworks": {
+        "giftName": "Fireworks",
+        "valor": 1088,
+        "accion": "nuclear overdrive"
+    },
+    "Fish and Chips": {
+        "giftName": "Fish and Chips",
+        "valor": 500,
+        "accion": "nuclear overdrive"
+    },
+    "Fist bump": {
+        "giftName": "Fist bump",
+        "valor": 90,
+        "accion": "laser"
+    },
+    "Flame heart": {
+        "giftName": "Flame heart",
+        "valor": 1,
+        "accion": "disparos"
+    },
+    "Flame Towers": {
+        "giftName": "Flame Towers",
+        "valor": 15000,
+        "accion": "nuclear overdrive"
+    },
+    "Flamingo Floaty": {
+        "giftName": "Flamingo Floaty",
+        "valor": 999,
+        "accion": "nuclear overdrive"
+    },
+    "Flamingo Groove": {
+        "giftName": "Flamingo Groove",
+        "valor": 1000,
+        "accion": "nuclear overdrive"
+    },
+    "Floating Octopus": {
+        "giftName": "Floating Octopus",
+        "valor": 199,
+        "accion": "cazador"
+    },
+    "Flower Headband": {
+        "giftName": "Flower Headband",
+        "valor": 199,
+        "accion": "cazador"
+    },
+    "Flower Show": {
+        "giftName": "Flower Show",
+        "valor": 500,
+        "accion": "nuclear overdrive"
+    },
+    "Flowers": {
+        "giftName": "Flowers",
+        "valor": 100,
+        "accion": "cazador"
+    },
+    "Fluffy Buddies": {
+        "giftName": "Fluffy Buddies",
+        "valor": 5388,
+        "accion": "nuclear overdrive"
+    },
+    "Fluffy Heart": {
+        "giftName": "Fluffy Heart",
+        "valor": 1,
+        "accion": "disparos"
+    },
+    "Fluffy Penguin": {
+        "giftName": "Fluffy Penguin",
+        "valor": 5,
+        "accion": "disparos"
+    },
+    "Fly Love": {
+        "giftName": "Fly Love",
+        "valor": 19999,
+        "accion": "nuclear overdrive"
+    },
+    "Flying Jets": {
+        "giftName": "Flying Jets",
+        "valor": 5000,
+        "accion": "nuclear overdrive"
+    },
+    "Football Love": {
+        "giftName": "Football Love",
+        "valor": 1,
+        "accion": "disparos"
+    },
+    "Forest Elf": {
+        "giftName": "Forest Elf",
+        "valor": 249,
+        "accion": "nuclear"
+    },
+    "Forever Rosa": {
+        "giftName": "Forever Rosa",
+        "valor": 399,
+        "accion": "nuclear"
+    },
+    "Forevermore": {
+        "giftName": "Forevermore",
+        "valor": 6000,
+        "accion": "nuclear overdrive"
+    },
+    "Fortune Cat": {
+        "giftName": "Fortune Cat",
+        "valor": 399,
+        "accion": "nuclear"
+    },
+    "Fortune Rush": {
+        "giftName": "Fortune Rush",
+        "valor": 2588,
+        "accion": "nuclear overdrive"
+    },
+    "Fountain": {
+        "giftName": "Fountain",
+        "valor": 1200,
+        "accion": "nuclear overdrive"
+    },
+    "Fox Legend": {
+        "giftName": "Fox Legend",
+        "valor": 1800,
+        "accion": "nuclear overdrive"
+    },
+    "Freestyle": {
+        "giftName": "Freestyle",
+        "valor": 1,
+        "accion": "disparos"
+    },
+    "French Handshake": {
+        "giftName": "French Handshake",
+        "valor": 299,
+        "accion": "nuclear"
+    },
+    "Friendship Necklace": {
+        "giftName": "Friendship Necklace",
+        "valor": 10,
+        "accion": "disparos"
+    },
+    "Frozen Magic": {
+        "giftName": "Frozen Magic",
+        "valor": 1299,
+        "accion": "nuclear overdrive"
+    },
+    "Fruit Friends": {
+        "giftName": "Fruit Friends",
+        "valor": 299,
+        "accion": "nuclear"
+    },
+    "Fruit Plate": {
+        "giftName": "Fruit Plate",
+        "valor": 10,
+        "accion": "disparos"
+    },
+    "Fully Bloomed Sakura": {
+        "giftName": "Fully Bloomed Sakura",
+        "valor": 599,
+        "accion": "nuclear overdrive"
+    },
+    "Furious Fire": {
+        "giftName": "Furious Fire",
+        "valor": 10,
+        "accion": "disparos"
+    },
+    "Future City": {
+        "giftName": "Future City",
+        "valor": 6000,
+        "accion": "nuclear overdrive"
+    },
+    "Future Encounter": {
+        "giftName": "Future Encounter",
+        "valor": 1500,
+        "accion": "nuclear overdrive"
+    },
+    "Future Journey": {
+        "giftName": "Future Journey",
+        "valor": 15000,
+        "accion": "nuclear overdrive"
+    },
+    "Galaxy": {
+        "giftName": "Galaxy",
+        "valor": 1000,
+        "accion": "nuclear overdrive"
+    },
+    "Galaxy Globe": {
+        "giftName": "Galaxy Globe",
+        "valor": 1500,
+        "accion": "nuclear overdrive"
+    },
+    "Game Controller": {
+        "giftName": "Game Controller",
+        "valor": 100,
+        "accion": "cazador"
+    },
+    "Gamepad": {
+        "giftName": "Gamepad",
+        "valor": 10,
+        "accion": "disparos"
+    },
+    "Gamer 2025": {
+        "giftName": "Gamer 2025",
+        "valor": 299,
+        "accion": "nuclear"
+    },
+    "Gamer's EVE": {
+        "giftName": "Gamer's EVE",
+        "valor": 5000,
+        "accion": "nuclear overdrive"
+    },
+    "Gaming Bear": {
+        "giftName": "Gaming Bear",
+        "valor": 4088,
+        "accion": "nuclear overdrive"
+    },
+    "Gaming Chair": {
+        "giftName": "Gaming Chair",
+        "valor": 1200,
+        "accion": "nuclear overdrive"
+    },
+    "Gaming Console": {
+        "giftName": "Gaming Console",
+        "valor": 15000,
+        "accion": "nuclear overdrive"
+    },
+    "Gaming Headset": {
+        "giftName": "Gaming Headset",
+        "valor": 399,
+        "accion": "nuclear"
+    },
+    "Gaming Keyboard": {
+        "giftName": "Gaming Keyboard",
+        "valor": 4000,
+        "accion": "nuclear overdrive"
+    },
+    "Garland Headpiece": {
+        "giftName": "Garland Headpiece",
+        "valor": 199,
+        "accion": "cazador"
+    },
+    "Gate of Trial": {
+        "giftName": "Gate of Trial",
+        "valor": 25999,
+        "accion": "nuclear overdrive"
+    },
+    "Gem Gun": {
+        "giftName": "Gem Gun",
+        "valor": 500,
+        "accion": "nuclear overdrive"
+    },
+    "Gerry the Giraffe": {
+        "giftName": "Gerry the Giraffe",
+        "valor": 1000,
+        "accion": "nuclear overdrive"
+    },
+    "GG": {
+        "giftName": "GG",
+        "valor": 1,
+        "accion": "disparos"
+    },
+    "GG 2025": {
+        "giftName": "GG 2025",
+        "valor": 1,
+        "accion": "disparos"
+    },
+    "Gift Box": {
+        "giftName": "Gift Box",
+        "valor": 3999,
+        "accion": "nuclear overdrive"
+    },
+    "Gimme The Mic": {
+        "giftName": "Gimme The Mic",
+        "valor": 12000,
+        "accion": "nuclear overdrive"
+    },
+    "Gimme The Vote": {
+        "giftName": "Gimme The Vote",
+        "valor": 1,
+        "accion": "disparos"
+    },
+    "Gingerbread Heart": {
+        "giftName": "Gingerbread Heart",
+        "valor": 1,
+        "accion": "disparos"
+    },
+    "Gingerbread Man": {
+        "giftName": "Gingerbread Man",
+        "valor": 349,
+        "accion": "nuclear"
+    },
+    "Gingerbread Party": {
+        "giftName": "Gingerbread Party",
+        "valor": 1200,
+        "accion": "nuclear overdrive"
+    },
+    "Giraffe": {
+        "giftName": "Giraffe",
+        "valor": 1000,
+        "accion": "nuclear overdrive"
+    },
+    "Give It All": {
+        "giftName": "Give It All",
+        "valor": 1,
+        "accion": "disparos"
+    },
+    "Glass of Airan": {
+        "giftName": "Glass of Airan",
+        "valor": 1,
+        "accion": "disparos"
+    },
+    "Glitter Cap": {
+        "giftName": "Glitter Cap",
+        "valor": 299,
+        "accion": "nuclear"
+    },
+    "Glow Stick": {
+        "giftName": "Glow Stick",
+        "valor": 1,
+        "accion": "disparos"
+    },
+    "Glowing Jellyfish": {
+        "giftName": "Glowing Jellyfish",
+        "valor": 1000,
+        "accion": "nuclear overdrive"
+    },
+    "Go Big Alpha Drifter": {
+        "giftName": "Go Big Alpha Drifter",
+        "valor": 7700,
+        "accion": "nuclear overdrive"
+    },
+    "Go Big LIVE Legends": {
+        "giftName": "Go Big LIVE Legends",
+        "valor": 29999,
+        "accion": "nuclear overdrive"
+    },
+    "Go Big Sky Rush": {
+        "giftName": "Go Big Sky Rush",
+        "valor": 15000,
+        "accion": "nuclear overdrive"
+    },
+    "Go Big Stallion": {
+        "giftName": "Go Big Stallion",
+        "valor": 15000,
+        "accion": "nuclear overdrive"
+    },
+    "Go for it!": {
+        "giftName": "Go for it!",
+        "valor": 1,
+        "accion": "disparos"
+    },
+    "Go Galaxy": {
+        "giftName": "Go Galaxy",
+        "valor": 500,
+        "accion": "nuclear overdrive"
+    },
+    "Go Hamster": {
+        "giftName": "Go Hamster",
+        "valor": 299,
+        "accion": "nuclear"
+    },
+    "Go Popular": {
+        "giftName": "Go Popular",
+        "valor": 1,
+        "accion": "disparos"
+    },
+    "Gold Boxing Gloves": {
+        "giftName": "Gold Boxing Gloves",
+        "valor": 10,
+        "accion": "disparos"
+    },
+    "Gold Medal": {
+        "giftName": "Gold Medal",
+        "valor": 200,
+        "accion": "nuclear"
+    },
+    "Gold Microphone": {
+        "giftName": "Gold Microphone",
+        "valor": 499,
+        "accion": "nuclear"
+    },
+    "Gold necklace": {
+        "giftName": "Gold necklace",
+        "valor": 200,
+        "accion": "nuclear"
+    },
+    "Golden Chain": {
+        "giftName": "Golden Chain",
+        "valor": 200,
+        "accion": "nuclear"
+    },
+    "Golden Crown": {
+        "giftName": "Golden Crown",
+        "valor": 299,
+        "accion": "nuclear"
+    },
+    "Golden Hall": {
+        "giftName": "Golden Hall",
+        "valor": 18000,
+        "accion": "nuclear overdrive"
+    },
+    "Golden Party": {
+        "giftName": "Golden Party",
+        "valor": 3000,
+        "accion": "nuclear overdrive"
+    },
+    "Golden Player": {
+        "giftName": "Golden Player",
+        "valor": 5,
+        "accion": "disparos"
+    },
+    "Golden sports car": {
+        "giftName": "Golden sports car",
+        "valor": 29999,
+        "accion": "nuclear overdrive"
+    },
+    "Golden Stars": {
+        "giftName": "Golden Stars",
+        "valor": 1099,
+        "accion": "nuclear overdrive"
+    },
+    "Goldfish Scooping": {
+        "giftName": "Goldfish Scooping",
+        "valor": 500,
+        "accion": "nuclear overdrive"
+    },
+    "Goldie in Bloom": {
+        "giftName": "Goldie in Bloom",
+        "valor": 2999,
+        "accion": "nuclear overdrive"
+    },
+    "Gorilla": {
+        "giftName": "Gorilla",
+        "valor": 30000,
+        "accion": "nuclear overdrive"
+    },
+    "Gorilla Explorer": {
+        "giftName": "Gorilla Explorer",
+        "valor": 4088,
+        "accion": "nuclear overdrive"
+    },
+    "Graduation Bouquet": {
+        "giftName": "Graduation Bouquet",
+        "valor": 1,
+        "accion": "disparos"
+    },
+    "Grand Prix Stage": {
+        "giftName": "Grand Prix Stage",
+        "valor": 2999,
+        "accion": "nuclear overdrive"
+    },
+    "Grand show": {
+        "giftName": "Grand show",
+        "valor": 999,
+        "accion": "nuclear overdrive"
+    },
+    "Great Barrier Reef": {
+        "giftName": "Great Barrier Reef",
+        "valor": 15000,
+        "accion": "nuclear overdrive"
+    },
+    "Greatsword Temple": {
+        "giftName": "Greatsword Temple",
+        "valor": 25999,
+        "accion": "nuclear overdrive"
+    },
+    "Greeting Card": {
+        "giftName": "Greeting Card",
+        "valor": 1500,
+        "accion": "nuclear overdrive"
+    },
+    "Greeting Heart": {
+        "giftName": "Greeting Heart",
+        "valor": 99,
+        "accion": "laser"
+    },
+    "Griffin": {
+        "giftName": "Griffin",
+        "valor": 25999,
+        "accion": "nuclear overdrive"
+    },
+    "Guardian Rhino": {
+        "giftName": "Guardian Rhino",
+        "valor": 30999,
+        "accion": "nuclear overdrive"
+    },
+    "Guardian Wings": {
+        "giftName": "Guardian Wings",
+        "valor": 1,
+        "accion": "disparos"
+    },
+    "Guitar": {
+        "giftName": "Guitar",
+        "valor": 99,
+        "accion": "laser"
+    },
+    "Gutab": {
+        "giftName": "Gutab",
+        "valor": 10,
+        "accion": "disparos"
+    },
+    "Gyeongbokgung": {
+        "giftName": "Gyeongbokgung",
+        "valor": 20000,
+        "accion": "nuclear overdrive"
+    },
+    "Halloween Fun Hat": {
+        "giftName": "Halloween Fun Hat",
+        "valor": 450,
+        "accion": "nuclear"
+    },
+    "Halloween Ghost": {
+        "giftName": "Halloween Ghost",
+        "valor": 500,
+        "accion": "nuclear overdrive"
+    },
+    "Hampers": {
+        "giftName": "Hampers",
+        "valor": 199,
+        "accion": "cazador"
+    },
+    "Hand Heart": {
+        "giftName": "Hand Heart",
+        "valor": 100,
+        "accion": "cazador"
+    },
+    "Hand Hearts": {
+        "giftName": "Hand Hearts",
+        "valor": 100,
+        "accion": "cazador"
+    },
+    "Hands Up": {
+        "giftName": "Hands Up",
+        "valor": 499,
+        "accion": "nuclear"
+    },
+    "Hands up High": {
+        "giftName": "Hands up High",
+        "valor": 6000,
+        "accion": "nuclear overdrive"
+    },
+    "Hanging Lights": {
+        "giftName": "Hanging Lights",
+        "valor": 199,
+        "accion": "cazador"
+    },
+    "Happy Hat '26": {
+        "giftName": "Happy Hat '26",
+        "valor": 226,
+        "accion": "nuclear"
+    },
+    "Happy Party": {
+        "giftName": "Happy Party",
+        "valor": 6999,
+        "accion": "nuclear overdrive"
+    },
+    "Harbour Bridge": {
+        "giftName": "Harbour Bridge",
+        "valor": 15000,
+        "accion": "nuclear overdrive"
+    },
+    "Hat and Mustache": {
+        "giftName": "Hat and Mustache",
+        "valor": 99,
+        "accion": "laser"
+    },
+    "Hat of Joy": {
+        "giftName": "Hat of Joy",
+        "valor": 450,
+        "accion": "nuclear"
+    },
+    "Haunted house": {
+        "giftName": "Haunted house",
+        "valor": 2200,
+        "accion": "nuclear overdrive"
+    },
+    "Headphone": {
+        "giftName": "Headphone",
+        "valor": 199,
+        "accion": "cazador"
+    },
+    "Health Potion": {
+        "giftName": "Health Potion",
+        "valor": 1,
+        "accion": "disparos"
+    },
+    "Heart": {
+        "giftName": "Heart",
+        "valor": 200,
+        "accion": "nuclear"
+    },
+    "Heart Balloons": {
+        "giftName": "Heart Balloons",
+        "valor": 149,
+        "accion": "cazador"
+    },
+    "Heart Gaze": {
+        "giftName": "Heart Gaze",
+        "valor": 10,
+        "accion": "disparos"
+    },
+    "Heart Guitar": {
+        "giftName": "Heart Guitar",
+        "valor": 500,
+        "accion": "nuclear overdrive"
+    },
+    "Heart Hood": {
+        "giftName": "Heart Hood",
+        "valor": 199,
+        "accion": "cazador"
+    },
+    "Heart It Out": {
+        "giftName": "Heart It Out",
+        "valor": 500,
+        "accion": "nuclear overdrive"
+    },
+    "Heart Me": {
+        "giftName": "Heart Me",
+        "valor": 1,
+        "accion": "disparos"
+    },
+    "Heart Puff": {
+        "giftName": "Heart Puff",
+        "valor": 1,
+        "accion": "disparos"
+    },
+    "Heart Rain": {
+        "giftName": "Heart Rain",
+        "valor": 149,
+        "accion": "cazador"
+    },
+    "Heart Signal": {
+        "giftName": "Heart Signal",
+        "valor": 100,
+        "accion": "cazador"
+    },
+    "Hearts": {
+        "giftName": "Hearts",
+        "valor": 199,
+        "accion": "cazador"
+    },
+    "Hearty Talk": {
+        "giftName": "Hearty Talk",
+        "valor": 1,
+        "accion": "disparos"
+    },
+    "Hello": {
+        "giftName": "Hello",
+        "valor": 1,
+        "accion": "disparos"
+    },
+    "Hello Traveler": {
+        "giftName": "Hello Traveler",
+        "valor": 5,
+        "accion": "disparos"
+    },
+    "Hena Aura": {
+        "giftName": "Hena Aura",
+        "valor": 500,
+        "accion": "nuclear overdrive"
+    },
+    "Henry": {
+        "giftName": "Henry",
+        "valor": 10000,
+        "accion": "nuclear overdrive"
+    },
+    "Here We Go": {
+        "giftName": "Here We Go",
+        "valor": 1799,
+        "accion": "nuclear overdrive"
+    },
+    "Hero Space Ship": {
+        "giftName": "Hero Space Ship",
+        "valor": 4999,
+        "accion": "nuclear overdrive"
+    },
+    "Hi Friend": {
+        "giftName": "Hi Friend",
+        "valor": 5,
+        "accion": "disparos"
+    },
+    "Hi! Rosie!": {
+        "giftName": "Hi! Rosie!",
+        "valor": 299,
+        "accion": "nuclear"
+    },
+    "Holiday Leon": {
+        "giftName": "Holiday Leon",
+        "valor": 10999,
+        "accion": "nuclear overdrive"
+    },
+    "Holiday Lion": {
+        "giftName": "Holiday Lion",
+        "valor": 39999,
+        "accion": "nuclear overdrive"
+    },
+    "Holiday Stocking": {
+        "giftName": "Holiday Stocking",
+        "valor": 5,
+        "accion": "disparos"
+    },
+    "Holiday Universe": {
+        "giftName": "Holiday Universe",
+        "valor": 60999,
+        "accion": "nuclear overdrive"
+    },
+    "Holy Arc": {
+        "giftName": "Holy Arc",
+        "valor": 14999,
+        "accion": "nuclear overdrive"
+    },
+    "Hot air balloon": {
+        "giftName": "Hot air balloon",
+        "valor": 1999,
+        "accion": "nuclear overdrive"
+    },
+    "Hunting Dog": {
+        "giftName": "Hunting Dog",
+        "valor": 1000,
+        "accion": "nuclear overdrive"
+    },
+    "I LOVE BR": {
+        "giftName": "I LOVE BR",
+        "valor": 1,
+        "accion": "disparos"
+    },
+    "I love you": {
+        "giftName": "I love you",
+        "valor": 10,
+        "accion": "disparos"
+    },
+    "I'm New Here": {
+        "giftName": "I'm New Here",
+        "valor": 1,
+        "accion": "disparos"
+    },
+    "I'm Ready!": {
+        "giftName": "I'm Ready!",
+        "valor": 1,
+        "accion": "disparos"
+    },
+    "Ice cream": {
+        "giftName": "Ice cream",
+        "valor": 5,
+        "accion": "disparos"
+    },
+    "Ice Cream Cone": {
+        "giftName": "Ice Cream Cone",
+        "valor": 1,
+        "accion": "disparos"
+    },
+    "Ice Cream Mic": {
+        "giftName": "Ice Cream Mic",
+        "valor": 249,
+        "accion": "nuclear"
+    },
+    "Ice Cream Truck": {
+        "giftName": "Ice Cream Truck",
+        "valor": 2988,
+        "accion": "nuclear overdrive"
+    },
+    "Ice Cube": {
+        "giftName": "Ice Cube",
+        "valor": 1,
+        "accion": "disparos"
+    },
+    "Ice Lolly": {
+        "giftName": "Ice Lolly",
+        "valor": 10,
+        "accion": "disparos"
+    },
+    "Ice Queen": {
+        "giftName": "Ice Queen",
+        "valor": 12000,
+        "accion": "nuclear overdrive"
+    },
+    "Ice skating": {
+        "giftName": "Ice skating",
+        "valor": 199,
+        "accion": "cazador"
+    },
+    "Illumination": {
+        "giftName": "Illumination",
+        "valor": 7000,
+        "accion": "nuclear overdrive"
+    },
+    "Im Just a Hamster": {
+        "giftName": "Im Just a Hamster",
+        "valor": 499,
+        "accion": "nuclear"
+    },
+    "Indoor Fan": {
+        "giftName": "Indoor Fan",
+        "valor": 199,
+        "accion": "cazador"
+    },
+    "Infinite Heart": {
+        "giftName": "Infinite Heart",
+        "valor": 23999,
+        "accion": "nuclear overdrive"
+    },
+    "Infinity Chain": {
+        "giftName": "Infinity Chain",
+        "valor": 100,
+        "accion": "cazador"
+    },
+    "Infinity Gold": {
+        "giftName": "Infinity Gold",
+        "valor": 1000,
+        "accion": "nuclear overdrive"
+    },
+    "Infinity Hall": {
+        "giftName": "Infinity Hall",
+        "valor": 15000,
+        "accion": "nuclear overdrive"
+    },
+    "Infinity Surge": {
+        "giftName": "Infinity Surge",
+        "valor": 900,
+        "accion": "nuclear overdrive"
+    },
+    "Interstellar": {
+        "giftName": "Interstellar",
+        "valor": 10000,
+        "accion": "nuclear overdrive"
+    },
+    "Interstellar Trek": {
+        "giftName": "Interstellar Trek",
+        "valor": 14999,
+        "accion": "nuclear overdrive"
+    },
+    "Invincible Hammer": {
+        "giftName": "Invincible Hammer",
+        "valor": 14999,
+        "accion": "nuclear overdrive"
+    },
+    "Island of Love": {
+        "giftName": "Island of Love",
+        "valor": 4000,
+        "accion": "nuclear overdrive"
+    },
+    "It’s corn": {
+        "giftName": "It’s corn",
+        "valor": 1,
+        "accion": "disparos"
+    },
+    "I’m blue": {
+        "giftName": "I’m blue",
+        "valor": 5,
+        "accion": "disparos"
+    },
+    "Jacaranda Season": {
+        "giftName": "Jacaranda Season",
+        "valor": 2999,
+        "accion": "nuclear overdrive"
+    },
+    "Jelly Snakes": {
+        "giftName": "Jelly Snakes",
+        "valor": 5,
+        "accion": "disparos"
+    },
+    "Jetski": {
+        "giftName": "Jetski",
+        "valor": 2199,
+        "accion": "nuclear overdrive"
+    },
+    "Join Butterflies": {
+        "giftName": "Join Butterflies",
+        "valor": 600,
+        "accion": "nuclear overdrive"
+    },
+    "Joker Ball": {
+        "giftName": "Joker Ball",
+        "valor": 199,
+        "accion": "cazador"
+    },
+    "Jollie the Joy Bean": {
+        "giftName": "Jollie the Joy Bean",
+        "valor": 399,
+        "accion": "nuclear"
+    },
+    "Jollie's Heartland": {
+        "giftName": "Jollie's Heartland",
+        "valor": 2199,
+        "accion": "nuclear overdrive"
+    },
+    "Journey Pass": {
+        "giftName": "Journey Pass",
+        "valor": 10,
+        "accion": "disparos"
+    },
+    "Joy Floats": {
+        "giftName": "Joy Floats",
+        "valor": 1030,
+        "accion": "nuclear overdrive"
+    },
+    "Judy Pose": {
+        "giftName": "Judy Pose",
+        "valor": 299,
+        "accion": "nuclear"
+    },
+    "Juicy Cap": {
+        "giftName": "Juicy Cap",
+        "valor": 349,
+        "accion": "nuclear"
+    },
+    "Juicy Smile": {
+        "giftName": "Juicy Smile",
+        "valor": 199,
+        "accion": "cazador"
+    },
+    "Julius the Champion": {
+        "giftName": "Julius the Champion",
+        "valor": 43999,
+        "accion": "nuclear overdrive"
+    },
+    "July Love": {
+        "giftName": "July Love",
+        "valor": 1,
+        "accion": "disparos"
+    },
+    "Kicker Challenge": {
+        "giftName": "Kicker Challenge",
+        "valor": 299,
+        "accion": "nuclear"
+    },
+    "King Leonardo": {
+        "giftName": "King Leonardo",
+        "valor": 42999,
+        "accion": "nuclear overdrive"
+    },
+    "King of Legends": {
+        "giftName": "King of Legends",
+        "valor": 42999,
+        "accion": "nuclear overdrive"
+    },
+    "Kiss": {
+        "giftName": "Kiss",
+        "valor": 150,
+        "accion": "cazador"
+    },
+    "Kiss your Heart": {
+        "giftName": "Kiss your Heart",
+        "valor": 99,
+        "accion": "laser"
+    },
+    "Kitten Headband": {
+        "giftName": "Kitten Headband",
+        "valor": 349,
+        "accion": "nuclear"
+    },
+    "Kitten Kneading": {
+        "giftName": "Kitten Kneading",
+        "valor": 399,
+        "accion": "nuclear"
+    },
+    "Knock Out": {
+        "giftName": "Knock Out",
+        "valor": 4999,
+        "accion": "nuclear overdrive"
+    },
+    "Koala Love": {
+        "giftName": "Koala Love",
+        "valor": 299,
+        "accion": "nuclear"
+    },
+    "Koala Refuel": {
+        "giftName": "Koala Refuel",
+        "valor": 10,
+        "accion": "disparos"
+    },
+    "KSA": {
+        "giftName": "KSA",
+        "valor": 1,
+        "accion": "disparos"
+    },
+    "Ladybug": {
+        "giftName": "Ladybug",
+        "valor": 5,
+        "accion": "disparos"
+    },
+    "League Ball": {
+        "giftName": "League Ball",
+        "valor": 10,
+        "accion": "disparos"
+    },
+    "League Boost": {
+        "giftName": "League Boost",
+        "valor": 399,
+        "accion": "nuclear"
+    },
+    "League Countdown": {
+        "giftName": "League Countdown",
+        "valor": 199,
+        "accion": "cazador"
+    },
+    "League Fandom": {
+        "giftName": "League Fandom",
+        "valor": 5000,
+        "accion": "nuclear overdrive"
+    },
+    "League Trophy": {
+        "giftName": "League Trophy",
+        "valor": 599,
+        "accion": "nuclear overdrive"
+    },
+    "Legend Crown": {
+        "giftName": "Legend Crown",
+        "valor": 299,
+        "accion": "nuclear"
+    },
+    "Lemon Love Booth": {
+        "giftName": "Lemon Love Booth",
+        "valor": 2199,
+        "accion": "nuclear overdrive"
+    },
+    "lenossa's Community Cake": {
+        "giftName": "lenossa's Community Cake",
+        "valor": 2999,
+        "accion": "nuclear overdrive"
+    },
+    "Leo Star Sign": {
+        "giftName": "Leo Star Sign",
+        "valor": 9999,
+        "accion": "nuclear overdrive"
+    },
+    "Leon and Lili": {
+        "giftName": "Leon and Lili",
+        "valor": 9699,
+        "accion": "nuclear overdrive"
+    },
+    "Leon and Lion": {
+        "giftName": "Leon and Lion",
+        "valor": 34000,
+        "accion": "nuclear overdrive"
+    },
+    "Leon in Gondola": {
+        "giftName": "Leon in Gondola",
+        "valor": 7999,
+        "accion": "nuclear overdrive"
+    },
+    "Leon the Kitten": {
+        "giftName": "Leon the Kitten",
+        "valor": 4888,
+        "accion": "nuclear overdrive"
+    },
+    "Leon’s Journey": {
+        "giftName": "Leon’s Journey",
+        "valor": 7999,
+        "accion": "nuclear overdrive"
+    },
+    "Leopard": {
+        "giftName": "Leopard",
+        "valor": 15000,
+        "accion": "nuclear overdrive"
+    },
+    "Let butterfly dances": {
+        "giftName": "Let butterfly dances",
+        "valor": 399,
+        "accion": "nuclear"
+    },
+    "Let Us Dance": {
+        "giftName": "Let Us Dance",
+        "valor": 1999,
+        "accion": "nuclear overdrive"
+    },
+    "Level Ship": {
+        "giftName": "Level Ship",
+        "valor": 21000,
+        "accion": "nuclear overdrive"
+    },
+    "Level-up Sparks": {
+        "giftName": "Level-up Sparks",
+        "valor": 99,
+        "accion": "laser"
+    },
+    "Level-up Spectacle": {
+        "giftName": "Level-up Spectacle",
+        "valor": 12999,
+        "accion": "nuclear overdrive"
+    },
+    "Level-up Spotlight": {
+        "giftName": "Level-up Spotlight",
+        "valor": 2999,
+        "accion": "nuclear overdrive"
+    },
+    "Light Castle": {
+        "giftName": "Light Castle",
+        "valor": 25999,
+        "accion": "nuclear overdrive"
+    },
+    "Lightning Bolt": {
+        "giftName": "Lightning Bolt",
+        "valor": 1,
+        "accion": "disparos"
+    },
+    "Lightning your world": {
+        "giftName": "Lightning your world",
+        "valor": 1000,
+        "accion": "nuclear overdrive"
+    },
+    "Like-Pop": {
+        "giftName": "Like-Pop",
+        "valor": 99,
+        "accion": "laser"
+    },
+    "Lili and Sakura": {
+        "giftName": "Lili and Sakura",
+        "valor": 12000,
+        "accion": "nuclear overdrive"
+    },
+    "Lili the Leopard": {
+        "giftName": "Lili the Leopard",
+        "valor": 6599,
+        "accion": "nuclear overdrive"
+    },
+    "Lily and Hydrangea": {
+        "giftName": "Lily and Hydrangea",
+        "valor": 7999,
+        "accion": "nuclear overdrive"
+    },
+    "Lion": {
+        "giftName": "Lion",
+        "valor": 29999,
+        "accion": "nuclear overdrive"
+    },
+    "Lion’s Mane": {
+        "giftName": "Lion’s Mane",
+        "valor": 500,
+        "accion": "nuclear overdrive"
+    },
+    "Little Crown": {
+        "giftName": "Little Crown",
+        "valor": 99,
+        "accion": "laser"
+    },
+    "Little Ghost": {
+        "giftName": "Little Ghost",
+        "valor": 10,
+        "accion": "disparos"
+    },
+    "Little Wing": {
+        "giftName": "Little Wing",
+        "valor": 99,
+        "accion": "laser"
+    },
+    "LIVE Island": {
+        "giftName": "LIVE Island",
+        "valor": 10,
+        "accion": "disparos"
+    },
+    "LIVE on holiday": {
+        "giftName": "LIVE on holiday",
+        "valor": 5000,
+        "accion": "nuclear overdrive"
+    },
+    "LIVE Pro Badge": {
+        "giftName": "LIVE Pro Badge",
+        "valor": 1000,
+        "accion": "nuclear overdrive"
+    },
+    "LIVE Ranking Crown": {
+        "giftName": "LIVE Ranking Crown",
+        "valor": 299,
+        "accion": "nuclear"
+    },
+    "LIVE Ranking Medal": {
+        "giftName": "LIVE Ranking Medal",
+        "valor": 2999,
+        "accion": "nuclear overdrive"
+    },
+    "Llama Greetings": {
+        "giftName": "Llama Greetings",
+        "valor": 299,
+        "accion": "nuclear"
+    },
+    "LNY Horse": {
+        "giftName": "LNY Horse",
+        "valor": 15000,
+        "accion": "nuclear overdrive"
+    },
+    "Lock and Key": {
+        "giftName": "Lock and Key",
+        "valor": 199,
+        "accion": "cazador"
+    },
+    "Look Up": {
+        "giftName": "Look Up",
+        "valor": 3350,
+        "accion": "nuclear overdrive"
+    },
+    "Look! Meteor Shower": {
+        "giftName": "Look! Meteor Shower",
+        "valor": 15000,
+        "accion": "nuclear overdrive"
+    },
+    "Love Call": {
+        "giftName": "Love Call",
+        "valor": 299,
+        "accion": "nuclear"
+    },
+    "Love Chain": {
+        "giftName": "Love Chain",
+        "valor": 99,
+        "accion": "laser"
+    },
+    "Love Charger": {
+        "giftName": "Love Charger",
+        "valor": 199,
+        "accion": "cazador"
+    },
+    "Love Drop": {
+        "giftName": "Love Drop",
+        "valor": 1800,
+        "accion": "nuclear overdrive"
+    },
+    "Love Explosion": {
+        "giftName": "Love Explosion",
+        "valor": 1500,
+        "accion": "nuclear overdrive"
+    },
+    "Love Flight": {
+        "giftName": "Love Flight",
+        "valor": 800,
+        "accion": "nuclear overdrive"
+    },
+    "Love Glasses": {
+        "giftName": "Love Glasses",
+        "valor": 149,
+        "accion": "cazador"
+    },
+    "Love in Sunset": {
+        "giftName": "Love in Sunset",
+        "valor": 2999,
+        "accion": "nuclear overdrive"
+    },
+    "Love Lake": {
+        "giftName": "Love Lake",
+        "valor": 2999,
+        "accion": "nuclear overdrive"
+    },
+    "Love Letter": {
+        "giftName": "Love Letter",
+        "valor": 200,
+        "accion": "nuclear"
+    },
+    "Love Morocco": {
+        "giftName": "Love Morocco",
+        "valor": 1,
+        "accion": "disparos"
+    },
+    "Love Painting": {
+        "giftName": "Love Painting",
+        "valor": 99,
+        "accion": "laser"
+    },
+    "Love Piggy": {
+        "giftName": "Love Piggy",
+        "valor": 10,
+        "accion": "disparos"
+    },
+    "Love Rain": {
+        "giftName": "Love Rain",
+        "valor": 199,
+        "accion": "cazador"
+    },
+    "Love Shelter": {
+        "giftName": "Love Shelter",
+        "valor": 1200,
+        "accion": "nuclear overdrive"
+    },
+    "LOVE U": {
+        "giftName": "LOVE U",
+        "valor": 899,
+        "accion": "nuclear overdrive"
+    },
+    "Love You": {
+        "giftName": "Love You",
+        "valor": 199,
+        "accion": "cazador"
+    },
+    "Love you so much": {
+        "giftName": "Love you so much",
+        "valor": 1,
+        "accion": "disparos"
+    },
+    "Lovely Music": {
+        "giftName": "Lovely Music",
+        "valor": 999,
+        "accion": "nuclear overdrive"
+    },
+    "Lover’s Lock": {
+        "giftName": "Lover’s Lock",
+        "valor": 1500,
+        "accion": "nuclear overdrive"
+    },
+    "Lucky Airdrop Box": {
+        "giftName": "Lucky Airdrop Box",
+        "valor": 999,
+        "accion": "nuclear overdrive"
+    },
+    "Lucky Pony": {
+        "giftName": "Lucky Pony",
+        "valor": 10,
+        "accion": "disparos"
+    },
+    "Lucky Star": {
+        "giftName": "Lucky Star",
+        "valor": 99,
+        "accion": "laser"
+    },
+    "Luxor": {
+        "giftName": "Luxor",
+        "valor": 15000,
+        "accion": "nuclear overdrive"
+    },
+    "Luxury Yacht": {
+        "giftName": "Luxury Yacht",
+        "valor": 10000,
+        "accion": "nuclear overdrive"
+    },
+    "Magic Blast": {
+        "giftName": "Magic Blast",
+        "valor": 2999,
+        "accion": "nuclear overdrive"
+    },
+    "Magic Genie": {
+        "giftName": "Magic Genie",
+        "valor": 200,
+        "accion": "nuclear"
+    },
+    "Magic Marcia": {
+        "giftName": "Magic Marcia",
+        "valor": 42999,
+        "accion": "nuclear overdrive"
+    },
+    "Magic Prop": {
+        "giftName": "Magic Prop",
+        "valor": 500,
+        "accion": "nuclear overdrive"
+    },
+    "Magic Rhythm": {
+        "giftName": "Magic Rhythm",
+        "valor": 399,
+        "accion": "nuclear"
+    },
+    "Magic Role": {
+        "giftName": "Magic Role",
+        "valor": 1088,
+        "accion": "nuclear overdrive"
+    },
+    "Magic Stage": {
+        "giftName": "Magic Stage",
+        "valor": 2599,
+        "accion": "nuclear overdrive"
+    },
+    "Magic World": {
+        "giftName": "Magic World",
+        "valor": 4088,
+        "accion": "nuclear overdrive"
+    },
+    "Maiden Tower": {
+        "giftName": "Maiden Tower",
+        "valor": 8000,
+        "accion": "nuclear overdrive"
+    },
+    "Majestic Hearts": {
+        "giftName": "Majestic Hearts",
+        "valor": 7238,
+        "accion": "nuclear overdrive"
+    },
+    "Mamma Mia": {
+        "giftName": "Mamma Mia",
+        "valor": 1,
+        "accion": "disparos"
+    },
+    "Manifesting": {
+        "giftName": "Manifesting",
+        "valor": 500,
+        "accion": "nuclear overdrive"
+    },
+    "Maracas": {
+        "giftName": "Maracas",
+        "valor": 1,
+        "accion": "disparos"
+    },
+    "Mark of Love": {
+        "giftName": "Mark of Love",
+        "valor": 99,
+        "accion": "laser"
+    },
+    "Marked with Love": {
+        "giftName": "Marked with Love",
+        "valor": 349,
+        "accion": "nuclear"
+    },
+    "Marvelous Confetti": {
+        "giftName": "Marvelous Confetti",
+        "valor": 100,
+        "accion": "cazador"
+    },
+    "Mask": {
+        "giftName": "Mask",
+        "valor": 199,
+        "accion": "cazador"
+    },
+    "Masquerade": {
+        "giftName": "Masquerade",
+        "valor": 149,
+        "accion": "cazador"
+    },
+    "Massage for You": {
+        "giftName": "Massage for You",
+        "valor": 199,
+        "accion": "cazador"
+    },
+    "Match Wand": {
+        "giftName": "Match Wand",
+        "valor": 100,
+        "accion": "cazador"
+    },
+    "Medium Fandom": {
+        "giftName": "Medium Fandom",
+        "valor": 900,
+        "accion": "nuclear overdrive"
+    },
+    "Meerkat": {
+        "giftName": "Meerkat",
+        "valor": 199,
+        "accion": "cazador"
+    },
+    "Melodic birds": {
+        "giftName": "Melodic birds",
+        "valor": 249,
+        "accion": "nuclear"
+    },
+    "Melody Glasses": {
+        "giftName": "Melody Glasses",
+        "valor": 299,
+        "accion": "nuclear"
+    },
+    "Melon Juice": {
+        "giftName": "Melon Juice",
+        "valor": 199,
+        "accion": "cazador"
+    },
+    "Merry Christmas": {
+        "giftName": "Merry Christmas",
+        "valor": 3999,
+        "accion": "nuclear overdrive"
+    },
+    "Merry Crust-mas": {
+        "giftName": "Merry Crust-mas",
+        "valor": 6999,
+        "accion": "nuclear overdrive"
+    },
+    "Merry Go Boo": {
+        "giftName": "Merry Go Boo",
+        "valor": 1500,
+        "accion": "nuclear overdrive"
+    },
+    "Merry Spongemas": {
+        "giftName": "Merry Spongemas",
+        "valor": 1500,
+        "accion": "nuclear overdrive"
+    },
+    "Meteor Shower": {
+        "giftName": "Meteor Shower",
+        "valor": 3000,
+        "accion": "nuclear overdrive"
+    },
+    "Mic Champ": {
+        "giftName": "Mic Champ",
+        "valor": 400,
+        "accion": "nuclear"
+    },
+    "Mic Drop": {
+        "giftName": "Mic Drop",
+        "valor": 500,
+        "accion": "nuclear overdrive"
+    },
+    "Mighty Sweetie": {
+        "giftName": "Mighty Sweetie",
+        "valor": 500,
+        "accion": "nuclear overdrive"
+    },
+    "Mimi & Fifi": {
+        "giftName": "Mimi & Fifi",
+        "valor": 5000,
+        "accion": "nuclear overdrive"
+    },
+    "Mini Star": {
+        "giftName": "Mini Star",
+        "valor": 100,
+        "accion": "cazador"
+    },
+    "Mishka Bear": {
+        "giftName": "Mishka Bear",
+        "valor": 100,
+        "accion": "cazador"
+    },
+    "Miss You": {
+        "giftName": "Miss You",
+        "valor": 1,
+        "accion": "disparos"
+    },
+    "Mistletoe": {
+        "giftName": "Mistletoe",
+        "valor": 199,
+        "accion": "cazador"
+    },
+    "Money Gun": {
+        "giftName": "Money Gun",
+        "valor": 500,
+        "accion": "nuclear overdrive"
+    },
+    "Money Magnet": {
+        "giftName": "Money Magnet",
+        "valor": 549,
+        "accion": "nuclear overdrive"
+    },
+    "Moonlight flower": {
+        "giftName": "Moonlight flower",
+        "valor": 1400,
+        "accion": "nuclear overdrive"
+    },
+    "Morning Bloom": {
+        "giftName": "Morning Bloom",
+        "valor": 1,
+        "accion": "disparos"
+    },
+    "Motorcycle": {
+        "giftName": "Motorcycle",
+        "valor": 2988,
+        "accion": "nuclear overdrive"
+    },
+    "Motorcycle Together": {
+        "giftName": "Motorcycle Together",
+        "valor": 5000,
+        "accion": "nuclear overdrive"
+    },
+    "Music  Album": {
+        "giftName": "Music  Album",
+        "valor": 1,
+        "accion": "disparos"
+    },
+    "Music Bubbles": {
+        "giftName": "Music Bubbles",
+        "valor": 249,
+        "accion": "nuclear"
+    },
+    "Music Carnival": {
+        "giftName": "Music Carnival",
+        "valor": 5000,
+        "accion": "nuclear overdrive"
+    },
+    "Music Conductor": {
+        "giftName": "Music Conductor",
+        "valor": 450,
+        "accion": "nuclear"
+    },
+    "Music Mate": {
+        "giftName": "Music Mate",
+        "valor": 299,
+        "accion": "nuclear"
+    },
+    "Music on Stage": {
+        "giftName": "Music on Stage",
+        "valor": 1,
+        "accion": "disparos"
+    },
+    "Music Play": {
+        "giftName": "Music Play",
+        "valor": 1,
+        "accion": "disparos"
+    },
+    "Music Player": {
+        "giftName": "Music Player",
+        "valor": 199,
+        "accion": "cazador"
+    },
+    "My favourite": {
+        "giftName": "My favourite",
+        "valor": 99,
+        "accion": "laser"
+    },
+    "Mystery Box": {
+        "giftName": "Mystery Box",
+        "valor": 500,
+        "accion": "nuclear overdrive"
+    },
+    "Mystery Firework": {
+        "giftName": "Mystery Firework",
+        "valor": 1999,
+        "accion": "nuclear overdrive"
+    },
+    "Mystery Mask": {
+        "giftName": "Mystery Mask",
+        "valor": 149,
+        "accion": "cazador"
+    },
+    "Mystic Drink": {
+        "giftName": "Mystic Drink",
+        "valor": 349,
+        "accion": "nuclear"
+    },
+    "Name shoutout": {
+        "giftName": "Name shoutout",
+        "valor": 5,
+        "accion": "disparos"
+    },
+    "Naughty Chicken": {
+        "giftName": "Naughty Chicken",
+        "valor": 299,
+        "accion": "nuclear"
+    },
+    "New Year Keyboard": {
+        "giftName": "New Year Keyboard",
+        "valor": 20,
+        "accion": "ola"
+    },
+    "Next Level": {
+        "giftName": "Next Level",
+        "valor": 4099,
+        "accion": "nuclear overdrive"
+    },
+    "Night Star": {
+        "giftName": "Night Star",
+        "valor": 199,
+        "accion": "cazador"
+    },
+    "Nine-Tailed Fox": {
+        "giftName": "Nine-Tailed Fox",
+        "valor": 1800,
+        "accion": "nuclear overdrive"
+    },
+    "Noor": {
+        "giftName": "Noor",
+        "valor": 99,
+        "accion": "laser"
+    },
+    "Octopus": {
+        "giftName": "Octopus",
+        "valor": 10000,
+        "accion": "nuclear overdrive"
+    },
+    "Oldies": {
+        "giftName": "Oldies",
+        "valor": 1,
+        "accion": "disparos"
+    },
+    "Otter Kiss": {
+        "giftName": "Otter Kiss",
+        "valor": 399,
+        "accion": "nuclear"
+    },
+    "Overreact": {
+        "giftName": "Overreact",
+        "valor": 5,
+        "accion": "disparos"
+    },
+    "Paddington Hat": {
+        "giftName": "Paddington Hat",
+        "valor": 299,
+        "accion": "nuclear"
+    },
+    "Paddington in Peru": {
+        "giftName": "Paddington in Peru",
+        "valor": 1,
+        "accion": "disparos"
+    },
+    "Paddington Snow": {
+        "giftName": "Paddington Snow",
+        "valor": 1200,
+        "accion": "nuclear overdrive"
+    },
+    "Palm Breeze": {
+        "giftName": "Palm Breeze",
+        "valor": 249,
+        "accion": "nuclear"
+    },
+    "Panda Climb": {
+        "giftName": "Panda Climb",
+        "valor": 199,
+        "accion": "cazador"
+    },
+    "Panda Hug": {
+        "giftName": "Panda Hug",
+        "valor": 499,
+        "accion": "nuclear"
+    },
+    "Panda Snap": {
+        "giftName": "Panda Snap",
+        "valor": 399,
+        "accion": "nuclear"
+    },
+    "Panther Paws": {
+        "giftName": "Panther Paws",
+        "valor": 199,
+        "accion": "cazador"
+    },
+    "Paper Crane": {
+        "giftName": "Paper Crane",
+        "valor": 99,
+        "accion": "laser"
+    },
+    "Paris": {
+        "giftName": "Paris",
+        "valor": 15000,
+        "accion": "nuclear overdrive"
+    },
+    "Party Blossom": {
+        "giftName": "Party Blossom",
+        "valor": 249,
+        "accion": "nuclear"
+    },
+    "Party Bus": {
+        "giftName": "Party Bus",
+        "valor": 2999,
+        "accion": "nuclear overdrive"
+    },
+    "Party On&On": {
+        "giftName": "Party On&On",
+        "valor": 15000,
+        "accion": "nuclear overdrive"
+    },
+    "Party Up '26": {
+        "giftName": "Party Up '26",
+        "valor": 226,
+        "accion": "nuclear"
+    },
+    "Patrick's Prezzie": {
+        "giftName": "Patrick's Prezzie",
+        "valor": 6000,
+        "accion": "nuclear overdrive"
+    },
+    "Pawfect": {
+        "giftName": "Pawfect",
+        "valor": 299,
+        "accion": "nuclear"
+    },
+    "Peach": {
+        "giftName": "Peach",
+        "valor": 5,
+        "accion": "disparos"
+    },
+    "Peacock Feather": {
+        "giftName": "Peacock Feather",
+        "valor": 5,
+        "accion": "disparos"
+    },
+    "Peek-a-Boo": {
+        "giftName": "Peek-a-Boo",
+        "valor": 6000,
+        "accion": "nuclear overdrive"
+    },
+    "Pegasus": {
+        "giftName": "Pegasus",
+        "valor": 42999,
+        "accion": "nuclear overdrive"
+    },
+    "Penguin Snowpal": {
+        "giftName": "Penguin Snowpal",
+        "valor": 299,
+        "accion": "nuclear"
+    },
+    "Perfume": {
+        "giftName": "Perfume",
+        "valor": 20,
+        "accion": "ola"
+    },
+    "Pharaoh Mask": {
+        "giftName": "Pharaoh Mask",
+        "valor": 399,
+        "accion": "nuclear"
+    },
+    "Pho": {
+        "giftName": "Pho",
+        "valor": 10,
+        "accion": "disparos"
+    },
+    "Phoenix": {
+        "giftName": "Phoenix",
+        "valor": 25999,
+        "accion": "nuclear overdrive"
+    },
+    "Picnic basket": {
+        "giftName": "Picnic basket",
+        "valor": 1000,
+        "accion": "nuclear overdrive"
+    },
+    "Pim Bear": {
+        "giftName": "Pim Bear",
+        "valor": 1500,
+        "accion": "nuclear overdrive"
+    },
+    "Pinch Cheek": {
+        "giftName": "Pinch Cheek",
+        "valor": 199,
+        "accion": "cazador"
+    },
+    "Pinch Face": {
+        "giftName": "Pinch Face",
+        "valor": 249,
+        "accion": "nuclear"
+    },
+    "Pink Dream": {
+        "giftName": "Pink Dream",
+        "valor": 2988,
+        "accion": "nuclear overdrive"
+    },
+    "Pink Dress": {
+        "giftName": "Pink Dress",
+        "valor": 499,
+        "accion": "nuclear"
+    },
+    "Pirate's Treasure": {
+        "giftName": "Pirate's Treasure",
+        "valor": 449,
+        "accion": "nuclear"
+    },
+    "Pirate’s Ship": {
+        "giftName": "Pirate’s Ship",
+        "valor": 15000,
+        "accion": "nuclear overdrive"
+    },
+    "Piñata": {
+        "giftName": "Piñata",
+        "valor": 699,
+        "accion": "nuclear overdrive"
+    },
+    "PK crown ring": {
+        "giftName": "PK crown ring",
+        "valor": 30,
+        "accion": "laser"
+    },
+    "Play for You": {
+        "giftName": "Play for You",
+        "valor": 299,
+        "accion": "nuclear"
+    },
+    "Play Samba": {
+        "giftName": "Play Samba",
+        "valor": 99,
+        "accion": "laser"
+    },
+    "Polaris": {
+        "giftName": "Polaris",
+        "valor": 500,
+        "accion": "nuclear overdrive"
+    },
+    "Pomegranate": {
+        "giftName": "Pomegranate",
+        "valor": 5,
+        "accion": "disparos"
+    },
+    "Pop": {
+        "giftName": "Pop",
+        "valor": 1,
+        "accion": "disparos"
+    },
+    "Potato eating spaghetti": {
+        "giftName": "Potato eating spaghetti",
+        "valor": 1500,
+        "accion": "nuclear overdrive"
+    },
+    "Potato floating": {
+        "giftName": "Potato floating",
+        "valor": 1500,
+        "accion": "nuclear overdrive"
+    },
+    "Potato in Paris": {
+        "giftName": "Potato in Paris",
+        "valor": 199,
+        "accion": "cazador"
+    },
+    "Potato to Fries": {
+        "giftName": "Potato to Fries",
+        "valor": 1800,
+        "accion": "nuclear overdrive"
+    },
+    "Potato Transformation": {
+        "giftName": "Potato Transformation",
+        "valor": 150,
+        "accion": "cazador"
+    },
+    "Potato with ice cream": {
+        "giftName": "Potato with ice cream",
+        "valor": 10,
+        "accion": "disparos"
+    },
+    "Power Couple": {
+        "giftName": "Power Couple",
+        "valor": 2000,
+        "accion": "nuclear overdrive"
+    },
+    "Power hug": {
+        "giftName": "Power hug",
+        "valor": 1,
+        "accion": "disparos"
+    },
+    "Power of Diamond": {
+        "giftName": "Power of Diamond",
+        "valor": 1,
+        "accion": "disparos"
+    },
+    "Powerful Mind": {
+        "giftName": "Powerful Mind",
+        "valor": 450,
+        "accion": "nuclear"
+    },
+    "Premium Shuttle": {
+        "giftName": "Premium Shuttle",
+        "valor": 20000,
+        "accion": "nuclear overdrive"
+    },
+    "Prime Power 2025": {
+        "giftName": "Prime Power 2025",
+        "valor": 12000,
+        "accion": "nuclear overdrive"
+    },
+    "Prince": {
+        "giftName": "Prince",
+        "valor": 500,
+        "accion": "nuclear overdrive"
+    },
+    "Private Jet": {
+        "giftName": "Private Jet",
+        "valor": 4888,
+        "accion": "nuclear overdrive"
+    },
+    "Pumped Up": {
+        "giftName": "Pumped Up",
+        "valor": 15,
+        "accion": "disparos"
+    },
+    "Pumpkin": {
+        "giftName": "Pumpkin",
+        "valor": 1,
+        "accion": "disparos"
+    },
+    "Pumpkin head": {
+        "giftName": "Pumpkin head",
+        "valor": 399,
+        "accion": "nuclear"
+    },
+    "Pumpkin Latte": {
+        "giftName": "Pumpkin Latte",
+        "valor": 10,
+        "accion": "disparos"
+    },
+    "Pumpkin Pie": {
+        "giftName": "Pumpkin Pie",
+        "valor": 5,
+        "accion": "disparos"
+    },
+    "Puppy Kisses": {
+        "giftName": "Puppy Kisses",
+        "valor": 299,
+        "accion": "nuclear"
+    },
+    "Puyo Shower!": {
+        "giftName": "Puyo Shower!",
+        "valor": 500,
+        "accion": "nuclear overdrive"
+    },
+    "Puyo Shuffle!": {
+        "giftName": "Puyo Shuffle!",
+        "valor": 999,
+        "accion": "nuclear overdrive"
+    },
+    "Pyramids": {
+        "giftName": "Pyramids",
+        "valor": 15000,
+        "accion": "nuclear overdrive"
+    },
+    "Race Car": {
+        "giftName": "Race Car",
+        "valor": 12000,
+        "accion": "nuclear overdrive"
+    },
+    "Racing Debut": {
+        "giftName": "Racing Debut",
+        "valor": 1500,
+        "accion": "nuclear overdrive"
+    },
+    "Racing Helmet": {
+        "giftName": "Racing Helmet",
+        "valor": 500,
+        "accion": "nuclear overdrive"
+    },
+    "Radiant Wings": {
+        "giftName": "Radiant Wings",
+        "valor": 600,
+        "accion": "nuclear overdrive"
+    },
+    "Rainbow": {
+        "giftName": "Rainbow",
+        "valor": 1,
+        "accion": "disparos"
+    },
+    "Rainforest": {
+        "giftName": "Rainforest",
+        "valor": 8800,
+        "accion": "nuclear overdrive"
+    },
+    "Raining gifts": {
+        "giftName": "Raining gifts",
+        "valor": 999,
+        "accion": "nuclear overdrive"
+    },
+    "Ramadan Blessing Box": {
+        "giftName": "Ramadan Blessing Box",
+        "valor": 1999,
+        "accion": "nuclear overdrive"
+    },
+    "Ramadan Kareem": {
+        "giftName": "Ramadan Kareem",
+        "valor": 1,
+        "accion": "disparos"
+    },
+    "Rave Dance": {
+        "giftName": "Rave Dance",
+        "valor": 10,
+        "accion": "disparos"
+    },
+    "Raving Snail": {
+        "giftName": "Raving Snail",
+        "valor": 149,
+        "accion": "cazador"
+    },
+    "Red Lightning": {
+        "giftName": "Red Lightning",
+        "valor": 12000,
+        "accion": "nuclear overdrive"
+    },
+    "Red Telephone Box": {
+        "giftName": "Red Telephone Box",
+        "valor": 2100,
+        "accion": "nuclear overdrive"
+    },
+    "Reindeer": {
+        "giftName": "Reindeer",
+        "valor": 199,
+        "accion": "cazador"
+    },
+    "Reindeer Milk": {
+        "giftName": "Reindeer Milk",
+        "valor": 400,
+        "accion": "nuclear"
+    },
+    "Relaxed Goose": {
+        "giftName": "Relaxed Goose",
+        "valor": 399,
+        "accion": "nuclear"
+    },
+    "Rhythmic Bear": {
+        "giftName": "Rhythmic Bear",
+        "valor": 2999,
+        "accion": "nuclear overdrive"
+    },
+    "Ribbit Ribbit": {
+        "giftName": "Ribbit Ribbit",
+        "valor": 2000,
+        "accion": "nuclear overdrive"
+    },
+    "Rilakkuma Dance": {
+        "giftName": "Rilakkuma Dance",
+        "valor": 1999,
+        "accion": "nuclear overdrive"
+    },
+    "Rilakkuma's ear": {
+        "giftName": "Rilakkuma's ear",
+        "valor": 200,
+        "accion": "nuclear"
+    },
+    "Rilakkuma's summer vacation": {
+        "giftName": "Rilakkuma's summer vacation",
+        "valor": 12000,
+        "accion": "nuclear overdrive"
+    },
+    "Ring Of Honor-Cube": {
+        "giftName": "Ring Of Honor-Cube",
+        "valor": 2999,
+        "accion": "nuclear overdrive"
+    },
+    "Rio de Janeiro": {
+        "giftName": "Rio de Janeiro",
+        "valor": 9999,
+        "accion": "nuclear overdrive"
+    },
+    "Rising Key": {
+        "giftName": "Rising Key",
+        "valor": 299,
+        "accion": "nuclear"
+    },
+    "Ritmos Latinos": {
+        "giftName": "Ritmos Latinos",
+        "valor": 12000,
+        "accion": "nuclear overdrive"
+    },
+    "Riyadh": {
+        "giftName": "Riyadh",
+        "valor": 15000,
+        "accion": "nuclear overdrive"
+    },
+    "Rock Star": {
+        "giftName": "Rock Star",
+        "valor": 299,
+        "accion": "nuclear"
+    },
+    "Rock the Stage": {
+        "giftName": "Rock the Stage",
+        "valor": 99,
+        "accion": "laser"
+    },
+    "Rocking Shroom": {
+        "giftName": "Rocking Shroom",
+        "valor": 349,
+        "accion": "nuclear"
+    },
+    "Rocky the Rock Bean": {
+        "giftName": "Rocky the Rock Bean",
+        "valor": 399,
+        "accion": "nuclear"
+    },
+    "Rocky's Punch": {
+        "giftName": "Rocky's Punch",
+        "valor": 2199,
+        "accion": "nuclear overdrive"
+    },
+    "Romance Blossoms": {
+        "giftName": "Romance Blossoms",
+        "valor": 6000,
+        "accion": "nuclear overdrive"
+    },
+    "Romance the World": {
+        "giftName": "Romance the World",
+        "valor": 15000,
+        "accion": "nuclear overdrive"
+    },
+    "Rosa": {
+        "giftName": "Rosa",
+        "valor": 10,
+        "accion": "disparos"
+    },
+    "Rosa Nebula": {
+        "giftName": "Rosa Nebula",
+        "valor": 15000,
+        "accion": "nuclear overdrive"
+    },
+    "Rose": {
+        "giftName": "Rose",
+        "valor": 1,
+        "accion": "disparos"
+    },
+    "Rose Bear": {
+        "giftName": "Rose Bear",
+        "valor": 214,
+        "accion": "nuclear"
+    },
+    "Rose Hand": {
+        "giftName": "Rose Hand",
+        "valor": 199,
+        "accion": "cazador"
+    },
+    "Rose Soundwave": {
+        "giftName": "Rose Soundwave",
+        "valor": 499,
+        "accion": "nuclear"
+    },
+    "Roses": {
+        "giftName": "Roses",
+        "valor": 500,
+        "accion": "nuclear overdrive"
+    },
+    "Rosie the Rose Bean": {
+        "giftName": "Rosie the Rose Bean",
+        "valor": 399,
+        "accion": "nuclear"
+    },
+    "Rosie's Concert": {
+        "giftName": "Rosie's Concert",
+        "valor": 399,
+        "accion": "nuclear"
+    },
+    "Rosie's Look": {
+        "giftName": "Rosie's Look",
+        "valor": 299,
+        "accion": "nuclear"
+    },
+    "Rosie's Saxophone": {
+        "giftName": "Rosie's Saxophone",
+        "valor": 399,
+        "accion": "nuclear"
+    },
+    "Ruff Rider": {
+        "giftName": "Ruff Rider",
+        "valor": 6000,
+        "accion": "nuclear overdrive"
+    },
+    "S Flowers": {
+        "giftName": "S Flowers",
+        "valor": 20,
+        "accion": "ola"
+    },
+    "Safari Hat": {
+        "giftName": "Safari Hat",
+        "valor": 199,
+        "accion": "cazador"
+    },
+    "Safari Park": {
+        "giftName": "Safari Park",
+        "valor": 8000,
+        "accion": "nuclear overdrive"
+    },
+    "Sage the Smart Bean": {
+        "giftName": "Sage the Smart Bean",
+        "valor": 399,
+        "accion": "nuclear"
+    },
+    "Sage's Coinbot": {
+        "giftName": "Sage's Coinbot",
+        "valor": 2199,
+        "accion": "nuclear overdrive"
+    },
+    "Sage's Slash": {
+        "giftName": "Sage's Slash",
+        "valor": 399,
+        "accion": "nuclear"
+    },
+    "Sage’s Venture": {
+        "giftName": "Sage’s Venture",
+        "valor": 4999,
+        "accion": "nuclear overdrive"
+    },
+    "Sakura": {
+        "giftName": "Sakura",
+        "valor": 5,
+        "accion": "disparos"
+    },
+    "Sakura Corgi": {
+        "giftName": "Sakura Corgi",
+        "valor": 499,
+        "accion": "nuclear"
+    },
+    "Sakura Crown": {
+        "giftName": "Sakura Crown",
+        "valor": 899,
+        "accion": "nuclear overdrive"
+    },
+    "Sam in New City": {
+        "giftName": "Sam in New City",
+        "valor": 6000,
+        "accion": "nuclear overdrive"
+    },
+    "Sam the Whale": {
+        "giftName": "Sam the Whale",
+        "valor": 30000,
+        "accion": "nuclear overdrive"
+    },
+    "Samfaring Tom": {
+        "giftName": "Samfaring Tom",
+        "valor": 2850,
+        "accion": "nuclear overdrive"
+    },
+    "Santa": {
+        "giftName": "Santa",
+        "valor": 1,
+        "accion": "disparos"
+    },
+    "Santa Cocoa": {
+        "giftName": "Santa Cocoa",
+        "valor": 149,
+        "accion": "cazador"
+    },
+    "Santa Heart": {
+        "giftName": "Santa Heart",
+        "valor": 1,
+        "accion": "disparos"
+    },
+    "Santa Owl Surprise": {
+        "giftName": "Santa Owl Surprise",
+        "valor": 399,
+        "accion": "nuclear"
+    },
+    "Santa Swing": {
+        "giftName": "Santa Swing",
+        "valor": 90,
+        "accion": "laser"
+    },
+    "Santa Town": {
+        "giftName": "Santa Town",
+        "valor": 9999,
+        "accion": "nuclear overdrive"
+    },
+    "Santa's Here!": {
+        "giftName": "Santa's Here!",
+        "valor": 9999,
+        "accion": "nuclear overdrive"
+    },
+    "Santa’s Express": {
+        "giftName": "Santa’s Express",
+        "valor": 5999,
+        "accion": "nuclear overdrive"
+    },
+    "Santa’s House": {
+        "giftName": "Santa’s House",
+        "valor": 2200,
+        "accion": "nuclear overdrive"
+    },
+    "Santa’s Mailbox": {
+        "giftName": "Santa’s Mailbox",
+        "valor": 199,
+        "accion": "cazador"
+    },
+    "Sausage": {
+        "giftName": "Sausage",
+        "valor": 10,
+        "accion": "disparos"
+    },
+    "Saxophone": {
+        "giftName": "Saxophone",
+        "valor": 9000,
+        "accion": "nuclear overdrive"
+    },
+    "Scented Candle": {
+        "giftName": "Scented Candle",
+        "valor": 20,
+        "accion": "ola"
+    },
+    "Sceptre": {
+        "giftName": "Sceptre",
+        "valor": 150,
+        "accion": "cazador"
+    },
+    "Scythe of Justice": {
+        "giftName": "Scythe of Justice",
+        "valor": 14999,
+        "accion": "nuclear overdrive"
+    },
+    "Seal and Whale": {
+        "giftName": "Seal and Whale",
+        "valor": 34500,
+        "accion": "nuclear overdrive"
+    },
+    "Season Champion": {
+        "giftName": "Season Champion",
+        "valor": 20000,
+        "accion": "nuclear overdrive"
+    },
+    "Send Heart": {
+        "giftName": "Send Heart",
+        "valor": 99,
+        "accion": "laser"
+    },
+    "Sending positivity": {
+        "giftName": "Sending positivity",
+        "valor": 199,
+        "accion": "cazador"
+    },
+    "Sending strength": {
+        "giftName": "Sending strength",
+        "valor": 90,
+        "accion": "laser"
+    },
+    "Shashlik": {
+        "giftName": "Shashlik",
+        "valor": 500,
+        "accion": "nuclear overdrive"
+    },
+    "Shell Energy": {
+        "giftName": "Shell Energy",
+        "valor": 100,
+        "accion": "cazador"
+    },
+    "Shepherd": {
+        "giftName": "Shepherd",
+        "valor": 10,
+        "accion": "disparos"
+    },
+    "Shiba Inu": {
+        "giftName": "Shiba Inu",
+        "valor": 199,
+        "accion": "cazador"
+    },
+    "Shield": {
+        "giftName": "Shield",
+        "valor": 1,
+        "accion": "disparos"
+    },
+    "Shield Gift": {
+        "giftName": "Shield Gift",
+        "valor": 299,
+        "accion": "nuclear"
+    },
+    "Shiny air balloon": {
+        "giftName": "Shiny air balloon",
+        "valor": 1000,
+        "accion": "nuclear overdrive"
+    },
+    "Shoot the Apple": {
+        "giftName": "Shoot the Apple",
+        "valor": 399,
+        "accion": "nuclear"
+    },
+    "Shooting Stars": {
+        "giftName": "Shooting Stars",
+        "valor": 1580,
+        "accion": "nuclear overdrive"
+    },
+    "Side by Side": {
+        "giftName": "Side by Side",
+        "valor": 199,
+        "accion": "cazador"
+    },
+    "Sign language love": {
+        "giftName": "Sign language love",
+        "valor": 49,
+        "accion": "laser"
+    },
+    "Signature Jet": {
+        "giftName": "Signature Jet",
+        "valor": 4888,
+        "accion": "nuclear overdrive"
+    },
+    "Silver Sports Car": {
+        "giftName": "Silver Sports Car",
+        "valor": 5000,
+        "accion": "nuclear overdrive"
+    },
+    "Singing frogs": {
+        "giftName": "Singing frogs",
+        "valor": 398,
+        "accion": "nuclear"
+    },
+    "Singing Magic": {
+        "giftName": "Singing Magic",
+        "valor": 100,
+        "accion": "cazador"
+    },
+    "Singing Mic": {
+        "giftName": "Singing Mic",
+        "valor": 399,
+        "accion": "nuclear"
+    },
+    "Singing Sax": {
+        "giftName": "Singing Sax",
+        "valor": 399,
+        "accion": "nuclear"
+    },
+    "Sky Drift": {
+        "giftName": "Sky Drift",
+        "valor": 2000,
+        "accion": "nuclear overdrive"
+    },
+    "Sky Lantern": {
+        "giftName": "Sky Lantern",
+        "valor": 700,
+        "accion": "nuclear overdrive"
+    },
+    "Slay": {
+        "giftName": "Slay",
+        "valor": 1,
+        "accion": "disparos"
+    },
+    "Sleepy Kitty": {
+        "giftName": "Sleepy Kitty",
+        "valor": 2800,
+        "accion": "nuclear overdrive"
+    },
+    "Slow motion": {
+        "giftName": "Slow motion",
+        "valor": 10,
+        "accion": "disparos"
+    },
+    "Smitten Kitten": {
+        "giftName": "Smitten Kitten",
+        "valor": 500,
+        "accion": "nuclear overdrive"
+    },
+    "Snow Leopard": {
+        "giftName": "Snow Leopard",
+        "valor": 15000,
+        "accion": "nuclear overdrive"
+    },
+    "Snow Rabbit": {
+        "giftName": "Snow Rabbit",
+        "valor": 99,
+        "accion": "laser"
+    },
+    "Snow Rider": {
+        "giftName": "Snow Rider",
+        "valor": 6999,
+        "accion": "nuclear overdrive"
+    },
+    "Snowboard": {
+        "giftName": "Snowboard",
+        "valor": 9,
+        "accion": "disparos"
+    },
+    "Snowfall": {
+        "giftName": "Snowfall",
+        "valor": 400,
+        "accion": "nuclear"
+    },
+    "Snowman": {
+        "giftName": "Snowman",
+        "valor": 10,
+        "accion": "disparos"
+    },
+    "So Cute": {
+        "giftName": "So Cute",
+        "valor": 1,
+        "accion": "disparos"
+    },
+    "Soaring Spirit": {
+        "giftName": "Soaring Spirit",
+        "valor": 3999,
+        "accion": "nuclear overdrive"
+    },
+    "Soccer Ball": {
+        "giftName": "Soccer Ball",
+        "valor": 39,
+        "accion": "laser"
+    },
+    "Solar Temple": {
+        "giftName": "Solar Temple",
+        "valor": 25999,
+        "accion": "nuclear overdrive"
+    },
+    "Song of Harvest": {
+        "giftName": "Song of Harvest",
+        "valor": 150,
+        "accion": "cazador"
+    },
+    "Sour Buddy": {
+        "giftName": "Sour Buddy",
+        "valor": 199,
+        "accion": "cazador"
+    },
+    "Space Cat": {
+        "giftName": "Space Cat",
+        "valor": 1500,
+        "accion": "nuclear overdrive"
+    },
+    "Space Dog": {
+        "giftName": "Space Dog",
+        "valor": 2500,
+        "accion": "nuclear overdrive"
+    },
+    "Space Love": {
+        "giftName": "Space Love",
+        "valor": 449,
+        "accion": "nuclear"
+    },
+    "Spaceship": {
+        "giftName": "Spaceship",
+        "valor": 13999,
+        "accion": "nuclear overdrive"
+    },
+    "Spark": {
+        "giftName": "Spark",
+        "valor": 20000,
+        "accion": "nuclear overdrive"
+    },
+    "Sparkle Dance": {
+        "giftName": "Sparkle Dance",
+        "valor": 1000,
+        "accion": "nuclear overdrive"
+    },
+    "Sparklers": {
+        "giftName": "Sparklers",
+        "valor": 199,
+        "accion": "cazador"
+    },
+    "Sponge cake": {
+        "giftName": "Sponge cake",
+        "valor": 5,
+        "accion": "disparos"
+    },
+    "Spookville": {
+        "giftName": "Spookville",
+        "valor": 15000,
+        "accion": "nuclear overdrive"
+    },
+    "Spooky Cat": {
+        "giftName": "Spooky Cat",
+        "valor": 1200,
+        "accion": "nuclear overdrive"
+    },
+    "Sports Car": {
+        "giftName": "Sports Car",
+        "valor": 7000,
+        "accion": "nuclear overdrive"
+    },
+    "Squeeze the Day": {
+        "giftName": "Squeeze the Day",
+        "valor": 2000,
+        "accion": "nuclear overdrive"
+    },
+    "Squirrel": {
+        "giftName": "Squirrel",
+        "valor": 1,
+        "accion": "disparos"
+    },
+    "Stallion": {
+        "giftName": "Stallion",
+        "valor": 15000,
+        "accion": "nuclear overdrive"
+    },
+    "Star": {
+        "giftName": "Star",
+        "valor": 99,
+        "accion": "laser"
+    },
+    "Star Glasses": {
+        "giftName": "Star Glasses",
+        "valor": 199,
+        "accion": "cazador"
+    },
+    "Star Goggles": {
+        "giftName": "Star Goggles",
+        "valor": 249,
+        "accion": "nuclear"
+    },
+    "Star Map": {
+        "giftName": "Star Map",
+        "valor": 500,
+        "accion": "nuclear overdrive"
+    },
+    "Star Map Polaris": {
+        "giftName": "Star Map Polaris",
+        "valor": 500,
+        "accion": "nuclear overdrive"
+    },
+    "Star of Red Carpet": {
+        "giftName": "Star of Red Carpet",
+        "valor": 1999,
+        "accion": "nuclear overdrive"
+    },
+    "Star Throne": {
+        "giftName": "Star Throne",
+        "valor": 7999,
+        "accion": "nuclear overdrive"
+    },
+    "Stargazing": {
+        "giftName": "Stargazing",
+        "valor": 2200,
+        "accion": "nuclear overdrive"
+    },
+    "Starlight Compass": {
+        "giftName": "Starlight Compass",
+        "valor": 299,
+        "accion": "nuclear"
+    },
+    "Starlight Sceptre": {
+        "giftName": "Starlight Sceptre",
+        "valor": 1200,
+        "accion": "nuclear overdrive"
+    },
+    "Stellar Ark": {
+        "giftName": "Stellar Ark",
+        "valor": 25999,
+        "accion": "nuclear overdrive"
+    },
+    "Steven Wingman": {
+        "giftName": "Steven Wingman",
+        "valor": 1,
+        "accion": "disparos"
+    },
+    "Stinging Bee": {
+        "giftName": "Stinging Bee",
+        "valor": 199,
+        "accion": "cazador"
+    },
+    "Storm Blade": {
+        "giftName": "Storm Blade",
+        "valor": 14999,
+        "accion": "nuclear overdrive"
+    },
+    "Strawbs & Cream": {
+        "giftName": "Strawbs & Cream",
+        "valor": 30,
+        "accion": "laser"
+    },
+    "Stroke Hair": {
+        "giftName": "Stroke Hair",
+        "valor": 199,
+        "accion": "cazador"
+    },
+    "Stroke Me": {
+        "giftName": "Stroke Me",
+        "valor": 2800,
+        "accion": "nuclear overdrive"
+    },
+    "Strong Finish": {
+        "giftName": "Strong Finish",
+        "valor": 6000,
+        "accion": "nuclear overdrive"
+    },
+    "Style Me Up": {
+        "giftName": "Style Me Up",
+        "valor": 10,
+        "accion": "disparos"
+    },
+    "Sugar Whiskers": {
+        "giftName": "Sugar Whiskers",
+        "valor": 4918,
+        "accion": "nuclear overdrive"
+    },
+    "Suitcase": {
+        "giftName": "Suitcase",
+        "valor": 199,
+        "accion": "cazador"
+    },
+    "Summer of LIVE": {
+        "giftName": "Summer of LIVE",
+        "valor": 500,
+        "accion": "nuclear overdrive"
+    },
+    "Summer Pass L": {
+        "giftName": "Summer Pass L",
+        "valor": 2499,
+        "accion": "nuclear overdrive"
+    },
+    "Summer Pass M": {
+        "giftName": "Summer Pass M",
+        "valor": 349,
+        "accion": "nuclear"
+    },
+    "Summer Pass S": {
+        "giftName": "Summer Pass S",
+        "valor": 1,
+        "accion": "disparos"
+    },
+    "Summer Pass XL": {
+        "giftName": "Summer Pass XL",
+        "valor": 13500,
+        "accion": "nuclear overdrive"
+    },
+    "Summer Sun": {
+        "giftName": "Summer Sun",
+        "valor": 20,
+        "accion": "ola"
+    },
+    "Suncatcher": {
+        "giftName": "Suncatcher",
+        "valor": 800,
+        "accion": "nuclear overdrive"
+    },
+    "Sundae Bowl": {
+        "giftName": "Sundae Bowl",
+        "valor": 99,
+        "accion": "laser"
+    },
+    "Sunglasses": {
+        "giftName": "Sunglasses",
+        "valor": 199,
+        "accion": "cazador"
+    },
+    "Sunset Speedway": {
+        "giftName": "Sunset Speedway",
+        "valor": 10000,
+        "accion": "nuclear overdrive"
+    },
+    "Super Cake": {
+        "giftName": "Super Cake",
+        "valor": 1999,
+        "accion": "nuclear overdrive"
+    },
+    "Super GG": {
+        "giftName": "Super GG",
+        "valor": 100,
+        "accion": "cazador"
+    },
+    "Super LIVE Star": {
+        "giftName": "Super LIVE Star",
+        "valor": 1000,
+        "accion": "nuclear overdrive"
+    },
+    "Super Popular": {
+        "giftName": "Super Popular",
+        "valor": 9,
+        "accion": "disparos"
+    },
+    "Superpower": {
+        "giftName": "Superpower",
+        "valor": 299,
+        "accion": "nuclear"
+    },
+    "Superstar": {
+        "giftName": "Superstar",
+        "valor": 900,
+        "accion": "nuclear overdrive"
+    },
+    "Surfing Penguin": {
+        "giftName": "Surfing Penguin",
+        "valor": 499,
+        "accion": "nuclear"
+    },
+    "Sushi Set": {
+        "giftName": "Sushi Set",
+        "valor": 20,
+        "accion": "ola"
+    },
+    "Swan": {
+        "giftName": "Swan",
+        "valor": 699,
+        "accion": "nuclear overdrive"
+    },
+    "Sweet Flutter": {
+        "giftName": "Sweet Flutter",
+        "valor": 249,
+        "accion": "nuclear"
+    },
+    "Tails in Flight": {
+        "giftName": "Tails in Flight",
+        "valor": 15000,
+        "accion": "nuclear overdrive"
+    },
+    "Take My Rose!": {
+        "giftName": "Take My Rose!",
+        "valor": 2000,
+        "accion": "nuclear overdrive"
+    },
+    "Tambourine": {
+        "giftName": "Tambourine",
+        "valor": 300,
+        "accion": "nuclear"
+    },
+    "Tango": {
+        "giftName": "Tango",
+        "valor": 800,
+        "accion": "nuclear overdrive"
+    },
+    "Taraxacum Corgi": {
+        "giftName": "Taraxacum Corgi",
+        "valor": 400,
+        "accion": "nuclear"
+    },
+    "Tarsier": {
+        "giftName": "Tarsier",
+        "valor": 10,
+        "accion": "disparos"
+    },
+    "Team Bracelet": {
+        "giftName": "Team Bracelet",
+        "valor": 2,
+        "accion": "disparos"
+    },
+    "Team Cheers": {
+        "giftName": "Team Cheers",
+        "valor": 1,
+        "accion": "disparos"
+    },
+    "Team Power": {
+        "giftName": "Team Power",
+        "valor": 9,
+        "accion": "disparos"
+    },
+    "Team Victory": {
+        "giftName": "Team Victory",
+        "valor": 99,
+        "accion": "laser"
+    },
+    "Tennis Love": {
+        "giftName": "Tennis Love",
+        "valor": 1,
+        "accion": "disparos"
+    },
+    "Terminator Face": {
+        "giftName": "Terminator Face",
+        "valor": 449,
+        "accion": "nuclear"
+    },
+    "The Crown": {
+        "giftName": "The Crown",
+        "valor": 199,
+        "accion": "cazador"
+    },
+    "The Magic Lamp": {
+        "giftName": "The Magic Lamp",
+        "valor": 1000,
+        "accion": "nuclear overdrive"
+    },
+    "The Mullet": {
+        "giftName": "The Mullet",
+        "valor": 299,
+        "accion": "nuclear"
+    },
+    "The Van Cat": {
+        "giftName": "The Van Cat",
+        "valor": 799,
+        "accion": "nuclear overdrive"
+    },
+    "Thumbs Up": {
+        "giftName": "Thumbs Up",
+        "valor": 2,
+        "accion": "disparos"
+    },
+    "Thunder Falcon": {
+        "giftName": "Thunder Falcon",
+        "valor": 39999,
+        "accion": "nuclear overdrive"
+    },
+    "Thunder Hammer": {
+        "giftName": "Thunder Hammer",
+        "valor": 1,
+        "accion": "disparos"
+    },
+    "Tiger Lift": {
+        "giftName": "Tiger Lift",
+        "valor": 399,
+        "accion": "nuclear"
+    },
+    "TikTok": {
+        "giftName": "TikTok",
+        "valor": 1,
+        "accion": "disparos"
+    },
+    "TikTok Crown": {
+        "giftName": "TikTok Crown",
+        "valor": 299,
+        "accion": "nuclear"
+    },
+    "TikTok Houses Glory": {
+        "giftName": "TikTok Houses Glory",
+        "valor": 30000,
+        "accion": "nuclear overdrive"
+    },
+    "TikTok Red Carpet": {
+        "giftName": "TikTok Red Carpet",
+        "valor": 6600,
+        "accion": "nuclear overdrive"
+    },
+    "TikTok Shuttle": {
+        "giftName": "TikTok Shuttle",
+        "valor": 20000,
+        "accion": "nuclear overdrive"
+    },
+    "TikTok Stars": {
+        "giftName": "TikTok Stars",
+        "valor": 39999,
+        "accion": "nuclear overdrive"
+    },
+    "TikTok Universe": {
+        "giftName": "TikTok Universe",
+        "valor": 44999,
+        "accion": "nuclear overdrive"
+    },
+    "TikTok Universe+": {
+        "giftName": "TikTok Universe+",
+        "valor": 34999,
+        "accion": "nuclear overdrive"
+    },
+    "Time for Family": {
+        "giftName": "Time for Family",
+        "valor": 15000,
+        "accion": "nuclear overdrive"
+    },
+    "Time Warp": {
+        "giftName": "Time Warp",
+        "valor": 1500,
+        "accion": "nuclear overdrive"
+    },
+    "Tiny Diny": {
+        "giftName": "Tiny Diny",
+        "valor": 10,
+        "accion": "disparos"
+    },
+    "Tiny Diny Hotdog": {
+        "giftName": "Tiny Diny Hotdog",
+        "valor": 20,
+        "accion": "ola"
+    },
+    "Tiny Diny in Love": {
+        "giftName": "Tiny Diny in Love",
+        "valor": 15,
+        "accion": "disparos"
+    },
+    "Tiny Diny Mic": {
+        "giftName": "Tiny Diny Mic",
+        "valor": 5,
+        "accion": "disparos"
+    },
+    "Tiny Diny on the Drums": {
+        "giftName": "Tiny Diny on the Drums",
+        "valor": 4000,
+        "accion": "nuclear overdrive"
+    },
+    "Tiny Diny Show": {
+        "giftName": "Tiny Diny Show",
+        "valor": 12000,
+        "accion": "nuclear overdrive"
+    },
+    "Tiny Diny Trek": {
+        "giftName": "Tiny Diny Trek",
+        "valor": 200,
+        "accion": "nuclear"
+    },
+    "To the Space": {
+        "giftName": "To the Space",
+        "valor": 15000,
+        "accion": "nuclear overdrive"
+    },
+    "Tofu": {
+        "giftName": "Tofu",
+        "valor": 5,
+        "accion": "disparos"
+    },
+    "Tom Christmas": {
+        "giftName": "Tom Christmas",
+        "valor": 10,
+        "accion": "disparos"
+    },
+    "Tom the Tomato": {
+        "giftName": "Tom the Tomato",
+        "valor": 1,
+        "accion": "disparos"
+    },
+    "Tom's Hug": {
+        "giftName": "Tom's Hug",
+        "valor": 399,
+        "accion": "nuclear"
+    },
+    "Tom's Love": {
+        "giftName": "Tom's Love",
+        "valor": 4999,
+        "accion": "nuclear overdrive"
+    },
+    "Torch": {
+        "giftName": "Torch",
+        "valor": 99,
+        "accion": "laser"
+    },
+    "Toucan": {
+        "giftName": "Toucan",
+        "valor": 199,
+        "accion": "cazador"
+    },
+    "Tractor": {
+        "giftName": "Tractor",
+        "valor": 4099,
+        "accion": "nuclear overdrive"
+    },
+    "Train": {
+        "giftName": "Train",
+        "valor": 899,
+        "accion": "nuclear overdrive"
+    },
+    "Travel with You": {
+        "giftName": "Travel with You",
+        "valor": 999,
+        "accion": "nuclear overdrive"
+    },
+    "Treasure Chest": {
+        "giftName": "Treasure Chest",
+        "valor": 1500,
+        "accion": "nuclear overdrive"
+    },
+    "Treasured Voice": {
+        "giftName": "Treasured Voice",
+        "valor": 249,
+        "accion": "nuclear"
+    },
+    "Trending Figure": {
+        "giftName": "Trending Figure",
+        "valor": 999,
+        "accion": "nuclear overdrive"
+    },
+    "Trophy": {
+        "giftName": "Trophy",
+        "valor": 500,
+        "accion": "nuclear overdrive"
+    },
+    "Trumpet": {
+        "giftName": "Trumpet",
+        "valor": 29,
+        "accion": "ola"
+    },
+    "Tsar": {
+        "giftName": "Tsar",
+        "valor": 100,
+        "accion": "cazador"
+    },
+    "Tulip Box": {
+        "giftName": "Tulip Box",
+        "valor": 200,
+        "accion": "nuclear"
+    },
+    "Twinkling Star": {
+        "giftName": "Twinkling Star",
+        "valor": 199,
+        "accion": "cazador"
+    },
+    "Twirl & Treat": {
+        "giftName": "Twirl & Treat",
+        "valor": 1500,
+        "accion": "nuclear overdrive"
+    },
+    "Tyubeteika": {
+        "giftName": "Tyubeteika",
+        "valor": 199,
+        "accion": "cazador"
+    },
+    "U make Miso happy!": {
+        "giftName": "U make Miso happy!",
+        "valor": 30,
+        "accion": "laser"
+    },
+    "Umbrella": {
+        "giftName": "Umbrella",
+        "valor": 150,
+        "accion": "cazador"
+    },
+    "Umbrella of Love": {
+        "giftName": "Umbrella of Love",
+        "valor": 1200,
+        "accion": "nuclear overdrive"
+    },
+    "Under Control": {
+        "giftName": "Under Control",
+        "valor": 1500,
+        "accion": "nuclear overdrive"
+    },
+    "UniCORN": {
+        "giftName": "UniCORN",
+        "valor": 5500,
+        "accion": "nuclear overdrive"
+    },
+    "Unicorn Fantasy": {
+        "giftName": "Unicorn Fantasy",
+        "valor": 5000,
+        "accion": "nuclear overdrive"
+    },
+    "United Heart": {
+        "giftName": "United Heart",
+        "valor": 299,
+        "accion": "nuclear"
+    },
+    "Universes Music": {
+        "giftName": "Universes Music",
+        "valor": 4888,
+        "accion": "nuclear overdrive"
+    },
+    "Vacation LIVE": {
+        "giftName": "Vacation LIVE",
+        "valor": 2000,
+        "accion": "nuclear overdrive"
+    },
+    "Valentine Cake": {
+        "giftName": "Valentine Cake",
+        "valor": 1500,
+        "accion": "nuclear overdrive"
+    },
+    "Valerian's Oath": {
+        "giftName": "Valerian's Oath",
+        "valor": 42999,
+        "accion": "nuclear overdrive"
+    },
+    "Valiant Odyssey": {
+        "giftName": "Valiant Odyssey",
+        "valor": 5888,
+        "accion": "nuclear overdrive"
+    },
+    "Varsity Squad": {
+        "giftName": "Varsity Squad",
+        "valor": 7000,
+        "accion": "nuclear overdrive"
+    },
+    "Vase": {
+        "giftName": "Vase",
+        "valor": 4000,
+        "accion": "nuclear overdrive"
+    },
+    "VHS Player": {
+        "giftName": "VHS Player",
+        "valor": 25000,
+        "accion": "nuclear overdrive"
+    },
+    "Vibrant Stage": {
+        "giftName": "Vibrant Stage",
+        "valor": 1400,
+        "accion": "nuclear overdrive"
+    },
+    "Victory Sign": {
+        "giftName": "Victory Sign",
+        "valor": 299,
+        "accion": "nuclear"
+    },
+    "Victory Wing": {
+        "giftName": "Victory Wing",
+        "valor": 5000,
+        "accion": "nuclear overdrive"
+    },
+    "Viking Hammer": {
+        "giftName": "Viking Hammer",
+        "valor": 1500,
+        "accion": "nuclear overdrive"
+    },
+    "Vintage flight": {
+        "giftName": "Vintage flight",
+        "valor": 349,
+        "accion": "nuclear"
+    },
+    "Vinyl Flip": {
+        "giftName": "Vinyl Flip",
+        "valor": 349,
+        "accion": "nuclear"
+    },
+    "VR Goggles": {
+        "giftName": "VR Goggles",
+        "valor": 500,
+        "accion": "nuclear overdrive"
+    },
+    "Vulcan": {
+        "giftName": "Vulcan",
+        "valor": 25999,
+        "accion": "nuclear overdrive"
+    },
+    "Wanda the Witch": {
+        "giftName": "Wanda the Witch",
+        "valor": 5000,
+        "accion": "nuclear overdrive"
+    },
+    "Wata Drum": {
+        "giftName": "Wata Drum",
+        "valor": 10,
+        "accion": "disparos"
+    },
+    "Watch out": {
+        "giftName": "Watch out",
+        "valor": 1800,
+        "accion": "nuclear overdrive"
+    },
+    "Watermelon Love": {
+        "giftName": "Watermelon Love",
+        "valor": 1000,
+        "accion": "nuclear overdrive"
+    },
+    "Wave Firework": {
+        "giftName": "Wave Firework",
+        "valor": 5,
+        "accion": "disparos"
+    },
+    "Whale Diving": {
+        "giftName": "Whale Diving",
+        "valor": 2150,
+        "accion": "nuclear overdrive"
+    },
+    "Whistle": {
+        "giftName": "Whistle",
+        "valor": 10,
+        "accion": "disparos"
+    },
+    "White Rose": {
+        "giftName": "White Rose",
+        "valor": 1,
+        "accion": "disparos"
+    },
+    "White Tiger": {
+        "giftName": "White Tiger",
+        "valor": 15999,
+        "accion": "nuclear overdrive"
+    },
+    "White Wolf": {
+        "giftName": "White Wolf",
+        "valor": 12000,
+        "accion": "nuclear overdrive"
+    },
+    "Wink Charm": {
+        "giftName": "Wink Charm",
+        "valor": 1,
+        "accion": "disparos"
+    },
+    "Wink wink": {
+        "giftName": "Wink wink",
+        "valor": 1,
+        "accion": "disparos"
+    },
+    "Winning Wednesday": {
+        "giftName": "Winning Wednesday",
+        "valor": 1600,
+        "accion": "nuclear overdrive"
+    },
+    "Winter Magic": {
+        "giftName": "Winter Magic",
+        "valor": 20000,
+        "accion": "nuclear overdrive"
+    },
+    "Wishing Bottle": {
+        "giftName": "Wishing Bottle",
+        "valor": 1,
+        "accion": "disparos"
+    },
+    "Wishing Cake": {
+        "giftName": "Wishing Cake",
+        "valor": 400,
+        "accion": "nuclear"
+    },
+    "Witchy Kitty": {
+        "giftName": "Witchy Kitty",
+        "valor": 30,
+        "accion": "laser"
+    },
+    "With you": {
+        "giftName": "With you",
+        "valor": 6000,
+        "accion": "nuclear overdrive"
+    },
+    "Wolf": {
+        "giftName": "Wolf",
+        "valor": 5500,
+        "accion": "nuclear overdrive"
+    },
+    "Woodland Wonder": {
+        "giftName": "Woodland Wonder",
+        "valor": 30,
+        "accion": "laser"
+    },
+    "Wooly Hat": {
+        "giftName": "Wooly Hat",
+        "valor": 199,
+        "accion": "cazador"
+    },
+    "Work Hard Play Harder": {
+        "giftName": "Work Hard Play Harder",
+        "valor": 6000,
+        "accion": "nuclear overdrive"
+    },
+    "Xich lo": {
+        "giftName": "Xich lo",
+        "valor": 2500,
+        "accion": "nuclear overdrive"
+    },
+    "Xmas in Berlin": {
+        "giftName": "Xmas in Berlin",
+        "valor": 20000,
+        "accion": "nuclear overdrive"
+    },
+    "Xmas in Italy": {
+        "giftName": "Xmas in Italy",
+        "valor": 15000,
+        "accion": "nuclear overdrive"
+    },
+    "Xmas in Paris": {
+        "giftName": "Xmas in Paris",
+        "valor": 15000,
+        "accion": "nuclear overdrive"
+    },
+    "Xmas in Spain": {
+        "giftName": "Xmas in Spain",
+        "valor": 15000,
+        "accion": "nuclear overdrive"
+    },
+    "Xmas Tree Hat": {
+        "giftName": "Xmas Tree Hat",
+        "valor": 449,
+        "accion": "nuclear"
+    },
+    "XXXL Flowers": {
+        "giftName": "XXXL Flowers",
+        "valor": 500,
+        "accion": "nuclear overdrive"
+    },
+    "Yalla!habibi!": {
+        "giftName": "Yalla!habibi!",
+        "valor": 1,
+        "accion": "disparos"
+    },
+    "You Are Loved": {
+        "giftName": "You Are Loved",
+        "valor": 399,
+        "accion": "nuclear"
+    },
+    "You are my Jam": {
+        "giftName": "You are my Jam",
+        "valor": 30,
+        "accion": "laser"
+    },
+    "You are on a Roll": {
+        "giftName": "You are on a Roll",
+        "valor": 30,
+        "accion": "laser"
+    },
+    "You're awesome": {
+        "giftName": "You're awesome",
+        "valor": 1,
+        "accion": "disparos"
+    },
+    "You're So Fly": {
+        "giftName": "You're So Fly",
+        "valor": 1500,
+        "accion": "nuclear overdrive"
+    },
+    "Your Concert": {
+        "giftName": "Your Concert",
+        "valor": 4500,
+        "accion": "nuclear overdrive"
+    },
+    "You’re Amazing": {
+        "giftName": "You’re Amazing",
+        "valor": 500,
+        "accion": "nuclear overdrive"
+    },
+    "You’re the Best!": {
+        "giftName": "You’re the Best!",
+        "valor": 10,
+        "accion": "disparos"
+    },
+    "Yurt": {
+        "giftName": "Yurt",
+        "valor": 5000,
+        "accion": "nuclear overdrive"
+    },
+    "Zeus": {
+        "giftName": "Zeus",
+        "valor": 34000,
+        "accion": "nuclear overdrive"
+    },
+    "Zodiac Wheel": {
+        "giftName": "Zodiac Wheel",
+        "valor": 5000,
+        "accion": "nuclear overdrive"
+    },
+    "Модный Дуэт": {
+        "giftName": "Модный Дуэт",
+        "valor": 1,
+        "accion": "disparos"
+    }
+});
+});

@@ -1,0 +1,11 @@
+{
+  "name": "nisoje-livepanel-v3",
+  "version-string": "0.1.0",
+  "builtin-baseline": "296b89248ad13be09e9324488eb4f74dd322d26c",
+  "dependencies": [
+    "fmt",
+    "spdlog",
+    "nlohmann-json",
+    "catch2"
+  ]
+}

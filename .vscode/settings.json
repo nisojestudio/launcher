@@ -1,0 +1,10 @@
+{
+  "files.eol": "\n",
+  "files.insertFinalNewline": true,
+  "editor.formatOnSave": true,
+  "editor.rulers": [100],
+  "cmake.configureOnOpen": false,
+  "C_Cpp.default.cppStandard": "c++20",
+  "terminal.integrated.defaultProfile.windows": "PowerShell",
+  "python.analysis.typeCheckingMode": "basic"
+}

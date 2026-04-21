@@ -1,0 +1,41 @@
+{
+    "generated_at":  "2026-04-11T18:18:22Z",
+    "games":  [
+                  {
+                      "game_id":  "arena_live",
+                      "display_name":  "Arena Live",
+                      "version":  "20260411-030455",
+                      "package_path":  "catalog/games/arena_live/20260411-030455/arena_live-20260411-030455.zip",
+                      "sha256_path":  "catalog/games/arena_live/20260411-030455/arena_live-20260411-030455.sha256.txt",
+                      "sha256":  "4F32C538B3559E58AC1E231B2F5B6AA6149DE5423692A2B9A976B30B5BBCD92A",
+                      "manifest":  {
+                                       "gameId":  "arena_live",
+                                       "displayName":  "Arena Live",
+                                       "version":  "20260411-030455",
+                                       "description":  "Juego standalone live heredado de LivePanel v2, adaptado como modulo externo para Nisoje Studio.",
+                                       "author":  "Nisoje Studio",
+                                       "capabilities":  [
+
+                                                        ]
+                                   }
+                  },
+                  {
+                      "game_id":  "conquista",
+                      "display_name":  "Conquista",
+                      "version":  "20260411-030455",
+                      "package_path":  "catalog/games/conquista/20260411-030455/conquista-20260411-030455.zip",
+                      "sha256_path":  "catalog/games/conquista/20260411-030455/conquista-20260411-030455.sha256.txt",
+                      "sha256":  "8416614144B91546396A7693242012B93A637CDE4BB912D41422C5AC1628152A",
+                      "manifest":  {
+                                       "gameId":  "conquista",
+                                       "displayName":  "Conquista",
+                                       "version":  "20260411-030455",
+                                       "description":  "Juego standalone 3:4 de conquista territorial heredado de LivePanel v2, adaptado como modulo externo para Nisoje Studio.",
+                                       "author":  "Nisoje Studio",
+                                       "capabilities":  [
+
+                                                        ]
+                                   }
+                  }
+              ]
+}

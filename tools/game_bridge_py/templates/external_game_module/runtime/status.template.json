@@ -1,0 +1,33 @@
+{
+  "type": "GAME_STATE_CHANGE",
+  "payload": {
+    "ts": 0,
+    "state": "RUNNING",
+    "data": {
+      "roundState": "RUNNING",
+      "mode": "replace_me_mode",
+      "canonical": {
+        "modeId": "replace_me_mode",
+        "round": {
+          "state": "RUNNING",
+          "timeLeft": 0,
+          "elapsed": 0
+        },
+        "ranking": [
+          {
+            "rank": 1,
+            "id": "player-1",
+            "name": "Jugador 1",
+            "score": 100,
+            "avatarUrl": ""
+          }
+        ],
+        "feed": [
+          "Rose x1 -> Jugador 1"
+        ]
+      },
+      "achievements": []
+    }
+  },
+  "ts": 0
+}

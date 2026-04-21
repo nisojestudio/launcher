@@ -1,0 +1,39 @@
+{
+  "id": "replace_me_game_id",
+  "displayName": "Replace Me Live",
+  "description": "Legacy live game adapted as an external module for Nisoje Studio.",
+  "type": "external-webview-game",
+  "entryExecutable": "ReplaceMe.exe",
+  "launchArgs": [
+    "--config-file",
+    "config/live_config.json",
+    "--inbox-file",
+    "runtime/inbox/events.jsonl",
+    "--status-file",
+    "runtime/status.json",
+    "--log-file",
+    "runtime/host.log.jsonl"
+  ],
+  "communication": {
+    "configFile": "config/live_config.json",
+    "inboxFile": "runtime/inbox/events.jsonl",
+    "statusFile": "runtime/status.json",
+    "logFile": "runtime/host.log.jsonl"
+  },
+  "bridge": {
+    "launch": {
+      "passModuleRootArg": true,
+      "workingDirectory": "module_root"
+    }
+  },
+  "ui": {
+    "title": "Replace Me Live",
+    "aspect": "3:4",
+    "logicalWidth": 900,
+    "logicalHeight": 1200
+  },
+  "legacyReference": {
+    "sourceGame": "replace_me",
+    "sourceProject": "Nisoje.LivePanel.v2"
+  }
+}
