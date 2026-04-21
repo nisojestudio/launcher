@@ -82,19 +82,25 @@ python -m unittest discover -s tools/bridge_py/tests -t tools/bridge_py -v
 Portable package:
 
 ```powershell
-powershell -ExecutionPolicy Bypass -File .\scripts\package_windows.ps1
+powershell -ExecutionPolicy Bypass -File .\scripts\package_windows.ps1 -OutputRoot .\dist\releases\0.2.0 -PortableZipName panel-live-0.2.0-win-x64-portable.zip
 ```
 
 Installer:
 
 ```powershell
-powershell -ExecutionPolicy Bypass -File .\scripts\build_windows_installer.ps1
+powershell -ExecutionPolicy Bypass -File .\scripts\build_windows_installer.ps1 -Version 0.2.0
+```
+
+Full release preparation:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File .\scripts\release\prepare_release.ps1 -Version 0.2.0
 ```
 
 Release manifest:
 
 ```powershell
-powershell -ExecutionPolicy Bypass -File .\scripts\release\new_release_manifest.ps1 -Version 0.2.0 -ArtifactPaths .\dist\NisojeStudio-portable.zip,.\dist\installer\PanelLive-0.2.0-win-x64.exe
+powershell -ExecutionPolicy Bypass -File .\scripts\release\new_release_manifest.ps1 -Version 0.2.0 -ArtifactPaths .\dist\releases\0.2.0\panel-live-0.2.0-win-x64-portable.zip,.\dist\releases\0.2.0\installer\panel-live-0.2.0-win-x64.exe
 ```
 
 ## Artifact Naming
@@ -106,7 +112,7 @@ panel-live-<version>-win-x64.exe
 panel-live-<version>-win-x64-portable.zip
 ```
 
-Current installer script still emits `PanelLive-3.0-Windows-x64-Setup.exe`. Versioned artifact naming should be implemented before public release publishing.
+The Windows installer flow now emits versioned artifacts under `dist/releases/<version>/`.
 
 ## No Overwrite Rule
 

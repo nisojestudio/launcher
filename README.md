@@ -46,18 +46,26 @@ Eso genera:
 ### Instalador Windows
 
 ```powershell
-powershell -ExecutionPolicy Bypass -File .\scripts\build_windows_installer.ps1
+powershell -ExecutionPolicy Bypass -File .\scripts\build_windows_installer.ps1 -Version 0.1.0
 ```
 
 Eso genera:
 
-- `dist\installer\PanelLive-3.0-Windows-x64-Setup.exe`
-- `dist\SHA256SUMS.txt`
+- `dist\releases\0.1.0\installer\panel-live-0.1.0-win-x64.exe`
+- `dist\releases\0.1.0\panel-live-0.1.0-win-x64-portable.zip`
+- `dist\releases\0.1.0\SHA256SUMS.txt`
+- `dist\releases\0.1.0\release-manifest-0.1.0.json`
 
-Ruta de entrega preparada actualmente:
+Flujo completo de release con backup y pruebas:
 
-- `dist\installer\PanelLive-3.0-Windows-x64-Setup.exe`
-- `dist\NisojeStudio-portable.zip`
+```powershell
+powershell -ExecutionPolicy Bypass -File .\scripts\release\prepare_release.ps1 -Version 0.1.0
+```
+
+Ruta de entrega preparada por version:
+
+- `dist\releases\<version>\installer\panel-live-<version>-win-x64.exe`
+- `dist\releases\<version>\panel-live-<version>-win-x64-portable.zip`
 
 El packaging portable usa un host C++ `Release` en `build\release` y falla si detecta dependencias a CRTs Debug como `MSVCP140D.dll` o `ucrtbased.dll`.
 
@@ -232,6 +240,7 @@ El repo ahora tiene una primera capa operativa no invasiva:
 - scripts base:
   - `scripts/backup/create_project_backup.ps1`
   - `scripts/release/new_release_manifest.ps1`
+  - `scripts/release/prepare_release.ps1`
 
 Respaldo diario de codigo:
 
@@ -243,6 +252,12 @@ Respaldo operativo completo:
 
 ```powershell
 powershell -ExecutionPolicy Bypass -File .\scripts\backup\create_project_backup.ps1 -Mode full
+```
+
+Release versionado con gates locales:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File .\scripts\release\prepare_release.ps1 -Version 0.1.0
 ```
 
 ## Producto local actual

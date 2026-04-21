@@ -7,6 +7,7 @@ param(
     [switch]$BuildOnly,
     [string]$PythonEmbedVersion = "",
     [string]$PythonEmbedZip = "",
+    [string]$PortableZipName = "NisojeStudio-portable.zip",
     [string]$PanelName = "Nisoje Studio",
     [switch]$RequireRemoteAuth,
     [string]$BaseConfigPath = "",
@@ -931,7 +932,11 @@ endlocal
         Assert-NoDebugCrtDependencies -BinaryPath (Join-Path $packageRoot "nlp3_app.exe")
     }
 
-    $zipPath = Join-Path $OutputRoot "NisojeStudio-portable.zip"
+    if ([string]::IsNullOrWhiteSpace($PortableZipName)) {
+        $PortableZipName = "NisojeStudio-portable.zip"
+    }
+
+    $zipPath = Join-Path $OutputRoot $PortableZipName
     Remove-IfExists $zipPath
     Compress-Archive -Path (Join-Path $packageRoot "*") -DestinationPath $zipPath
 

@@ -24,6 +24,8 @@ Goals:
 
 ## Phase 3 - Releases
 
+Status: in progress
+
 Goals:
 - Versioned installer output names.
 - `dist/releases/<version>` output folders.

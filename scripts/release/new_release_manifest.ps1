@@ -8,7 +8,19 @@ param(
 
     [string]$OutputDir = "",
 
-    [switch]$AllowDirty
+    [switch]$AllowDirty,
+
+    [ValidateSet("pending", "passed", "failed", "skipped", "unknown")]
+    [string]$BuildStatus = "pending",
+
+    [ValidateSet("pending", "passed", "failed", "skipped", "unknown")]
+    [string]$TestsStatus = "pending",
+
+    [ValidateSet("pending", "passed", "failed", "skipped", "unknown")]
+    [string]$InstallerStatus = "pending",
+
+    [ValidateSet("pending", "passed", "failed", "skipped", "unknown")]
+    [string]$BackupStatus = "pending"
 )
 
 Set-StrictMode -Version Latest
@@ -68,6 +80,23 @@ function Resolve-Architecture {
     return "unknown"
 }
 
+function Expand-ArtifactPaths {
+    param([string[]]$PathValues)
+
+    foreach ($pathValue in $PathValues) {
+        if ([string]::IsNullOrWhiteSpace($pathValue)) {
+            continue
+        }
+
+        foreach ($part in ($pathValue -split ",")) {
+            $trimmed = $part.Trim()
+            if (-not [string]::IsNullOrWhiteSpace($trimmed)) {
+                $trimmed
+            }
+        }
+    }
+}
+
 $resolvedProjectRoot = Resolve-ProjectRoot -RequestedRoot $ProjectRoot
 $commit = Invoke-Git -Root $resolvedProjectRoot -Arguments @("rev-parse", "--short", "HEAD")
 $branch = Invoke-Git -Root $resolvedProjectRoot -Arguments @("branch", "--show-current")
@@ -85,7 +114,7 @@ $resolvedOutputDir = [System.IO.Path]::GetFullPath($OutputDir)
 New-Item -ItemType Directory -Path $resolvedOutputDir -Force | Out-Null
 
 $artifactEntries = @()
-foreach ($artifactPath in $ArtifactPaths) {
+foreach ($artifactPath in (Expand-ArtifactPaths -PathValues $ArtifactPaths)) {
     if ([string]::IsNullOrWhiteSpace($artifactPath)) {
         continue
     }
@@ -124,10 +153,10 @@ $manifest = [ordered]@{
     artifacts = $artifactEntries
     releaseNotes = "CHANGELOG.md"
     validation = [ordered]@{
-        build = "pending"
-        tests = "pending"
-        installer = "pending"
-        backup = "pending"
+        build = $BuildStatus
+        tests = $TestsStatus
+        installer = $InstallerStatus
+        backup = $BackupStatus
     }
     knownRisks = @()
 }

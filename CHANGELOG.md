@@ -13,6 +13,7 @@ Format follows a lightweight Keep a Changelog style. Versions use SemVer.
 - Added release policy and release manifest schema.
 - Added backup and restore runbooks.
 - Added backup and release manifest helper scripts.
+- Added versioned release preparation flow for Windows installer, portable ZIP, checksums, and manifest outputs under `dist/releases/<version>`.
 - Added contributing guide and roadmap.
 
 ### Fixed

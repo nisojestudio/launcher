@@ -1,9 +1,16 @@
 param(
+    [string]$Version = "0.1.0",
     [string]$ConfigurePreset = "release",
     [string]$BuildPreset = "release",
     [string]$BuildDir = "",
     [string]$OutputRoot = "",
     [switch]$SkipBuild,
+    [switch]$SkipManifest,
+    [switch]$AllowDirtyManifest,
+    [ValidateSet("pending", "passed", "failed", "skipped", "unknown")]
+    [string]$TestsStatus = "pending",
+    [ValidateSet("pending", "passed", "failed", "skipped", "unknown")]
+    [string]$BackupStatus = "pending",
     [string]$VcRedistUrl = "https://aka.ms/vc14/vc_redist.x64.exe",
     [string]$WebView2RuntimeUrl = "https://msedge.sf.dl.delivery.mp.microsoft.com/filestreamingservice/files/0622d6c1-fc78-41a1-88d9-7097d919158f/MicrosoftEdgeWebView2RuntimeInstallerX64.exe",
     [string]$InnoCompiler = ""
@@ -15,6 +22,21 @@ $ErrorActionPreference = "Stop"
 
 function Resolve-ProjectRoot {
     return (Resolve-Path (Join-Path $PSScriptRoot "..")).Path
+}
+
+function Assert-SemVer {
+    param([string]$Value)
+
+    if ($Value -notmatch '^\d+\.\d+\.\d+$') {
+        throw "Version must use MAJOR.MINOR.PATCH format, for example 0.2.0. Received: $Value"
+    }
+}
+
+function ConvertTo-WindowsVersionInfo {
+    param([string]$Value)
+
+    Assert-SemVer -Value $Value
+    return "$Value.0"
 }
 
 function Remove-IfExists {
@@ -115,11 +137,22 @@ function Resolve-IsccPath {
 $projectRoot = Resolve-ProjectRoot
 Push-Location $projectRoot
 try {
+    Assert-SemVer -Value $Version
+
     if ([string]::IsNullOrWhiteSpace($OutputRoot)) {
-        $OutputRoot = Join-Path $projectRoot "dist"
+        $OutputRoot = Join-Path $projectRoot ("dist\releases\{0}" -f $Version)
     }
+    $OutputRoot = [System.IO.Path]::GetFullPath($OutputRoot)
+    New-Item -ItemType Directory -Path $OutputRoot -Force | Out-Null
+
+    $portableZipName = "panel-live-$Version-win-x64-portable.zip"
+    $portableZipPath = [System.IO.Path]::GetFullPath((Join-Path $OutputRoot $portableZipName))
+    $setupBaseName = "panel-live-$Version-win-x64"
+    $windowsVersionInfo = ConvertTo-WindowsVersionInfo -Value $Version
+    $sha256SumsPath = [System.IO.Path]::GetFullPath((Join-Path $OutputRoot "SHA256SUMS.txt"))
 
     $packageScript = Join-Path $projectRoot "scripts\package_windows.ps1"
+    $manifestScript = Join-Path $projectRoot "scripts\release\new_release_manifest.ps1"
     $installerScript = Join-Path $projectRoot "installer\panel_live.iss"
     $packageRoot = [System.IO.Path]::GetFullPath((Join-Path $OutputRoot "NisojeStudio"))
     $installerCache = [System.IO.Path]::GetFullPath((Join-Path $projectRoot "build\installer_cache"))
@@ -132,6 +165,7 @@ try {
         Write-Host "[installer] building portable package source..."
         $packageParams = @{
             OutputRoot = $OutputRoot
+            PortableZipName = $portableZipName
             PanelName = "Panel Live"
             RequireRemoteAuth = $true
             ClearExternalTargetUser = $true
@@ -171,13 +205,16 @@ try {
     Write-Host "[installer] using ISCC: $isccPath"
 
     & $isccPath `
+        "/DAppVersion=$Version" `
+        "/DSetupBaseName=$setupBaseName" `
+        "/DVersionInfoVersionValue=$windowsVersionInfo" `
         "/DPackageRoot=$packageRoot" `
         "/DDependencyRoot=$installerCache" `
         "/DOutputRoot=$installerOutput" `
         "/DSetupIcon=$setupIcon" `
         $installerScript
 
-    $setupExe = Join-Path $installerOutput "PanelLive-3.0-Windows-x64-Setup.exe"
+    $setupExe = Join-Path $installerOutput "$setupBaseName.exe"
     if (-not (Test-Path $setupExe)) {
         throw "Installer was not generated at $setupExe"
     }
@@ -186,11 +223,34 @@ try {
         -OutputRoot $OutputRoot `
         -FilePaths @(
             (Join-Path $packageRoot "NisojeStudio.exe"),
-            (Join-Path $OutputRoot "NisojeStudio-portable.zip"),
+            $portableZipPath,
             $setupExe
         )
 
+    if (-not $SkipManifest) {
+        $manifestParams = @{
+            Version = $Version
+            OutputDir = $OutputRoot
+            ArtifactPaths = @(
+                $portableZipPath,
+                $setupExe,
+                $sha256SumsPath
+            )
+            BuildStatus = $(if ($SkipBuild) { "skipped" } else { "passed" })
+            TestsStatus = $TestsStatus
+            InstallerStatus = "passed"
+            BackupStatus = $BackupStatus
+        }
+        if ($AllowDirtyManifest) {
+            $manifestParams.AllowDirty = $true
+        }
+
+        & $manifestScript @manifestParams
+    }
+
     Write-Host "[installer] setup generated: $setupExe"
+    Write-Host "[installer] portable zip:    $portableZipPath"
+    Write-Host "[installer] checksums:       $sha256SumsPath"
     Write-Host "[installer] package source: $packageRoot"
     Write-Host "[installer] bundled prerequisites: $vcRedistPath, $webView2Path"
 } finally {

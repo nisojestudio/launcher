@@ -1,5 +1,14 @@
 #define MyAppName "Panel Live"
-#define MyAppVersion "3.0"
+#ifndef AppVersion
+  #define AppVersion "0.1.0"
+#endif
+#ifndef SetupBaseName
+  #define SetupBaseName "panel-live-" + AppVersion + "-win-x64"
+#endif
+#ifndef VersionInfoVersionValue
+  #define VersionInfoVersionValue AppVersion + ".0"
+#endif
+#define MyAppVersion AppVersion
 #define MyAppPublisher "Nisoje Studio"
 #define MyAppExeName "NisojeStudio.exe"
 #define VCREDIST_FILE "vc_redist.x64.exe"
@@ -31,7 +40,7 @@ ArchitecturesInstallIn64BitMode=x64compatible
 Compression=lzma2/ultra64
 SolidCompression=yes
 OutputDir={#OutputRoot}
-OutputBaseFilename=PanelLive-3.0-Windows-x64-Setup
+OutputBaseFilename={#SetupBaseName}
 WizardStyle=modern
 WizardBackColor=$09111d
 SetupIconFile={#SetupIcon}
@@ -40,7 +49,7 @@ PrivilegesRequired=admin
 DisableProgramGroupPage=yes
 CloseApplications=yes
 SetupLogging=yes
-VersionInfoVersion=3.0.0.0
+VersionInfoVersion={#VersionInfoVersionValue}
 
 [Languages]
 Name: "spanish"; MessagesFile: "compiler:Languages\Spanish.isl"
