@@ -202,6 +202,14 @@ Documentacion tecnica completa:
 ## Archivos clave
 
 - `AGENTS.md` -> contrato principal para el agente
+- `agents/definitions/AGENT_MAP.md` -> mapa operativo de agentes y responsabilidades
+- `agents/routing/ROUTING_POLICY.md` -> reglas de asignacion y escalamiento
+- `skills/SKILL_CATALOG.md` -> catalogo de skills compartidas por flujo y stack
+- `CHANGELOG.md` -> historial de cambios versionable
+- `ROADMAP.md` -> fases operativas y de producto
+- `CONTRIBUTING.md` -> reglas de ramas, commits, validacion y backups
+- `docs/releases/RELEASE_POLICY.md` -> politica de versionado, artefactos e instaladores
+- `docs/runbooks/BACKUP_POLICY.md` -> politica de respaldos del proyecto
 - `docs/WORKING_CONTRACT.md` -> reglas operativas detalladas
 - `docs/TOOLS_AND_DEPENDENCIES.md` -> herramientas requeridas
 - `docs/HOST_ARCHITECTURE_BASELINE.md` -> estado tecnico del host
@@ -212,6 +220,30 @@ Documentacion tecnica completa:
 - `.github/copilot-instructions.md` -> instrucciones de trabajo dentro del repo
 - `tools/bridge_py/REAL_LOCAL_RUNBOOK.md` -> pasos concretos para operar TikTok real o eventos simulados
 - `tools/bridge_py/README_bridge.md` -> documentacion completa del bridge TikTok modular
+
+## Operacion con agentes, releases y respaldos
+
+El repo ahora tiene una primera capa operativa no invasiva:
+
+- 7 roles principales para orientar el trabajo: Orchestrator, C++ Engineer, Python Engineer, Frontend Web Engineer, Node.js Engineer, QA Engineer y Release Manager.
+- catalogo de skills compartidas para intake, Git, testing, changelog, releases, backups e incidentes
+- politica SemVer y manifiesto JSON por release
+- runbook de backup y restore test
+- scripts base:
+  - `scripts/backup/create_project_backup.ps1`
+  - `scripts/release/new_release_manifest.ps1`
+
+Respaldo diario de codigo:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File .\scripts\backup\create_project_backup.ps1 -Mode code
+```
+
+Respaldo operativo completo:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File .\scripts\backup\create_project_backup.ps1 -Mode full
+```
 
 ## Producto local actual
 

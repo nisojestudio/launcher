@@ -81,6 +81,13 @@ El agente debe crear skills o subagentes solo si aportan valor real, por ejemplo
 - generador de scaffolds de juego
 - validador de contratos C++ ↔ web
 
+La capa operativa del proyecto queda documentada en:
+- `agents/definitions/AGENT_MAP.md`
+- `agents/routing/ROUTING_POLICY.md`
+- `skills/SKILL_CATALOG.md`
+- `docs/releases/RELEASE_POLICY.md`
+- `docs/runbooks/BACKUP_POLICY.md`
+
 ## 9. Entregables por etapa
 Cada etapa debe terminar con:
 - resumen de lo hecho
