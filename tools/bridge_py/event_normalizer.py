@@ -16,11 +16,13 @@ from tiktok_adapter import (
     _timestamp_ms,
     clamp_int,
     clamp_text,
+    extract_chat_message,
     extract_tiktok_event_identity,
     extract_viewer_count,
     resolve_room_id,
     safe_attr,
     safe_user,
+    tiktok_source_event_type,
 )
 
 
@@ -116,16 +118,25 @@ def _custom_raw_payload(event: Any) -> dict[str, Any]:
         "msg_type",
         "message",
         "comment",
+        "content",
+        "text",
+        "action_content",
     ):
         field_value = safe_attr(event, field_name, None)
         if field_value is not None:
-            payload[field_name] = field_value
+            payload[field_name] = field_value if isinstance(field_value, (str, int, float, bool)) else str(field_value)
+    question = safe_attr(event, "question", None)
+    question_content = safe_attr(question, "content", None)
+    if question_content is not None:
+        payload["question_content"] = (
+            question_content if isinstance(question_content, (str, int, float, bool)) else str(question_content)
+        )
     return payload
 
 
 def normalize_chat_event(event: Any, *, room_id: Any = "", session_id: str | int | None = None) -> CanonicalEvent:
     actor = _actor_from_user(event)
-    message = clamp_text(safe_attr(event, "comment", "") or safe_attr(event, "text", ""), "", 300)
+    message = extract_chat_message(event)
     metadata = _metadata_from_tiktok_event(
         CanonicalEventType.CHAT,
         event,
@@ -133,7 +144,7 @@ def normalize_chat_event(event: Any, *, room_id: Any = "", session_id: str | int
         room_id=room_id,
         session_id=session_id,
         payload_data={"message": message},
-        source_event_type="comment",
+        source_event_type=tiktok_source_event_type(event),
     )
     return _base_event(
         event_type=CanonicalEventType.CHAT,

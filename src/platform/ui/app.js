@@ -1927,7 +1927,7 @@
     const latestItem = latestRecentActivityItem(18);
     setText(
       els.activityUpdated,
-      latestItem ? `Actualizado ${formatTime(latestItem.timestampMs)}` : "Esperando"
+      latestItem ? "Actividad en curso" : "Esperando"
     );
     setText(els.activityFeedUser, external.targetUser ? `@${external.targetUser}` : "Sin cuenta conectada");
     setText(
@@ -1945,7 +1945,6 @@
 
     els.recentActivityList.innerHTML = items.map((entry) => (
       `<div class="activity-monitor-line">` +
-        `<span class="activity-monitor-time">${escapeHtml(formatTime(entry.timestampMs))}</span>` +
         `<span class="activity-monitor-label tone-${escapeHtml(activityMonitorTone(entry))}">[${escapeHtml(activityMonitorTag(entry))}]</span>` +
         `<span class="activity-monitor-actor">${escapeHtml(entry.actorName || "Nisoje Studio")}</span>` +
         `${entry.details ? `<span class="activity-monitor-detail">${escapeHtml(entry.details)}</span>` : ""}` +
@@ -2630,4 +2629,3 @@
 
   init();
 })();
-

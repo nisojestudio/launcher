@@ -27,6 +27,13 @@ from structured_logging import log_json, utc_now_ms
 
 
 TIKTOK_USER_RE = re.compile(r"^[a-z0-9._-]{2,64}$")
+TIKTOK_CHAT_EVENT_NAMES = (
+    "CommentEvent",
+    "CommentsEvent",
+    "EmoteChatEvent",
+    "QuestionNewEvent",
+    "ScreenChatEvent",
+)
 
 
 class TikTokConnectionError(RuntimeError):
@@ -380,7 +387,8 @@ class TikTokConnection:
             )
 
         self._register_handler("ConnectEvent", on_connect)
-        self._register_handler("CommentEvent", on_comment)
+        for event_name in TIKTOK_CHAT_EVENT_NAMES:
+            self._register_handler(event_name, on_comment)
         self._register_handler("GiftEvent", on_gift)
         self._register_handler("LikeEvent", on_like)
         self._register_handler("FollowEvent", on_follow)

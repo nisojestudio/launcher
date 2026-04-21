@@ -52,6 +52,94 @@ class EventNormalizerTests(unittest.TestCase):
         self.assertEqual(normalized.actor.avatar_url, "https://example.com/chat.png")
         self.assertEqual(normalized.text, "hola")
 
+    def test_normalize_chat_preserves_millisecond_timestamp(self) -> None:
+        event = SimpleNamespace(
+            user=make_user(
+                user_id="chat-user",
+                username="chatuser",
+                display_name="Chat User",
+                avatar_url="",
+            ),
+            comment="hola",
+            base_message=SimpleNamespace(create_time=1_776_700_000_000, message_id="msg-001"),
+        )
+
+        normalized = normalize_chat_event(event, room_id="room-001", session_id="session-001")
+
+        self.assertEqual(normalized.metadata.timestamp_ms, 1_776_700_000_000)
+
+    def test_normalize_chat_converts_second_timestamp_to_milliseconds(self) -> None:
+        event = SimpleNamespace(
+            user=make_user(
+                user_id="chat-user",
+                username="chatuser",
+                display_name="Chat User",
+                avatar_url="",
+            ),
+            comment="hola",
+            base_message=SimpleNamespace(create_time=1_776_700_000, message_id="msg-002"),
+        )
+
+        normalized = normalize_chat_event(event, room_id="room-001", session_id="session-001")
+
+        self.assertEqual(normalized.metadata.timestamp_ms, 1_776_700_000_000)
+
+    def test_normalize_screen_chat_uses_user_info_and_content(self) -> None:
+        screen_chat_event = type("ScreenChatEvent", (), {})()
+        screen_chat_event.user_info = make_user(
+            user_id="screen-user",
+            username="screenuser",
+            display_name="Screen User",
+            avatar_url="https://example.com/screen.png",
+        )
+        screen_chat_event.content = "mensaje en pantalla"
+        screen_chat_event.base_message = SimpleNamespace(create_time=1_776_700_000_000, message_id="screen-001")
+
+        normalized = normalize_chat_event(screen_chat_event, room_id="room-001", session_id="session-001")
+
+        self.assertEqual(normalized.event_type, CanonicalEventType.CHAT)
+        self.assertEqual(normalized.actor.user_id, "screen-user")
+        self.assertEqual(normalized.text, "mensaje en pantalla")
+        self.assertEqual(normalized.metadata.source_event_type, "screen_chat")
+
+    def test_normalize_question_chat_uses_nested_question_user_and_content(self) -> None:
+        question_event = type("QuestionNewEvent", (), {})()
+        question_event.question = SimpleNamespace(
+            user=make_user(
+                user_id="question-user",
+                username="questionuser",
+                display_name="Question User",
+                avatar_url="https://example.com/question.png",
+            ),
+            content="pregunta del chat",
+            create_time=1_776_700_000,
+        )
+
+        normalized = normalize_chat_event(question_event, room_id="room-001", session_id="session-001")
+
+        self.assertEqual(normalized.event_type, CanonicalEventType.CHAT)
+        self.assertEqual(normalized.actor.user_id, "question-user")
+        self.assertEqual(normalized.text, "pregunta del chat")
+        self.assertEqual(normalized.metadata.timestamp_ms, 1_776_700_000_000)
+        self.assertEqual(normalized.metadata.source_event_type, "question_new")
+
+    def test_normalize_emote_chat_records_placeholder_text(self) -> None:
+        emote_event = type("EmoteChatEvent", (), {})()
+        emote_event.user = make_user(
+            user_id="emote-user",
+            username="emoteuser",
+            display_name="Emote User",
+            avatar_url="",
+        )
+        emote_event.emote_list = [SimpleNamespace(emote_id="smile")]
+
+        normalized = normalize_chat_event(emote_event, room_id="room-001", session_id="session-001")
+
+        self.assertEqual(normalized.event_type, CanonicalEventType.CHAT)
+        self.assertEqual(normalized.actor.user_id, "emote-user")
+        self.assertEqual(normalized.text, "emote")
+        self.assertEqual(normalized.metadata.source_event_type, "emote_chat")
+
     def test_normalize_viewer_join_preserves_avatar(self) -> None:
         event = SimpleNamespace(
             user=make_user(

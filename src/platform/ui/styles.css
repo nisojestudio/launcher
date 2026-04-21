@@ -1792,11 +1792,6 @@ body::-webkit-scrollbar-corner,
   line-height: 1.45;
 }
 
-.activity-monitor-time {
-  color: #7dd3fc;
-  font-variant-numeric: tabular-nums;
-}
-
 .activity-monitor-label {
   font-weight: 700;
   letter-spacing: 0.06em;

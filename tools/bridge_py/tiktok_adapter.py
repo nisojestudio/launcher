@@ -14,6 +14,26 @@ from bridge_client import (
     build_viewer_join_event,
 )
 
+MAX_EVENT_TIMESTAMP_MS = 9_999_999_999_999
+
+CHAT_EVENT_NAMES = frozenset(
+    (
+        "CommentEvent",
+        "CommentsEvent",
+        "EmoteChatEvent",
+        "QuestionNewEvent",
+        "ScreenChatEvent",
+    )
+)
+
+CHAT_SOURCE_EVENT_TYPES = {
+    "CommentEvent": "comment",
+    "CommentsEvent": "comments",
+    "EmoteChatEvent": "emote_chat",
+    "QuestionNewEvent": "question_new",
+    "ScreenChatEvent": "screen_chat",
+}
+
 
 def clamp_int(value: Any, default: int = 0, min_value: int = 0, max_value: int = 1_000_000) -> int:
     try:
@@ -80,7 +100,78 @@ def normalize_event_time(value: Any) -> int | None:
         parsed = int(value)
     except Exception:
         return None
+    if parsed <= 0:
+        return None
+    if parsed < 10_000_000_000:
+        return parsed * 1000
+    while parsed > MAX_EVENT_TIMESTAMP_MS:
+        parsed //= 1000
     return parsed if parsed > 0 else None
+
+
+def tiktok_event_class_name(event: Any) -> str:
+    return clamp_text(safe_attr(safe_attr(event, "__class__", None), "__name__", ""), "", 80)
+
+
+def tiktok_source_event_type(event: Any) -> str:
+    event_name = tiktok_event_class_name(event)
+    if event_name in CHAT_SOURCE_EVENT_TYPES:
+        return CHAT_SOURCE_EVENT_TYPES[event_name]
+    if event_name.endswith("Event"):
+        event_name = event_name[:-5]
+    return clamp_text(event_name.lower(), "comment", 64)
+
+
+def text_from_tiktok_model(value: Any, *, max_len: int = 300) -> str:
+    if value is None:
+        return ""
+    if isinstance(value, str):
+        return clamp_text(value, "", max_len)
+    if isinstance(value, (int, float)) and not isinstance(value, bool):
+        return clamp_text(str(value), "", max_len)
+
+    pieces = safe_attr(value, "pieces", None)
+    if isinstance(pieces, (list, tuple)) and pieces:
+        joined = "".join(
+            clamp_text(safe_attr(piece, "string_value", ""), "", max_len)
+            for piece in pieces
+        )
+        if joined:
+            return clamp_text(joined, "", max_len)
+
+    for field_name in ("text", "content", "string_value", "default_pattern", "action_content", "message"):
+        text = clamp_text(safe_attr(value, field_name, ""), "", max_len)
+        if text:
+            return text
+    return ""
+
+
+def extract_chat_message(event: Any) -> str:
+    for field_name in ("comment", "text", "content", "message", "action_content"):
+        text = text_from_tiktok_model(safe_attr(event, field_name, None))
+        if text:
+            return text
+
+    question = safe_attr(event, "question", None)
+    question_text = text_from_tiktok_model(safe_attr(question, "content", None))
+    if question_text:
+        return question_text
+
+    content_list = safe_attr(event, "content_list", None)
+    if isinstance(content_list, (list, tuple)) and content_list:
+        parts: list[str] = []
+        for item in content_list:
+            text = text_from_tiktok_model(safe_attr(item, "text", None) or safe_attr(item, "content", None))
+            if text:
+                parts.append(text)
+        if parts:
+            return clamp_text(" ".join(parts), "", 300)
+
+    emote_list = safe_attr(event, "emote_list", None)
+    if isinstance(emote_list, (list, tuple)) and emote_list:
+        return "emote" if len(emote_list) == 1 else f"{len(emote_list)} emotes"
+
+    return ""
 
 
 def normalize_event_identity_value(value: Any, max_len: int = 160) -> str | None:
@@ -154,9 +245,11 @@ def extract_tiktok_event_identity(
         safe_attr(base_message, "log_id", None)
         or safe_attr(event, "log_id", None)
     )
+    question = safe_attr(event, "question", None)
     create_time = (
         safe_attr(base_message, "create_time", None)
         or safe_attr(event, "create_time", None)
+        or safe_attr(question, "create_time", None)
         or safe_attr(event, "timestamp", None)
     )
     return {
@@ -176,7 +269,12 @@ def extract_tiktok_event_identity(
 
 
 def safe_user(event: Any) -> dict[str, str]:
-    user = safe_attr(event, "user", None)
+    question = safe_attr(event, "question", None)
+    user = (
+        safe_attr(event, "user", None)
+        or safe_attr(event, "user_info", None)
+        or safe_attr(question, "user", None)
+    )
     if user is None:
         return {
             "user_id": "",
@@ -280,7 +378,12 @@ def extract_viewer_count(event: Any) -> int:
 
 
 def _timestamp_ms(identity: dict[str, Any]) -> int:
-    return clamp_int(identity.get("timestamp_ms"), default=int(time.time() * 1000), min_value=1)
+    return clamp_int(
+        identity.get("timestamp_ms"),
+        default=int(time.time() * 1000),
+        min_value=1,
+        max_value=MAX_EVENT_TIMESTAMP_MS,
+    )
 
 
 def _actor_fields(user: dict[str, Any]) -> tuple[str, str, str, str, bool, bool, bool]:
@@ -302,12 +405,7 @@ def _actor_fields(user: dict[str, Any]) -> tuple[str, str, str, str, bool, bool,
 def to_external_chat_event(event: Any, *, room_id: Any = "", session_id: str | int | None = None) -> Payload:
     user = safe_user(event)
     actor_id, username, display_name, avatar_url, is_follower, is_subscriber, is_moderator = _actor_fields(user)
-    message = clamp_text(
-        safe_attr(event, "comment", "")
-        or safe_attr(event, "text", ""),
-        "",
-        300,
-    )
+    message = extract_chat_message(event)
     data = {"message": message, "comment": message}
     identity = extract_tiktok_event_identity("chat", event, actor_id, data=data, session_id=session_id)
     return build_chat_event(
@@ -432,13 +530,13 @@ def to_external_viewer_join_event(event: Any, *, room_id: Any = "", session_id: 
 
 def adapt_known_tiktok_event(event: Any, *, room_id: Any = "", session_id: str | int | None = None) -> Payload | None:
     event_name = safe_attr(safe_attr(event, "__class__", None), "__name__", "")
-    adapters = {
-        "CommentEvent": to_external_chat_event,
+    adapters = {name: to_external_chat_event for name in CHAT_EVENT_NAMES}
+    adapters.update({
         "GiftEvent": to_external_gift_event,
         "FollowEvent": to_external_follow_event,
         "ShareEvent": to_external_share_event,
         "JoinEvent": to_external_viewer_join_event,
-    }
+    })
     adapter = adapters.get(str(event_name))
     if adapter is None:
         return None
