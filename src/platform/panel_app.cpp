@@ -801,6 +801,7 @@ bool PanelApp::apply_live_config() {
         return false;
     }
 
+    host_runtime_->clear_pending_tts();
     host_runtime_->apply_automation_config(config_.automation);
     host_runtime_->apply_periodic_tts_config(config_.periodic_tts);
     host_runtime_->apply_bridge_mapper_config(config_.bridge);
@@ -1453,6 +1454,39 @@ PanelAuthLoginResult PanelApp::authenticate_access(const PanelAuthLoginRequest& 
 }
 
 void PanelApp::logout_access() noexcept {
+    if (external_runner_ != nullptr && external_runner_->status().running) {
+        stop_external_runner();
+    } else if (host_runtime_ != nullptr) {
+        host_runtime_->clear_pending_live_backlog();
+    }
+
+    if (host_runtime_ != nullptr) {
+        host_runtime_->reset_session_metrics();
+    }
+    if (activity_log_ != nullptr) {
+        activity_log_->clear();
+    }
+
+    total_external_events_submitted_ = 0;
+    external_bridge_connection_state_ = "disconnected";
+    external_bridge_last_status_message_ = "Access session closed";
+    external_bridge_last_status_timestamp_ms_ = now_wall_clock_ms();
+    external_bridge_current_room_id_.clear();
+    external_bridge_last_event_kind_.clear();
+    external_bridge_last_event_actor_.clear();
+    external_bridge_last_event_timestamp_ms_ = 0;
+    external_bridge_chat_events_ = 0;
+    external_bridge_like_events_ = 0;
+    external_bridge_gift_events_ = 0;
+    external_bridge_follow_events_ = 0;
+    external_bridge_share_events_ = 0;
+    external_bridge_viewer_join_events_ = 0;
+    external_bridge_viewer_count_events_ = 0;
+    external_bridge_live_start_events_ = 0;
+    external_bridge_live_end_events_ = 0;
+    external_bridge_moderation_events_ = 0;
+    external_bridge_custom_raw_events_ = 0;
+
     if (license_service_ != nullptr) {
         license_service_->logout();
     }

@@ -8,6 +8,7 @@
 #include <optional>
 #include <sstream>
 #include <string_view>
+#include <utility>
 #include <vector>
 
 #ifdef _WIN32
@@ -88,6 +89,7 @@ struct ParsedRequest {
     std::string method{};
     std::string path{};
     std::string body{};
+    std::vector<std::pair<std::string, std::string>> headers{};
     bool ready = false;
 };
 
@@ -121,6 +123,7 @@ ParsedRequest parse_request_buffer(std::string_view request_buffer) {
         if (separator != std::string_view::npos) {
             const auto header_name = to_lower_copy(trim_copy(line.substr(0, separator)));
             const auto header_value = trim_copy(line.substr(separator + 1));
+            parsed.headers.emplace_back(header_name, header_value);
             if (header_name == "content-length") {
                 try {
                     content_length = static_cast<std::size_t>(std::stoull(header_value));
@@ -144,6 +147,16 @@ ParsedRequest parse_request_buffer(std::string_view request_buffer) {
     parsed.body = std::string(request_buffer.substr(body_offset, content_length));
     parsed.ready = true;
     return parsed;
+}
+
+std::string request_header(const ParsedRequest& request, std::string_view name) {
+    const auto lowered_name = to_lower_copy(name);
+    for (const auto& [header_name, header_value] : request.headers) {
+        if (header_name == lowered_name) {
+            return header_value;
+        }
+    }
+    return {};
 }
 
 std::string make_http_response(
@@ -420,6 +433,58 @@ std::string make_auth_required_result() {
         "\"message\":\"auth_required\","
         "\"errorCode\":\"auth_required\""
         "}"}; 
+}
+
+std::string make_origin_forbidden_result() {
+    return std::string{"{"
+        "\"ok\":false,"
+        "\"message\":\"origin_not_allowed\","
+        "\"errorCode\":\"origin_not_allowed\""
+        "}"};
+}
+
+bool is_allowed_loopback_origin(std::string_view origin, std::uint16_t port) {
+    const auto normalized = to_lower_copy(trim_copy(origin));
+    constexpr std::string_view prefix = "http://";
+    if (normalized.rfind(prefix, 0) != 0) {
+        return false;
+    }
+
+    auto authority = std::string_view(normalized).substr(prefix.size());
+    const auto path_start = authority.find('/');
+    if (path_start != std::string_view::npos) {
+        authority = authority.substr(0, path_start);
+    }
+
+    const auto port_separator = authority.rfind(':');
+    if (port_separator == std::string_view::npos) {
+        return false;
+    }
+
+    const auto host = authority.substr(0, port_separator);
+    const auto port_text = authority.substr(port_separator + 1);
+    if (host != "127.0.0.1" && host != "localhost") {
+        return false;
+    }
+
+    try {
+        return std::stoul(std::string(port_text)) == port;
+    } catch (...) {
+        return false;
+    }
+}
+
+bool request_origin_allowed(const ParsedRequest& request, const PanelHttpServerStatus& status) {
+    if (request.method != "POST") {
+        return true;
+    }
+
+    const auto origin = request_header(request, "origin");
+    if (origin.empty()) {
+        return true;
+    }
+
+    return is_allowed_loopback_origin(origin, status.port);
 }
 
 bool request_requires_access(const ParsedRequest& request) {
@@ -927,6 +992,10 @@ std::string build_route_response(
     PanelApp* app,
     const ParsedRequest& request,
     const PanelHttpServerStatus& status) {
+    if (!request_origin_allowed(request, status)) {
+        return make_http_response("403 Forbidden", "application/json; charset=utf-8", make_origin_forbidden_result());
+    }
+
     if (request.method == "GET" && request.path == "/") {
         return make_http_response("200 OK", "text/html; charset=utf-8", std::string(nlp3::platform::panel_ui_index_html()));
     }
@@ -935,6 +1004,12 @@ std::string build_route_response(
     }
     if (request.method == "GET" && request.path == "/app.js") {
         return make_http_response("200 OK", "application/javascript; charset=utf-8", std::string(nlp3::platform::panel_ui_app_js()));
+    }
+    if (request.method == "GET" && request.path == "/game-previews.js") {
+        return make_http_response(
+            "200 OK",
+            "application/javascript; charset=utf-8",
+            std::string(nlp3::platform::panel_ui_game_previews_js()));
     }
     if (request.method == "GET" && request.path == "/api/state") {
         return make_http_response(
@@ -953,6 +1028,12 @@ std::string build_route_response(
             "200 OK",
             "application/json; charset=utf-8",
             nlp3::platform::build_panel_http_metrics_json(*app));
+    }
+    if (request.method == "GET" && request.path == "/api/realtime") {
+        return make_http_response(
+            "200 OK",
+            "application/json; charset=utf-8",
+            nlp3::platform::build_panel_http_realtime_json(*app));
     }
     if (request.method == "GET" && request.path == "/api/tts/config") {
         return make_http_response(

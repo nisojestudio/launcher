@@ -728,6 +728,13 @@ std::string events_json(const PanelSnapshot& snapshot) {
     return output.str();
 }
 
+std::string realtime_json(const nlp3::platform::PanelApp& app, const PanelSnapshot& snapshot) {
+    return "{"
+        "\"metrics\":" + metrics_json(app, snapshot) + ","
+        "\"events\":" + events_json(snapshot)
+        + "}";
+}
+
 std::string system_json(const nlp3::platform::PanelApp& app, const PanelSnapshot& snapshot) {
     const auto diagnostics = app.diagnostics();
     const auto system_status = diagnostics.ok
@@ -773,6 +780,11 @@ std::string build_panel_http_events_json(const PanelApp& app) {
 
 std::string build_panel_http_metrics_json(const PanelApp& app) {
     return metrics_json(app, app.snapshot());
+}
+
+std::string build_panel_http_realtime_json(const PanelApp& app) {
+    const auto snapshot = app.snapshot();
+    return realtime_json(app, snapshot);
 }
 
 std::string build_panel_http_tts_json(const PanelApp& app) {

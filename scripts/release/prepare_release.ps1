@@ -76,6 +76,34 @@ function Invoke-External {
     }
 }
 
+function Resolve-BridgeTestPython {
+    param([string]$Root)
+
+    $candidates = @()
+    if (-not [string]::IsNullOrWhiteSpace($env:LIVEPANEL_TIKTOK_PYTHON_EXE)) {
+        $candidates += $env:LIVEPANEL_TIKTOK_PYTHON_EXE
+    }
+    $candidates += (Join-Path $Root "tools\bridge_py\.venv\Scripts\python.exe")
+    $candidates += "python"
+
+    foreach ($candidate in $candidates) {
+        if ([System.IO.Path]::IsPathRooted($candidate) -and -not (Test-Path $candidate)) {
+            continue
+        }
+
+        try {
+            & $candidate -c "import yaml, websockets" *> $null
+            if ($LASTEXITCODE -eq 0) {
+                return $candidate
+            }
+        } catch {
+            continue
+        }
+    }
+
+    throw "Python bridge tests require a runtime with yaml and websockets. Set LIVEPANEL_TIKTOK_PYTHON_EXE or run tools\bridge_py\setup_windows_bridge_env.ps1."
+}
+
 Assert-SemVer -Value $Version
 $projectRoot = Resolve-ProjectRoot
 $releaseRoot = if ([string]::IsNullOrWhiteSpace($OutputRoot)) {
@@ -124,9 +152,10 @@ try {
         Write-Host "[release] running C++ tests"
         Invoke-External -FilePath "ctest" -Arguments @("--preset", "release", "--output-on-failure")
 
-        Write-Host "[release] running Python bridge tests"
+        $bridgeTestPython = Resolve-BridgeTestPython -Root $projectRoot
+        Write-Host "[release] running Python bridge tests with $bridgeTestPython"
         Invoke-External `
-            -FilePath "python" `
+            -FilePath $bridgeTestPython `
             -Arguments @(
                 "-m", "unittest",
                 "discover",

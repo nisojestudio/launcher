@@ -73,7 +73,7 @@ class ConnectionManager:
             connection: TikTokConnection | None = None
 
             async def emit_event(event: CanonicalEvent) -> None:
-                nonlocal accepted_events, connection
+                nonlocal accepted_events, connection, final_message
                 heartbeat_monitor.mark_event()
                 if await self._event_callback(event):
                     accepted_events += 1

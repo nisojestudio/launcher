@@ -49,7 +49,9 @@ std::optional<events::HostEvent> TikTokEventMapper::map(const TikTokRawEvent& ra
     };
     mapped.metadata = events::HostEventMetadata{
         !config_.source_name.empty() ? config_.source_name : (config_.stub_mode ? "tiktok-stub" : "tiktok-external"),
-        std::string{to_string(raw_event.kind)},
+        !raw_event.metadata.raw_event_type.empty()
+            ? raw_event.metadata.raw_event_type
+            : std::string{to_string(raw_event.kind)},
         raw_event.metadata.event_id,
         raw_event.metadata.room_id,
         raw_event.metadata.timestamp_ms,

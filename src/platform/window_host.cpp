@@ -58,11 +58,10 @@ RECT build_window_rect_for_client_size(int client_width, int client_height, DWOR
 }
 
 DWORD resolve_window_style(const nlp3::platform::WindowHostOptions& options) {
-    DWORD style = WS_OVERLAPPEDWINDOW;
     if (options.custom_chrome) {
-        style &= ~static_cast<DWORD>(WS_CAPTION);
+        return WS_POPUP | WS_THICKFRAME | WS_MINIMIZEBOX | WS_MAXIMIZEBOX | WS_SYSMENU;
     }
-    return style;
+    return WS_OVERLAPPEDWINDOW;
 }
 
 UINT resolve_window_dpi(HWND hwnd) {

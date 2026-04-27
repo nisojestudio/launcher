@@ -15,6 +15,7 @@ std::string build_panel_http_state_json(
 std::string build_panel_http_events_json(const PanelApp& app);
 
 std::string build_panel_http_metrics_json(const PanelApp& app);
+std::string build_panel_http_realtime_json(const PanelApp& app);
 std::string build_panel_http_tts_json(const PanelApp& app);
 
 std::string build_panel_http_command_json(

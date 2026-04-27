@@ -1,12 +1,13 @@
-const DEFAULT_FIREBASE_API_KEY = "AIzaSyBWRMoHbPNkOw0zvflcPb_dv9G1Bgg1uLc";
+const DEFAULT_FIREBASE_API_KEY = "";
 const DEFAULT_GAMES_CATALOG_OBJECT = "catalog/latest.json";
 const DEFAULT_DOWNLOAD_TTL_SECONDS = 300;
 const DEFAULT_GAME_DOWNLOAD_ROUTE = "/api/me/games/download";
-const DEFAULT_ADMIN_EMAIL = "nisojestudio@gmail.com";
+const DEFAULT_ADMIN_EMAIL = "";
 const DEFAULT_INSTALLER_URL =
-  "https://github.com/nisojestudio/launcher/releases/download/instalador/PanelLive-3.0-Windows-x64-Setup.exe";
+  "https://example.invalid/panel-live-win-x64.exe";
 const CORS_ALLOW_HEADERS = "authorization, content-type";
 const CORS_ALLOW_METHODS = "GET, POST, OPTIONS";
+let configuredCorsAllowOrigin = "";
 
 const ADMIN_PROTECTED_PATHS = new Set([
   "/api/users",
@@ -31,10 +32,26 @@ const ADMIN_PROTECTED_PATHS = new Set([
 
 export default {
   async fetch(request, env) {
+    configuredCorsAllowOrigin = trim(env.CORS_ALLOW_ORIGIN || env.APP_BASE_URL || "");
     const url = new URL(request.url);
 
     try {
       if (request.method === "OPTIONS") {
+        const requestOrigin = trim(request.headers.get("Origin") || "");
+        if (configuredCorsAllowOrigin && requestOrigin && requestOrigin !== configuredCorsAllowOrigin) {
+          return new Response(
+            JSON.stringify({
+              error: "cors_origin_not_allowed",
+              message: "El origen solicitado no esta autorizado para esta API"
+            }),
+            {
+              status: 403,
+              headers: {
+                "content-type": "application/json; charset=utf-8"
+              }
+            }
+          );
+        }
         return corsResponse();
       }
 
@@ -75,8 +92,12 @@ export default {
       }
 
       if (url.pathname === "/api/register-profile" && request.method === "POST") {
-        const body = await parseJsonBody(request);
-        const identity = await resolveProfileIdentity(request, env, body);
+        const profileAuth = await resolveVerifiedFirebaseIdentity(request, env);
+        if (profileAuth.response) {
+          return profileAuth.response;
+        }
+
+        const identity = profileAuth.identity;
         const firebaseUid = trim(identity.firebase_uid);
         const email = trim(identity.email) || null;
         const name = trim(identity.name) || null;
@@ -296,7 +317,8 @@ export default {
 
       if (url.pathname === "/api/me/licenses") {
         const auth = await resolveAuthenticatedUserContext(request, env, url, {
-          allowFirebaseUidFallback: true
+          allowFirebaseUidFallback: false,
+          requireBearer: true
         });
         if (auth.response) {
           return auth.response;
@@ -324,7 +346,8 @@ export default {
 
       if (url.pathname === "/api/downloads/latest") {
         const auth = await resolveAuthenticatedUserContext(request, env, url, {
-          allowFirebaseUidFallback: true
+          allowFirebaseUidFallback: false,
+          requireBearer: true
         });
         if (auth.response) {
           return auth.response;
@@ -893,19 +916,29 @@ function getDownloadTtlSeconds(env) {
   return Math.floor(raw);
 }
 
-async function resolveProfileIdentity(request, env, body) {
+async function resolveVerifiedFirebaseIdentity(request, env) {
   const bearerToken = extractBearerToken(request);
-  if (bearerToken) {
-    const firebaseIdentity = await verifyFirebaseIdToken(bearerToken, env);
-    if (firebaseIdentity?.firebase_uid) {
-      return firebaseIdentity;
-    }
+  if (!bearerToken) {
+    return {
+      response: json({
+        error: "firebase_token_missing",
+        message: "Se requiere Authorization: Bearer para sincronizar el perfil"
+      }, 401)
+    };
+  }
+
+  const firebaseIdentity = await verifyFirebaseIdToken(bearerToken, env);
+  if (!firebaseIdentity?.firebase_uid) {
+    return {
+      response: json({
+        error: "firebase_token_invalid",
+        message: "Token de Firebase invalido"
+      }, 401)
+    };
   }
 
   return {
-    firebase_uid: trim(body?.firebase_uid),
-    email: trim(body?.email) || null,
-    name: trim(body?.name) || null
+    identity: firebaseIdentity
   };
 }
 
@@ -1074,7 +1107,7 @@ async function requireAdminUserContext(request, env, url) {
   }
 
   const adminEmail = getAdminEmail(env).toLowerCase();
-  const userEmail = trim(auth.user?.email || auth.firebase?.email).toLowerCase();
+  const userEmail = trim(auth.firebase?.email || auth.user?.email).toLowerCase();
   if (!userEmail || userEmail !== adminEmail) {
     return {
       response: json({
@@ -1608,21 +1641,44 @@ function json(data, status = 200) {
 }
 
 function buildCorsHeaders(extraHeaders = {}) {
-  return {
-    "access-control-allow-origin": "*",
+  const headers = {
     "access-control-allow-methods": CORS_ALLOW_METHODS,
     "access-control-allow-headers": CORS_ALLOW_HEADERS,
     ...extraHeaders
   };
+  if (configuredCorsAllowOrigin) {
+    headers["access-control-allow-origin"] = configuredCorsAllowOrigin;
+    headers.vary = headers.vary ? `${headers.vary}, Origin` : "Origin";
+  }
+  return headers;
 }
 
 function applyCorsHeaders(headers) {
-  headers.set("access-control-allow-origin", "*");
   headers.set("access-control-allow-methods", CORS_ALLOW_METHODS);
   headers.set("access-control-allow-headers", CORS_ALLOW_HEADERS);
+  if (configuredCorsAllowOrigin) {
+    headers.set("access-control-allow-origin", configuredCorsAllowOrigin);
+    headers.set("vary", headers.get("vary") ? `${headers.get("vary")}, Origin` : "Origin");
+  } else {
+    headers.delete("access-control-allow-origin");
+  }
 }
 
 function corsResponse() {
+  if (!configuredCorsAllowOrigin) {
+    return new Response(
+      JSON.stringify({
+        error: "cors_origin_not_configured",
+        message: "Configura CORS_ALLOW_ORIGIN antes de exponer esta API a navegadores"
+      }),
+      {
+        status: 403,
+        headers: {
+          "content-type": "application/json; charset=utf-8"
+        }
+      }
+    );
+  }
   return new Response(null, {
     status: 204,
     headers: buildCorsHeaders()

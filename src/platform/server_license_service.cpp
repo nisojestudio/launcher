@@ -303,8 +303,7 @@ PanelAuthLoginResult ServerLicenseService::authenticate(const PanelAuthLoginRequ
         return make_login_result(false, auth_snapshot_.message, auth_snapshot_.last_error_code, license_snapshot_, auth_snapshot_);
     }
 
-    const auto licenses_url = join_url(config_.nisoje_api_base, config_.me_licenses_path)
-        + "?firebase_uid=" + url_encode(firebase_uid);
+    const auto licenses_url = join_url(config_.nisoje_api_base, config_.me_licenses_path);
     std::vector<HttpHeader> license_headers{};
     if (!id_token.empty()) {
         license_headers.push_back(HttpHeader{"Authorization", "Bearer " + id_token});

@@ -402,7 +402,7 @@ int main() {
     assert(compatible_probe.event_log[2].kind == nlp3::events::HostEventKind::chat_message);
     assert(compatible_probe.event_log[2].actor.avatar_url == "https://cdn.example.com/avatar-alice.png");
     assert(compatible_probe.event_log[2].metadata.source == "tiktok-stub");
-    assert(compatible_probe.event_log[2].metadata.source_event_type == "chat");
+    assert(compatible_probe.event_log[2].metadata.source_event_type == "comment");
     assert(compatible_probe.event_log[2].metadata.source_event_id == "evt-chat-001");
     assert(compatible_probe.event_log[2].metadata.source_room_id == "room-001");
     assert(compatible_probe.event_log[2].metadata.source_timestamp_ms == 1710000001000);
@@ -437,7 +437,7 @@ int main() {
     assert(runtime.queued_tts_messages() == 0);
     assert(tts_backend.spoken_messages().size() == 2);
     assert(tts_backend.spoken_messages()[1].trigger == nlp3::tts::TtsTrigger::chat_event);
-    assert(tts_backend.spoken_messages()[1].text == "Alice: Hello host");
+    assert(tts_backend.spoken_messages()[1].text == "Hello host");
 
     assert(!runtime.tick_periodic_tts(500));
     assert(runtime.queued_tts_messages() == 0);
@@ -674,7 +674,7 @@ int main() {
     assert(viewer_join_probe.event_log[0].metadata.source_event_id == "evt-join-001");
     assert(viewer_join_probe.game_input_log[0].kind == nlp3::gamesdk::GameInputEventKind::viewer_join);
     assert(viewer_join_probe.game_input_log[0].actor.avatar_url == "https://cdn.example.com/avatar-join-alice.png");
-    assert(viewer_join_probe.game_input_log[0].metadata.source_event_type == "viewer_join");
+    assert(viewer_join_probe.game_input_log[0].metadata.source_event_type == "join");
     assert(viewer_join_runtime.queued_tts_messages() == 0);
 
     std::puts("smoke cp10");

@@ -6,6 +6,7 @@ from types import SimpleNamespace
 from event_models import CanonicalEventType
 from event_normalizer import (
     normalize_chat_event,
+    normalize_custom_raw_event,
     normalize_gift_event,
     normalize_viewer_join_event,
 )
@@ -51,6 +52,104 @@ class EventNormalizerTests(unittest.TestCase):
         self.assertEqual(normalized.actor.display_name, "Chat User")
         self.assertEqual(normalized.actor.avatar_url, "https://example.com/chat.png")
         self.assertEqual(normalized.text, "hola")
+
+    def test_normalize_chat_preserves_and_serializes_actor_flags(self) -> None:
+        event = SimpleNamespace(
+            user=make_user(
+                user_id="flag-user",
+                username="flaguser",
+                display_name="Flag User",
+                avatar_url="https://example.com/flag.png",
+                is_follower=True,
+                is_subscriber=True,
+                is_moderator=True,
+            ),
+            comment="hola flags",
+        )
+
+        normalized = normalize_chat_event(event, room_id="room-001", session_id="session-001")
+        payload = normalized.to_dict()
+
+        self.assertTrue(normalized.actor.is_follower)
+        self.assertTrue(normalized.actor.is_subscriber)
+        self.assertTrue(normalized.actor.is_moderator)
+        self.assertEqual(
+            payload["actor"],
+            {
+                "id": "flag-user",
+                "username": "flaguser",
+                "display_name": "Flag User",
+                "avatar_url": "https://example.com/flag.png",
+                "is_follower": True,
+                "is_subscriber": True,
+                "is_moderator": True,
+            },
+        )
+
+    def test_normalize_custom_raw_preserves_actor_flags_from_snake_and_camel_case(self) -> None:
+        cases = (
+            {
+                "is_follower": True,
+                "is_subscriber": True,
+                "is_moderator": True,
+            },
+            {
+                "isFollower": True,
+                "isSubscriber": True,
+                "isModerator": True,
+            },
+        )
+
+        for actor_flags in cases:
+            with self.subTest(actor_flags=actor_flags):
+                normalized = normalize_custom_raw_event(
+                    {
+                        "event_type": "chat",
+                        "actor": {
+                            "id": "custom-user",
+                            "username": "customuser",
+                            "display_name": "Custom User",
+                            **actor_flags,
+                        },
+                        "text": "custom flags",
+                    },
+                    room_id="room-001",
+                    target_user="fallback-user",
+                    timestamp_ms=1_776_700_000_000,
+                )
+
+                self.assertTrue(normalized.actor.is_follower)
+                self.assertTrue(normalized.actor.is_subscriber)
+                self.assertTrue(normalized.actor.is_moderator)
+                self.assertTrue(normalized.to_dict()["actor"]["is_follower"])
+                self.assertTrue(normalized.to_dict()["actor"]["is_subscriber"])
+                self.assertTrue(normalized.to_dict()["actor"]["is_moderator"])
+
+    def test_normalize_custom_raw_parses_string_and_numeric_false_actor_flags(self) -> None:
+        normalized = normalize_custom_raw_event(
+            {
+                "event_type": "chat",
+                "actor": {
+                    "id": "custom-user",
+                    "username": "customuser",
+                    "display_name": "Custom User",
+                    "isFollower": "false",
+                    "isSubscriber": "0",
+                    "isModerator": 0,
+                },
+                "text": "custom flags",
+            },
+            room_id="room-001",
+            target_user="fallback-user",
+            timestamp_ms=1_776_700_000_000,
+        )
+
+        self.assertFalse(normalized.actor.is_follower)
+        self.assertFalse(normalized.actor.is_subscriber)
+        self.assertFalse(normalized.actor.is_moderator)
+        self.assertFalse(normalized.to_dict()["actor"]["is_follower"])
+        self.assertFalse(normalized.to_dict()["actor"]["is_subscriber"])
+        self.assertFalse(normalized.to_dict()["actor"]["is_moderator"])
 
     def test_normalize_chat_preserves_millisecond_timestamp(self) -> None:
         event = SimpleNamespace(

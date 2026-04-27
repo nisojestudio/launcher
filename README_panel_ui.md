@@ -87,7 +87,7 @@ Games are shown as friendly cards instead of technical manifests.
 
 Each card includes:
 
-- demo image area rendered with local HTML/CSS
+- real poster image embedded in the panel build
 - game title
 - short description
 - status badge
@@ -133,6 +133,7 @@ The UI keeps using the existing routes:
 
 - `GET /`
 - `GET /app.css`
+- `GET /game-previews.js`
 - `GET /app.js`
 - `GET /api/state`
 - `GET /api/events`

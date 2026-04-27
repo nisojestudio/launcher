@@ -1,12 +1,14 @@
 #include <cassert>
 #include <filesystem>
 
+#include "host/host_runtime.hpp"
 #include "platform/local_game_catalog_source.hpp"
 #include "platform/local_license_service.hpp"
 #include "platform/panel_config.hpp"
 #include "platform/panel_config_storage.hpp"
 #include "platform/runtime.hpp"
 #include "test_support.hpp"
+#include "tts/mock_tts_backend.hpp"
 
 int main() {
     const auto manifest = nlp3::platform::build_runtime_manifest();
@@ -146,6 +148,48 @@ int main() {
     assert(loaded_catalog_entry != nullptr);
     assert(loaded_catalog_entry->display_name == "Catalog Probe");
     assert(loaded_catalog_entry->source == "local");
+
+    nlp3::tts::MockTtsBackend mock_tts_backend;
+    nlp3::tts::TtsConfig live_tts_runtime{};
+    live_tts_runtime.enabled = true;
+    live_tts_runtime.max_queue_size = 0;
+    live_tts_runtime.max_dispatch_per_tick = 8;
+
+    nlp3::tts::TtsPolicy live_tts_policy{};
+    live_tts_policy.allow_manual_messages = true;
+    live_tts_policy.min_text_length = 1;
+
+    nlp3::tts::HostTtsService live_tts_service{live_tts_runtime, live_tts_policy, mock_tts_backend};
+    nlp3::host::HostRuntime host_runtime{
+        nullptr,
+        &live_tts_service,
+        nullptr,
+        nullptr,
+        nlp3::bridge::TikTokEventMapper{},
+        nullptr,
+        nlp3::host::HostAutomationEngine{},
+        nlp3::host::HostPeriodicTtsEngine{},
+        nullptr,
+    };
+
+    nlp3::host::HostPeriodicTtsConfig first_periodic{};
+    first_periodic.enabled = true;
+    first_periodic.interval_ms = 1000;
+    first_periodic.messages = {"Mensaje viejo"};
+    host_runtime.apply_periodic_tts_config(first_periodic);
+    assert(host_runtime.tick_periodic_tts(1000));
+    assert(host_runtime.queued_tts_messages() == 1);
+
+    host_runtime.clear_pending_tts();
+
+    nlp3::host::HostPeriodicTtsConfig second_periodic = first_periodic;
+    second_periodic.messages = {"Mensaje nuevo"};
+    host_runtime.apply_periodic_tts_config(second_periodic);
+    assert(host_runtime.queued_tts_messages() == 0);
+    assert(host_runtime.tick_periodic_tts(1000));
+    assert(host_runtime.flush_tts(8) == 1);
+    assert(mock_tts_backend.spoken_messages().size() == 1);
+    assert(mock_tts_backend.spoken_messages().back().text == "Mensaje nuevo");
 
     std::filesystem::remove(config_path);
     return 0;

@@ -391,12 +391,16 @@ std::size_t HostRuntime::flush_tts(std::size_t max_messages) {
     return tts_service_ != nullptr ? tts_service_->dispatch_pending(max_messages) : 0;
 }
 
-void HostRuntime::clear_pending_live_backlog() noexcept {
-    pending_like_batches_.clear();
+void HostRuntime::clear_pending_tts() noexcept {
     periodic_tts_.reset();
     if (tts_service_ != nullptr) {
         tts_service_->clear_pending();
     }
+}
+
+void HostRuntime::clear_pending_live_backlog() noexcept {
+    pending_like_batches_.clear();
+    clear_pending_tts();
 }
 
 void HostRuntime::reset_session_metrics() noexcept {

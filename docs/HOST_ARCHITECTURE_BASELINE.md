@@ -88,6 +88,10 @@ Target flow:
 - The Python TikTok bridge is now also modularized into connection, supervision, normalization, dispatch, replay, metrics and HTTP status layers, with a real bridge config YAML, container packaging files and an automated Python test suite integrated into CTest.
 - The panel-driven Python runner now also attempts a clean local `/shutdown` before falling back to hard process termination, so day-to-day operator stops behave like a service stop instead of a crash.
 - The host now also includes a real Windows SAPI TTS backend behind the existing `src/tts` scheduler/service architecture, with curated voice profiles, chat filtering, editable templates and HTTP/UI configuration surfaces.
+- The local HTTP UI now exposes a dedicated `/api/realtime` read model for fast-changing metrics and recent events, leaving `/api/state` for broader state refreshes and reducing repeated full-state polling.
+- Local control surfaces now enforce loopback and Origin boundaries across the embedded HTTP UI, the Python bridge server and the C++ external WebSocket intake, keeping browser-origin writes inside the local trust boundary.
+- Support bundles now pass through a sanitizer boundary before export, redacting sensitive config and structured-log fields while preserving enough operational context for debugging.
+- The UI polling loop is now adaptive to document visibility, and high-churn lists avoid redundant DOM writes when their generated markup has not changed.
 
 ## Deferred areas
 

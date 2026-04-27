@@ -49,6 +49,20 @@ def choose_newest_existing_path(candidates: list[Path]) -> Path | None:
     return max(ranked)[2]
 
 
+def discover_versioned_panel_executables() -> list[Path]:
+    candidates: list[Path] = []
+
+    releases_root = REPO_ROOT / "dist" / "releases"
+    if releases_root.exists():
+        candidates.extend(releases_root.glob("*/NisojeStudio/NisojeStudio.exe"))
+
+    build_root = REPO_ROOT / "build"
+    if build_root.exists():
+        candidates.extend(build_root.glob("release-*/src/platform/NisojeStudio.exe"))
+
+    return candidates
+
+
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(
         description="Launch Nisoje Studio for desktop users without requiring terminal interaction.",
@@ -225,7 +239,12 @@ def find_panel_executable(override_path: str) -> Path:
             return candidate
         raise RuntimeError(f"Panel executable not found at {candidate}")
 
+    versioned_match = choose_newest_existing_path(discover_versioned_panel_executables())
+    if versioned_match is not None:
+        return versioned_match
+
     candidates = [
+        REPO_ROOT / "NisojeStudio.exe",
         REPO_ROOT / "dist" / "NisojeStudio" / "NisojeStudio.exe",
         REPO_ROOT / "build" / "release" / "src" / "platform" / "NisojeStudio.exe",
         REPO_ROOT / "build" / "Release" / "src" / "platform" / "NisojeStudio.exe",

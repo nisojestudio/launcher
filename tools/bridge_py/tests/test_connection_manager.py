@@ -88,6 +88,7 @@ class ConnectionManagerTests(unittest.IsolatedAsyncioTestCase):
         metrics = MetricsRegistry()
         received_ids: list[str] = []
         statuses: list[str] = []
+        messages: list[str] = []
 
         async def event_callback(event) -> bool:
             received_ids.append(event.metadata.event_id)
@@ -95,6 +96,7 @@ class ConnectionManagerTests(unittest.IsolatedAsyncioTestCase):
 
         async def status_callback(status) -> None:
             statuses.append(status.connection_state.value)
+            messages.append(status.message)
 
         async def fast_sleep(_seconds: float) -> None:
             return None
@@ -117,6 +119,7 @@ class ConnectionManagerTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(FakeConnection.attempts, 2)
         self.assertEqual(len(received_ids), 1)
         self.assertIn("reconnecting", statuses)
+        self.assertIn("max_events reached (1)", messages)
         self.assertGreaterEqual(metrics.snapshot().counters.get("reconnect_total", 0), 1)
 
     async def test_stops_without_retry_on_user_not_found(self) -> None:
@@ -130,8 +133,10 @@ class ConnectionManagerTests(unittest.IsolatedAsyncioTestCase):
         async def event_callback(_event) -> bool:
             return True
 
-        async def status_callback(_status) -> None:
-            return None
+        messages: list[str] = []
+
+        async def status_callback(status) -> None:
+            messages.append(status.message)
 
         manager = ConnectionManager(
             config=BridgeConfig(),
@@ -159,8 +164,10 @@ class ConnectionManagerTests(unittest.IsolatedAsyncioTestCase):
         async def event_callback(_event) -> bool:
             return True
 
-        async def status_callback(_status) -> None:
-            return None
+        messages: list[str] = []
+
+        async def status_callback(status) -> None:
+            messages.append(status.message)
 
         manager = ConnectionManager(
             config=BridgeConfig(),
@@ -175,6 +182,7 @@ class ConnectionManagerTests(unittest.IsolatedAsyncioTestCase):
 
         self.assertEqual(exit_code, 0)
         self.assertEqual(FakeConnection.attempts, 1)
+        self.assertIn("max_seconds reached (1)", messages)
 
 
 if __name__ == "__main__":

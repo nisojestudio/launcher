@@ -89,36 +89,44 @@ public:
         return true;
     }
 
-    bool send_handshake_request() const {
+    bool send_handshake_request(std::string_view extra_headers = {}) const {
         if (socket_ == INVALID_SOCKET) {
             return false;
         }
 
-        static constexpr std::string_view request =
+        const auto request = std::string(
             "GET / HTTP/1.1\r\n"
             "Host: 127.0.0.1\r\n"
             "Upgrade: websocket\r\n"
             "Connection: Upgrade\r\n"
             "Sec-WebSocket-Version: 13\r\n"
             "Sec-WebSocket-Key: dGVzdC1rZXktMTIzNA==\r\n"
-            "\r\n";
+        ) + std::string(extra_headers) + "\r\n";
 
         return send(socket_, request.data(), static_cast<int>(request.size()), 0)
             == static_cast<int>(request.size());
     }
 
-    bool receive_handshake_response() const {
+    std::string receive_response() const {
         if (socket_ == INVALID_SOCKET) {
-            return false;
+            return {};
         }
 
         char buffer[1024];
         const auto received = recv(socket_, buffer, static_cast<int>(sizeof(buffer)), 0);
         if (received <= 0) {
+            return {};
+        }
+
+        return std::string(buffer, static_cast<std::size_t>(received));
+    }
+
+    bool receive_handshake_response() const {
+        const auto response = receive_response();
+        if (response.empty()) {
             return false;
         }
 
-        const std::string response(buffer, static_cast<std::size_t>(received));
         return response.find("101 Switching Protocols") != std::string::npos
             && response.find("Sec-WebSocket-Accept:") != std::string::npos;
     }
@@ -256,7 +264,15 @@ int main() {
 #ifdef _WIN32
     WsTestClient ws_test_client;
     assert(ws_test_client.connect_tcp(19876));
-    assert(ws_test_client.send_handshake_request());
+    assert(ws_test_client.send_handshake_request("Origin: https://example.invalid\r\n"));
+    assert(panel_console.execute_line("bridge demo ws run 5 0"));
+    const auto forbidden_response = ws_test_client.receive_response();
+    assert(forbidden_response.find("403 Forbidden") != std::string::npos);
+    assert(forbidden_response.find("origin_not_allowed") != std::string::npos);
+    ws_test_client.close();
+
+    assert(ws_test_client.connect_tcp(19876));
+    assert(ws_test_client.send_handshake_request("Origin: http://127.0.0.1:18913\r\n"));
     assert(panel_console.execute_line("bridge demo ws run 5 0"));
     assert(ws_test_client.receive_handshake_response());
 

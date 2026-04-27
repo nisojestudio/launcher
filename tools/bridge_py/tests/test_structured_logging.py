@@ -30,6 +30,25 @@ class StructuredLoggingTests(unittest.TestCase):
         self.assertTrue(info["usesLocalFallback"])
         self.assertTrue(str(info["resolvedPath"]).startswith(str(Path(temp_dir).resolve())))
 
+    def test_relative_log_path_falls_back_to_tempdir_when_local_appdata_missing(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            fallback_temp = Path(temp_dir) / "tmp"
+            fallback_temp.mkdir()
+            with patch("structured_logging.Path.cwd", return_value=Path(r"C:\Program Files\Panel Live")), patch(
+                "structured_logging._is_existing_parent_writable",
+                return_value=False,
+            ), patch("tempfile.gettempdir", return_value=str(fallback_temp)), patch.dict(
+                "os.environ",
+                {"LOCALAPPDATA": ""},
+                clear=False,
+            ):
+                resolved = resolve_log_path("tools/bridge_py/logs/bridge.jsonl")
+
+        self.assertEqual(
+            resolved,
+            (fallback_temp / "NisojeStudio" / "logs" / "bridge.jsonl").resolve(),
+        )
+
 
 if __name__ == "__main__":
     unittest.main()

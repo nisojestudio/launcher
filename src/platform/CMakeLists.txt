@@ -26,10 +26,12 @@ endfunction()
 set(NLP3_PANEL_UI_INDEX_INC "${NLP3_PANEL_UI_GENERATED_DIR}/panel_ui_index_html.inc")
 set(NLP3_PANEL_UI_STYLES_INC "${NLP3_PANEL_UI_GENERATED_DIR}/panel_ui_styles_css.inc")
 set(NLP3_PANEL_UI_APP_INC "${NLP3_PANEL_UI_GENERATED_DIR}/panel_ui_app_js.inc")
+set(NLP3_PANEL_UI_GAME_PREVIEWS_INC "${NLP3_PANEL_UI_GENERATED_DIR}/panel_ui_game_previews_js.inc")
 
 nlp3_embed_text_asset("${NLP3_PANEL_UI_SOURCE_DIR}/index.html" "${NLP3_PANEL_UI_INDEX_INC}")
 nlp3_embed_text_asset("${NLP3_PANEL_UI_SOURCE_DIR}/styles.css" "${NLP3_PANEL_UI_STYLES_INC}")
 nlp3_embed_text_asset("${NLP3_PANEL_UI_SOURCE_DIR}/app.js" "${NLP3_PANEL_UI_APP_INC}")
+nlp3_embed_text_asset("${NLP3_PANEL_UI_SOURCE_DIR}/game-previews.js" "${NLP3_PANEL_UI_GAME_PREVIEWS_INC}")
 
 add_custom_target(
     nlp3_panel_ui_assets
@@ -37,6 +39,7 @@ add_custom_target(
         "${NLP3_PANEL_UI_INDEX_INC}"
         "${NLP3_PANEL_UI_STYLES_INC}"
         "${NLP3_PANEL_UI_APP_INC}"
+        "${NLP3_PANEL_UI_GAME_PREVIEWS_INC}"
 )
 
 add_library(nlp3_platform
@@ -62,9 +65,17 @@ add_library(nlp3_platform
     remote_game_distribution_service.cpp
     server_license_service.cpp
     support_bundle_exporter.cpp
+    support_bundle_sanitizer.cpp
     win_http_client.cpp
     webview_host.cpp
     window_host.cpp
+)
+
+set_source_files_properties(
+    panel_ui_assets.cpp
+    PROPERTIES
+        OBJECT_DEPENDS
+            "${NLP3_PANEL_UI_INDEX_INC};${NLP3_PANEL_UI_STYLES_INC};${NLP3_PANEL_UI_APP_INC};${NLP3_PANEL_UI_GAME_PREVIEWS_INC}"
 )
 
 target_compile_features(nlp3_platform PUBLIC cxx_std_20)

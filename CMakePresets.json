@@ -10,6 +10,7 @@
       "name": "default",
       "displayName": "Default Ninja",
       "generator": "Ninja",
+      "toolchainFile": "${sourceDir}/cmake/vcpkg-auto.cmake",
       "binaryDir": "${sourceDir}/build",
       "cacheVariables": {
         "CMAKE_CXX_STANDARD": "20",
@@ -20,6 +21,7 @@
       "name": "release",
       "displayName": "Release Ninja",
       "generator": "Ninja",
+      "toolchainFile": "${sourceDir}/cmake/vcpkg-auto.cmake",
       "binaryDir": "${sourceDir}/build/release",
       "cacheVariables": {
         "CMAKE_BUILD_TYPE": "Release",

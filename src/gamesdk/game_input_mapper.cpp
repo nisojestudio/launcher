@@ -26,7 +26,8 @@ GameInputEvent GameInputEventMapper::map(const events::HostEvent& event) const {
         mapped.kind = GameInputEventKind::chat_message;
         break;
     case events::HostEventKind::like:
-        mapped.kind = GameInputEventKind::unknown;
+        mapped.kind = GameInputEventKind::like;
+        mapped.like_count = static_cast<std::uint32_t>(event.magnitude > 0 ? event.magnitude : 1);
         break;
     case events::HostEventKind::gift:
         mapped.kind = GameInputEventKind::gift;

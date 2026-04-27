@@ -30,10 +30,22 @@ std::string trim_copy(const std::string& input) {
     return std::string(begin, end);
 }
 
-void append_space_if_needed(std::string& output, bool& previous_space) {
-    if (!output.empty() && !previous_space) {
-        output.push_back(' ');
-        previous_space = true;
+bool suppresses_leading_space(std::uint32_t codepoint) {
+    switch (codepoint) {
+    case '.':
+    case ',':
+    case ';':
+    case ':':
+    case '!':
+    case '?':
+    case ')':
+    case '/':
+    case '%':
+    case 0x2019:
+    case 0x201D:
+        return true;
+    default:
+        return false;
     }
 }
 
@@ -221,27 +233,30 @@ bool is_allowed_tts_text_codepoint(std::uint32_t codepoint) {
 std::string sanitize_tts_text(const std::string& input) {
     std::string output{};
     output.reserve(input.size());
-    bool previous_space = true;
+    bool pending_space = false;
 
     for (std::size_t index = 0; index < input.size();) {
         std::uint32_t codepoint = 0;
         if (!decode_utf8_codepoint(input, index, codepoint)) {
-            append_space_if_needed(output, previous_space);
+            pending_space = !output.empty();
             continue;
         }
 
         if (is_unicode_whitespace(codepoint)) {
-            append_space_if_needed(output, previous_space);
+            pending_space = !output.empty();
             continue;
         }
 
         if (is_allowed_tts_text_codepoint(codepoint)) {
+            if (pending_space && !suppresses_leading_space(codepoint)) {
+                output.push_back(' ');
+            }
             append_utf8_codepoint(output, codepoint);
-            previous_space = false;
+            pending_space = false;
             continue;
         }
 
-        append_space_if_needed(output, previous_space);
+        pending_space = !output.empty();
     }
 
     return trim_copy(output);

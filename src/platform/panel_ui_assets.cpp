@@ -14,6 +14,10 @@ static constexpr const char* kPanelUiAppJs =
 #include "panel_ui_app_js.inc"
 ;
 
+static constexpr const char* kPanelUiGamePreviewsJs =
+#include "panel_ui_game_previews_js.inc"
+;
+
 } // namespace
 
 namespace nlp3::platform {
@@ -28,6 +32,10 @@ std::string_view panel_ui_styles_css() noexcept {
 
 std::string_view panel_ui_app_js() noexcept {
     return kPanelUiAppJs;
+}
+
+std::string_view panel_ui_game_previews_js() noexcept {
+    return kPanelUiGamePreviewsJs;
 }
 
 } // namespace nlp3::platform

@@ -179,7 +179,7 @@ int main() {
     assert(tts_backend.spoken_messages()[0].category == nlp3::tts::TtsMessageCategory::gift);
     assert(tts_backend.spoken_messages()[0].text.find("Pipeline Bob") != std::string::npos);
     assert(tts_backend.spoken_messages()[1].trigger == nlp3::tts::TtsTrigger::chat_event);
-    assert(tts_backend.spoken_messages()[1].text == "Pipeline Alice: Hello runtime");
+    assert(tts_backend.spoken_messages()[1].text == "Hello runtime");
 
     assert(!runtime.tick_periodic_tts(500));
     assert(runtime.tick_periodic_tts(1000));
@@ -265,6 +265,8 @@ int main() {
         nlp3::host::HostPeriodicTtsEngine{},
         &like_activity_log,
     };
+    MockGameProbe like_probe;
+    like_runtime.activate_game(std::make_unique<MockGame>(&like_probe));
 
     const auto make_like_event = [](std::string_view event_id, std::int64_t source_timestamp_ms, int magnitude) {
         return nlp3::events::HostEvent{
@@ -296,6 +298,9 @@ int main() {
     assert(like_runtime.snapshot().likes == 0);
     assert(like_runtime.tick_like_batches(6000));
     assert(like_runtime.snapshot().likes == 20);
+    assert(like_probe.game_input_log.size() == 1);
+    assert(like_probe.game_input_log.back().kind == nlp3::gamesdk::GameInputEventKind::like);
+    assert(like_probe.game_input_log.back().like_count == 20);
     assert(like_runtime.flush_tts() == 1);
     assert(like_tts_backend.spoken_messages().size() == 1);
     assert(like_tts_backend.spoken_messages().back().text.find("20 likes") != std::string::npos);
@@ -305,6 +310,9 @@ int main() {
     assert(like_runtime.snapshot().likes == 20);
     like_runtime.receive_event(make_like_event("evt-like-burst-005", 1710000034000, 10), 8500);
     assert(like_runtime.snapshot().likes == 50);
+    assert(like_probe.game_input_log.size() == 2);
+    assert(like_probe.game_input_log.back().kind == nlp3::gamesdk::GameInputEventKind::like);
+    assert(like_probe.game_input_log.back().like_count == 30);
     assert(like_runtime.flush_tts() == 1);
     assert(like_tts_backend.spoken_messages().size() == 2);
     assert(like_tts_backend.spoken_messages().back().text.find("30 likes") != std::string::npos);

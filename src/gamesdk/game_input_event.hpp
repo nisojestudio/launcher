@@ -9,6 +9,7 @@ namespace nlp3::gamesdk {
 enum class GameInputEventKind {
     unknown,
     chat_message,
+    like,
     gift,
     follow,
     share,
@@ -50,6 +51,7 @@ struct GameInputEvent {
     std::uint32_t viewer_count = 0;
     std::string raw_payload;
     GameInputMetadata metadata{};
+    std::uint32_t like_count = 0;
 };
 
 } // namespace nlp3::gamesdk

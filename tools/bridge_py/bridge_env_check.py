@@ -29,6 +29,13 @@ REQUIRED_FILES = (
     "tiktok_connection.py",
 )
 
+REQUIRED_REMOTE_AUTH_FIELDS = (
+    "firebase_api_key",
+    "nisoje_api_base",
+    "me_licenses_path",
+    "me_games_catalog_path",
+)
+
 REQUIRED_RUNTIME_FILES = (
     "python.exe",
     "libssl-3.dll",
@@ -191,6 +198,8 @@ def _build_report(
 
     config_target_user = ""
     config_auth_required = False
+    config_remote_auth_ready = False
+    missing_remote_auth_fields: list[str] = []
     config_exists = config_path.exists()
     if not config_exists:
         alerts.append(
@@ -206,10 +215,18 @@ def _build_report(
     else:
         try:
             parsed_config = json.loads(config_path.read_text(encoding="utf-8"))
+            auth_config = parsed_config.get("auth") or {}
             config_target_user = str(parsed_config.get("external_target_user") or "").strip()
             config_bridge_mode = str(parsed_config.get("bridge_mode") or "").strip()
-            config_auth_required = bool((parsed_config.get("auth") or {}).get("required", False))
+            config_auth_required = bool(auth_config.get("required", False))
             config_ok = config_bridge_mode in ("external", "stub")
+            if config_auth_required:
+                missing_remote_auth_fields = [
+                    field_name
+                    for field_name in REQUIRED_REMOTE_AUTH_FIELDS
+                    if not str(auth_config.get(field_name) or "").strip()
+                ]
+                config_remote_auth_ready = not missing_remote_auth_fields
             checks.append({
                 "type": "config",
                 "id": "panel_config.json",
@@ -219,6 +236,14 @@ def _build_report(
                 "targetUser": config_target_user,
                 "authRequired": config_auth_required,
             })
+            checks.append({
+                "type": "config_remote_auth",
+                "id": "panel_config.remote_auth",
+                "ok": (not config_auth_required) or config_remote_auth_ready,
+                "path": str(config_path),
+                "authRequired": config_auth_required,
+                "missingFields": missing_remote_auth_fields,
+            })
             if not config_ok:
                 alerts.append(
                     "panel_config.json no define un bridge_mode valido para Panel Live."
@@ -226,6 +251,12 @@ def _build_report(
             elif expect_auth_required and not config_auth_required:
                 alerts.append(
                     "panel_config.json no exige autenticacion remota. Este instalador no bloqueara el acceso en el primer arranque."
+                )
+            elif config_auth_required and not config_remote_auth_ready:
+                missing_fields_text = ", ".join(missing_remote_auth_fields)
+                alerts.append(
+                    "panel_config.json exige autenticacion remota, pero faltan campos requeridos: "
+                    f"{missing_fields_text}."
                 )
         except Exception as exc:  # pragma: no cover - depends on installed file state
             checks.append({
@@ -263,6 +294,8 @@ def _build_report(
         "configPath": str(config_path),
         "configTargetUser": config_target_user,
         "configAuthRequired": config_auth_required,
+        "configRemoteAuthReady": config_remote_auth_ready,
+        "configMissingRemoteAuthFields": missing_remote_auth_fields,
         "configuredBridgeLogPath": bridge_config.logging.log_path,
         "effectiveBridgeLogPath": log_destination.get("resolvedPath"),
         "bridgeLogDirectoryWritable": bool(log_destination.get("directoryWritable")),

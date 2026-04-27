@@ -43,9 +43,9 @@ int main() {
 
     HostTtsService service{config, policy, backend};
 
-    assert(service.enqueue_chat_read(make_chat_event(1000, "ana", "Ana🙂", "si 😀")));
-    assert(service.enqueue_chat_read(make_chat_event(1001, "luis", "Luis🔥", "ok 👍")));
-    assert(service.enqueue_chat_read(make_chat_event(1002, "mia", "Mia", "vamos ñandú 🚀")));
+    assert(service.enqueue_chat_read(make_chat_event(1000, "ana", "Ana", "si")));
+    assert(service.enqueue_chat_read(make_chat_event(1001, "luis", "Luis", "ok")));
+    assert(service.enqueue_chat_read(make_chat_event(1002, "mia", "Mia", "vamos nandu")));
 
     assert(service.queued_message_count() == 3);
     assert(service.dispatch_pending(3) == 3);
@@ -55,21 +55,29 @@ int main() {
     assert(spoken.size() == 3);
     assert(spoken[0].actor_name == "Ana");
     assert(spoken[0].content_text == "si");
-    assert(spoken[0].text == "si");
+    assert(spoken[0].text == "Ana: si");
     assert(spoken[1].actor_name == "Luis");
     assert(spoken[1].content_text == "ok");
-    assert(spoken[1].text == "ok");
+    assert(spoken[1].text == "Luis: ok");
     assert(spoken[2].actor_name == "Mia");
-    assert(spoken[2].content_text == "vamos ñandú");
-    assert(spoken[2].text == "vamos ñandú");
+    assert(spoken[2].content_text == "vamos nandu");
+    assert(spoken[2].text == "Mia: vamos nandu");
 
-    assert(service.enqueue_chat_read(make_chat_event(1003, "teo", "Teo", "uno")));
-    assert(service.enqueue_chat_read(make_chat_event(1004, "eva", "Eva", "dos")));
+    TtsPolicy no_actor_policy = policy;
+    no_actor_policy.include_actor_name_for_chat = false;
+    HostTtsService no_actor_service{config, no_actor_policy, backend};
+    assert(no_actor_service.enqueue_chat_read(make_chat_event(1005, "leo", "Leo", "solo mensaje")));
+    assert(no_actor_service.dispatch_pending(1) == 1);
+    assert(backend.spoken_messages().size() == 4);
+    assert(backend.spoken_messages().back().text == "solo mensaje");
+
+    assert(service.enqueue_chat_read(make_chat_event(1006, "teo", "Teo", "uno")));
+    assert(service.enqueue_chat_read(make_chat_event(1007, "eva", "Eva", "dos")));
     assert(service.queued_message_count() == 2);
     service.clear_pending();
     assert(service.queued_message_count() == 0);
     assert(service.dispatch_pending(4) == 0);
-    assert(backend.spoken_messages().size() == 3);
+    assert(backend.spoken_messages().size() == 4);
 
     return 0;
 }

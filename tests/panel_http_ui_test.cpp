@@ -145,12 +145,14 @@ std::string make_get_request(const std::string& path) {
 std::string make_post_request(
     const std::string& path,
     const std::string& body,
-    const std::string& content_type = "application/json; charset=utf-8") {
+    const std::string& content_type = "application/json; charset=utf-8",
+    const std::string& extra_headers = "") {
     return "POST " + path + " HTTP/1.1\r\n"
         "Host: 127.0.0.1\r\n"
         "Content-Type: " + content_type + "\r\n"
         "Content-Length: " + std::to_string(body.size()) + "\r\n"
-        "Connection: close\r\n\r\n"
+        + extra_headers
+        + "Connection: close\r\n\r\n"
         + body;
 }
 
@@ -260,11 +262,13 @@ int main() {
     if (!require(html.find("connection-status-meta") != std::string::npos, "html titlebar connection meta")) return 1;
     if (!require(html.find("activity-gift-menu") != std::string::npos, "html gift picker")) return 1;
     if (!require(html.find("voice-notices-list") != std::string::npos, "html voice notices list")) return 1;
+    if (!require(html.find("voice-save-button") != std::string::npos, "html voice save button")) return 1;
     if (!require(html.find("voice-read-likes") != std::string::npos, "html voice likes bridge")) return 1;
     if (!require(html.find("auth-form-body") != std::string::npos, "html auth form body")) return 1;
     if (!require(html.find("auth-field-wide") != std::string::npos, "html auth wide field")) return 1;
     if (!require(html.find("auth-meta-grid") != std::string::npos, "html auth meta grid")) return 1;
     if (!require(html.find("auth-brand-copy-group") != std::string::npos, "html auth brand copy group")) return 1;
+    if (!require(html.find("/game-previews.js") != std::string::npos, "html game previews asset")) return 1;
 
     const auto css = issue_request(panel_app, kPort, make_get_request("/app.css"));
     if (!require(css.find("HTTP/1.1 200 OK") != std::string::npos, "css 200")) return 1;
@@ -302,6 +306,23 @@ int main() {
     if (!require(js.find("authMetaGrid") != std::string::npos, "js auth meta grid visibility")) return 1;
     if (!require(js.find("document.documentElement.classList.toggle(\"auth-locked\", locked)") != std::string::npos, "js html auth lock")) return 1;
     if (!require(js.find("Conecta tu cuenta para empezar el live.") != std::string::npos, "js simple ui logs")) return 1;
+    if (!require(js.find("/api/realtime") != std::string::npos, "js realtime combined endpoint")) return 1;
+    if (!require(js.find("POLL_REALTIME_HIDDEN_MS = 1500") != std::string::npos, "js hidden realtime poll")) return 1;
+    if (!require(js.find("document.addEventListener(\"visibilitychange\"") != std::string::npos, "js visibility polling hook")) return 1;
+    if (!require(js.find("restartPollingLoops(false)") != std::string::npos, "js adaptive polling start")) return 1;
+    if (!require(js.find("function setHtml") != std::string::npos, "js html render cache helper")) return 1;
+    if (!require(js.find("element.innerHTML === html") != std::string::npos, "js html cache checks dom")) return 1;
+    if (!require(js.find("recentActivityMarkup") != std::string::npos, "js activity render cache")) return 1;
+    if (!require(js.find("gamesMarkup") != std::string::npos, "js games render cache")) return 1;
+    if (!require(js.find("renderVoiceSaveState") != std::string::npos, "js voice save state")) return 1;
+    if (!require(js.find("Escuchando") != std::string::npos, "js latency listening state")) return 1;
+
+    const auto game_previews = issue_request(panel_app, kPort, make_get_request("/game-previews.js"));
+    if (!require(game_previews.find("HTTP/1.1 200 OK") != std::string::npos, "game previews 200")) return 1;
+    if (!require(game_previews.find("window.__GAME_PREVIEW_IMAGES__") != std::string::npos, "game previews object")) return 1;
+    if (!require(game_previews.find("\"arena_live\"") != std::string::npos, "game previews arena image")) return 1;
+    if (!require(game_previews.find("\"conquista\"") != std::string::npos, "game previews conquista image")) return 1;
+    if (!require(game_previews.find("\"super_chat\"") != std::string::npos, "game previews super chat image")) return 1;
 
     const auto raw_chat = nlp3::testsupport::make_chat_event(
         "user-1",
@@ -345,6 +366,12 @@ int main() {
     if (!require(metrics_json.find("\"chatMessages\":1") != std::string::npos, "metrics chat count before reset")) return 1;
     if (!require(metrics_json.find("\"gifts\":1") != std::string::npos, "metrics gift count before reset")) return 1;
 
+    const auto realtime_json = issue_request(panel_app, kPort, make_get_request("/api/realtime"));
+    if (!require(realtime_json.find("\"metrics\":{") != std::string::npos, "realtime metrics section")) return 1;
+    if (!require(realtime_json.find("\"events\":{") != std::string::npos, "realtime events section")) return 1;
+    if (!require(realtime_json.find("\"chatMessages\":1") != std::string::npos, "realtime chat count")) return 1;
+    if (!require(realtime_json.find("chat_message") != std::string::npos, "realtime chat item")) return 1;
+
     const auto metrics_reset = issue_request(
         panel_app,
         kPort,
@@ -355,6 +382,35 @@ int main() {
     if (!require(metrics_after_reset.find("\"chatMessages\":0") != std::string::npos, "metrics chat count reset")) return 1;
     if (!require(metrics_after_reset.find("\"gifts\":0") != std::string::npos, "metrics gift count reset")) return 1;
     if (!require(panel_app.snapshot().total_events == 0, "metrics reset cleared host totals")) return 1;
+
+    const auto cross_origin_metrics_reset = issue_request(
+        panel_app,
+        kPort,
+        make_post_request(
+            "/api/metrics/reset",
+            "{}",
+            "application/json; charset=utf-8",
+            "Origin: https://example.invalid\r\n"));
+    if (!require(
+            cross_origin_metrics_reset.find("HTTP/1.1 403 Forbidden") != std::string::npos,
+            "cross-origin metrics reset blocked")) {
+        return 1;
+    }
+    if (!require(
+            cross_origin_metrics_reset.find("\"errorCode\":\"origin_not_allowed\"") != std::string::npos,
+            "cross-origin metrics reset origin error")) {
+        return 1;
+    }
+
+    const auto same_origin_metrics_reset = issue_request(
+        panel_app,
+        kPort,
+        make_post_request(
+            "/api/metrics/reset",
+            "{}",
+            "application/json; charset=utf-8",
+            "Origin: http://127.0.0.1:" + std::to_string(kPort) + "\r\n"));
+    if (!require(same_origin_metrics_reset.find("metrics_reset") != std::string::npos, "same-origin metrics reset allowed")) return 1;
 
     const auto tts_before = issue_request(panel_app, kPort, make_get_request("/api/tts/config"));
     if (!require(tts_before.find("\"ttsBackendName\"") != std::string::npos, "tts config backend name")) return 1;
@@ -520,6 +576,24 @@ int main() {
         return 1;
     }
 
+    const auto locked_chat = nlp3::testsupport::make_chat_event(
+        "locked-user",
+        "locked",
+        "Locked",
+        "evt-locked-chat-1",
+        "room-locked",
+        "logout should clear me",
+        3000);
+    if (!require(locked_panel_app.submit_external_bridge_event(locked_chat), "locked submit raw chat")) return 1;
+    locked_panel_app.tick(3200);
+
+    const auto locked_events_before_logout = issue_request(locked_panel_app, kLockedPort, make_get_request("/api/events"));
+    if (!require(
+            locked_events_before_logout.find("logout should clear me") != std::string::npos,
+            "locked events before logout")) {
+        return 1;
+    }
+
     const auto logged_out = issue_request(
         locked_panel_app,
         kLockedPort,
@@ -527,6 +601,12 @@ int main() {
     if (!require(logged_out.find("\"message\":\"auth_logged_out\"") != std::string::npos, "logout endpoint ok")) {
         return 1;
     }
+
+    const auto locked_events_after_logout = issue_request(locked_panel_app, kLockedPort, make_get_request("/api/events"));
+    if (!require(locked_events_after_logout.find("\"total\":0") != std::string::npos, "logout cleared recent events")) return 1;
+
+    const auto locked_metrics_after_logout = issue_request(locked_panel_app, kLockedPort, make_get_request("/api/metrics"));
+    if (!require(locked_metrics_after_logout.find("\"chatMessages\":0") != std::string::npos, "logout cleared chat metrics")) return 1;
 
     const auto support_export = issue_request(
         locked_panel_app,

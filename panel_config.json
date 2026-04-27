@@ -2,7 +2,7 @@
   "panel_name": "Nisoje Studio",
   "default_game_id": "arena_live",
   "bridge_mode": "external",
-  "external_target_user": "curmita01",
+  "external_target_user": "nisoje.tk",
   "external_ws_port": 8765,
   "embedded_ui_enabled": true,
   "embedded_ui_fallback_to_browser": true,

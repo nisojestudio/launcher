@@ -1,3 +1,7 @@
+if(NOT TARGET nlohmann_json::nlohmann_json)
+    find_package(nlohmann_json CONFIG REQUIRED)
+endif()
+
 add_executable(nlp3_smoke_test
     smoke_test.cpp
 )
@@ -126,6 +130,15 @@ target_link_libraries(nlp3_panel_services_test PRIVATE nlp3_platform)
 
 add_test(NAME nlp3_panel_services_test COMMAND nlp3_panel_services_test)
 
+add_executable(nlp3_support_bundle_sanitizer_test
+    support_bundle_sanitizer_test.cpp
+)
+
+target_link_libraries(nlp3_support_bundle_sanitizer_test PRIVATE nlp3_platform)
+target_link_libraries(nlp3_support_bundle_sanitizer_test PRIVATE nlohmann_json::nlohmann_json)
+
+add_test(NAME nlp3_support_bundle_sanitizer_test COMMAND nlp3_support_bundle_sanitizer_test)
+
 add_executable(nlp3_panel_config_storage_test
     panel_config_storage_test.cpp
 )
@@ -205,6 +218,20 @@ add_executable(nlp3_tiktok_external_event_codec_test
 target_link_libraries(nlp3_tiktok_external_event_codec_test PRIVATE nlp3_bridge)
 
 add_test(NAME nlp3_tiktok_external_event_codec_test COMMAND nlp3_tiktok_external_event_codec_test)
+
+add_library(nlp3_test_asserts INTERFACE)
+target_compile_options(nlp3_test_asserts INTERFACE
+    $<$<CXX_COMPILER_ID:MSVC>:/FI${CMAKE_CURRENT_SOURCE_DIR}/test_asserts_enabled.hpp>
+    $<$<NOT:$<CXX_COMPILER_ID:MSVC>>:-include>
+    $<$<NOT:$<CXX_COMPILER_ID:MSVC>>:${CMAKE_CURRENT_SOURCE_DIR}/test_asserts_enabled.hpp>
+)
+
+get_property(NLP3_TEST_TARGETS DIRECTORY PROPERTY BUILDSYSTEM_TARGETS)
+foreach(NLP3_TEST_TARGET IN LISTS NLP3_TEST_TARGETS)
+    if(NLP3_TEST_TARGET MATCHES "^nlp3_.*_test$")
+        target_link_libraries(${NLP3_TEST_TARGET} PRIVATE nlp3_test_asserts)
+    endif()
+endforeach()
 
 if(EXISTS "${PROJECT_SOURCE_DIR}/tools/bridge_py/.venv/Scripts/python.exe")
     set(NLP3_TEST_PYTHON "${PROJECT_SOURCE_DIR}/tools/bridge_py/.venv/Scripts/python.exe")

@@ -1,9 +1,12 @@
 from __future__ import annotations
 
 import asyncio
+import ipaddress
 import json
+import re
 from dataclasses import dataclass
 from typing import Any, Awaitable, Callable
+from urllib.parse import urlparse
 
 from metrics_registry import MetricsRegistry
 
@@ -12,6 +15,39 @@ JsonFactory = Callable[[], dict[str, Any]]
 ReplayStartHandler = Callable[[dict[str, Any]], Awaitable[dict[str, Any]]]
 ReplayStopHandler = Callable[[], Awaitable[dict[str, Any]]]
 ShutdownHandler = Callable[[], Awaitable[dict[str, Any]]]
+
+LOOPBACK_ORIGIN_PATTERN = re.compile(r"^https?://(?:localhost|127\.0\.0\.1|\[::1\])(?::\d+)?$", re.IGNORECASE)
+
+
+def _is_loopback_host(host: str) -> bool:
+    normalized = str(host or "").strip().lower()
+    if not normalized:
+        return False
+    if normalized == "localhost":
+        return True
+    try:
+        return ipaddress.ip_address(normalized).is_loopback
+    except ValueError:
+        return False
+
+
+def _is_loopback_origin(origin: str | None) -> bool:
+    if not origin:
+        return True
+    try:
+        parsed = urlparse(origin)
+    except Exception:
+        return False
+    if parsed.scheme not in {"http", "https"}:
+        return False
+    return _is_loopback_host(parsed.hostname or "")
+
+
+def _validate_loopback_server_hosts(config: "BridgeServerConfig") -> None:
+    if not _is_loopback_host(config.host):
+        raise ValueError("BridgeServer requires a loopback control_host")
+    if config.enable_ws_broadcast and not _is_loopback_host(config.ws_host):
+        raise ValueError("BridgeServer requires a loopback broadcast_ws_host")
 
 
 @dataclass(slots=True)
@@ -47,6 +83,7 @@ class BridgeServer:
         self._subscribers: set[Any] = set()
 
     async def start(self) -> None:
+        _validate_loopback_server_hosts(self._config)
         self._http_server = await asyncio.start_server(
             self._handle_http_client,
             self._config.host,
@@ -59,6 +96,7 @@ class BridgeServer:
                 self._handle_ws_client,
                 self._config.ws_host,
                 self._config.ws_port,
+                origins=[None, LOOPBACK_ORIGIN_PATTERN],
             )
 
     async def stop(self) -> None:
@@ -152,6 +190,10 @@ class BridgeServer:
         if content_length > 0:
             body = await reader.readexactly(content_length)
 
+        if method == "POST" and not _is_loopback_origin(headers.get("origin")):
+            await self._write_response(writer, 403, {"error": "origin_not_allowed"})
+            return
+
         if method == "GET" and path == "/health":
             await self._write_response(writer, 200, self._health_factory())
             return
@@ -193,6 +235,7 @@ class BridgeServer:
         reason = {
             200: "OK",
             400: "Bad Request",
+            403: "Forbidden",
             404: "Not Found",
         }.get(status, "OK")
         encoded = body.encode("utf-8")

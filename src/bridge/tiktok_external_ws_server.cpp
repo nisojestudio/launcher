@@ -110,6 +110,88 @@ std::optional<std::string> extract_websocket_key(std::string_view request) {
     return std::nullopt;
 }
 
+std::optional<std::string> extract_header_value(
+    std::string_view request,
+    std::string_view expected_header_name) {
+    const auto expected = to_lower_ascii(expected_header_name);
+
+    std::size_t line_begin = 0;
+    while (line_begin < request.size()) {
+        const auto line_end = request.find("\r\n", line_begin);
+        const auto line = request.substr(
+            line_begin,
+            line_end == std::string_view::npos ? request.size() - line_begin : line_end - line_begin);
+
+        const auto separator = line.find(':');
+        if (separator != std::string_view::npos) {
+            const auto header_name = to_lower_ascii(line.substr(0, separator));
+            if (header_name == expected) {
+                const auto value = trim_copy(line.substr(separator + 1));
+                if (!value.empty()) {
+                    return value;
+                }
+                return std::string{};
+            }
+        }
+
+        if (line_end == std::string_view::npos) {
+            break;
+        }
+        line_begin = line_end + 2;
+    }
+
+    return std::nullopt;
+}
+
+bool is_allowed_loopback_origin(std::string_view origin) {
+    const auto normalized = to_lower_ascii(trim_copy(origin));
+
+    std::string_view authority{};
+    if (normalized.rfind("http://", 0) == 0) {
+        authority = std::string_view(normalized).substr(7);
+    } else if (normalized.rfind("https://", 0) == 0) {
+        authority = std::string_view(normalized).substr(8);
+    } else {
+        return false;
+    }
+
+    const auto path_start = authority.find('/');
+    if (path_start != std::string_view::npos) {
+        authority = authority.substr(0, path_start);
+    }
+
+    if (authority.empty()) {
+        return false;
+    }
+
+    std::string_view host = authority;
+    if (authority.front() == '[') {
+        const auto bracket_end = authority.find(']');
+        if (bracket_end == std::string_view::npos) {
+            return false;
+        }
+        host = authority.substr(1, bracket_end - 1);
+    } else {
+        const auto port_separator = authority.find(':');
+        if (port_separator != std::string_view::npos) {
+            host = authority.substr(0, port_separator);
+        }
+    }
+
+    return host == "127.0.0.1" || host == "localhost" || host == "::1";
+}
+
+std::string make_http_error_response(
+    std::string_view status_line,
+    std::string_view body) {
+    return std::string("HTTP/1.1 ")
+        + std::string(status_line)
+        + "\r\nContent-Type: text/plain; charset=utf-8\r\nContent-Length: "
+        + std::to_string(body.size())
+        + "\r\nConnection: close\r\n\r\n"
+        + std::string(body);
+}
+
 std::array<std::uint8_t, 20> sha1_bytes(std::string_view input) {
     std::array<std::uint8_t, 20> digest{};
     std::array<std::uint32_t, 5> state{
@@ -441,6 +523,17 @@ std::size_t TikTokExternalWsServer::poll() {
         const auto websocket_key = extract_websocket_key(request);
         if (!websocket_key.has_value()) {
             close_socket(impl_->client_socket);
+            impl_->receive_buffer.clear();
+            return 0;
+        }
+
+        const auto origin = extract_header_value(request, "origin");
+        if (origin.has_value() && !origin->empty() && !is_allowed_loopback_origin(*origin)) {
+            const auto forbidden_response =
+                make_http_error_response("403 Forbidden", "origin_not_allowed");
+            send_all(impl_->client_socket, forbidden_response);
+            close_socket(impl_->client_socket);
+            impl_->handshake_complete = false;
             impl_->receive_buffer.clear();
             return 0;
         }

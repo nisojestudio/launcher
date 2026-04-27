@@ -1,4 +1,4 @@
-name = "nisoje-api"
+name = "nisoje-api-dev"
 main = "worker.js"
 compatibility_date = "2026-04-11"
 
@@ -6,8 +6,9 @@ compatibility_date = "2026-04-11"
 FIREBASE_API_KEY = "REPLACE_ME"
 GAMES_CATALOG_OBJECT = "catalog/latest.json"
 GAME_DOWNLOAD_TTL_SECONDS = "300"
-ADMIN_EMAIL = "nisojestudio@gmail.com"
-INSTALLER_URL = "https://github.com/nisojestudio/launcher/releases/download/instalador/PanelLive-3.0-Windows-x64-Setup.exe"
+ADMIN_EMAIL = "REPLACE_ME"
+INSTALLER_URL = "https://example.invalid/panel-live-win-x64.exe"
+CORS_ALLOW_ORIGIN = "https://panel.example.com"
 
 [[d1_databases]]
 binding = "DB"
@@ -16,4 +17,4 @@ database_id = "REPLACE_ME"
 
 [[r2_buckets]]
 binding = "GAMES_CATALOG_BUCKET"
-bucket_name = "games-catalog"
+bucket_name = "REPLACE_ME"

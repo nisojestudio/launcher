@@ -12,3 +12,5 @@ Original prompt: perfecto ahora necesito que en el juego subas al espacio que es
 - 2026-04-08: `src/platform/ui/index.html` y `tests/panel_http_ui_test.cpp` alineados con la instruccion visual de TTS y con el tema oscuro real del host.
 - 2026-04-08: detectado que los `.inc` del panel UI estaban regenerados pero `NisojeStudio.exe` seguia sirviendo una version vieja hasta relinkear `nlp3_app`; se forzo recompilacion limpia del bloque embebido.
 - 2026-04-08: validacion real del host UI hecha con smoke HTTP directo contra `NisojeStudio.exe` en puerto 19100 y con `ctest --preset release -R "nlp3_panel_http_ui_test|nlp3_panel_app_smoke_test|nlp3_tts_scheduler_test|nlp3_tts_template_formatter_test" --output-on-failure`.
+- 2026-04-23: agregadas portadas reales de `Arena Live`, `Super Chat` y `Conquista` al panel embebido mediante `src/platform/ui/game-previews.js` servido desde el host HTTP.
+- 2026-04-23: tarjetas de juegos rediseñadas con poster vertical 3:4 y descripciones no tecnicas para que la imagen se vea completa y el panel sea mas claro a simple vista.

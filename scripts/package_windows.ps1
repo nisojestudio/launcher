@@ -170,6 +170,65 @@ function Resolve-BasePanelConfigPath {
     return (Resolve-Path $candidate).Path
 }
 
+function Get-ReleaseAuthDefaults {
+    return [ordered]@{
+        firebase_api_key = "AIzaSyBWRMoHbPNkOw0zvflcPb_dv9G1Bgg1uLc"
+        firebase_project_id = "nisoje-studio"
+        firebase_auth_domain = "nisoje-studio.firebaseapp.com"
+        nisoje_api_base = "https://nisoje-api.nisojestudio.workers.dev"
+        me_licenses_path = "/api/me/licenses"
+        me_games_catalog_path = "/api/me/games/catalog"
+    }
+}
+
+function Ensure-ReleaseAuthConfig {
+    param(
+        [Parameter(Mandatory = $true)]
+        [object]$AuthConfig,
+
+        [Parameter(Mandatory = $true)]
+        [bool]$RequireRemoteAuth
+    )
+
+    $defaults = Get-ReleaseAuthDefaults
+    foreach ($entry in $defaults.GetEnumerator()) {
+        $currentValue = ""
+        if ($null -ne $AuthConfig.PSObject.Properties[$entry.Key] -and $null -ne $AuthConfig.$($entry.Key)) {
+            $currentValue = [string]$AuthConfig.$($entry.Key)
+        }
+
+        if ([string]::IsNullOrWhiteSpace($currentValue)) {
+            Set-ObjectProperty -Target $AuthConfig -Name $entry.Key -Value $entry.Value
+        }
+    }
+
+    if (-not $RequireRemoteAuth) {
+        return
+    }
+
+    $runtimeRequiredKeys = @(
+        "firebase_api_key",
+        "nisoje_api_base",
+        "me_licenses_path",
+        "me_games_catalog_path"
+    )
+
+    $missingKeys = @()
+    foreach ($key in $runtimeRequiredKeys) {
+        $value = ""
+        if ($null -ne $AuthConfig.PSObject.Properties[$key] -and $null -ne $AuthConfig.$key) {
+            $value = [string]$AuthConfig.$key
+        }
+        if ([string]::IsNullOrWhiteSpace($value)) {
+            $missingKeys += $key
+        }
+    }
+
+    if ($missingKeys.Count -gt 0) {
+        throw "Release packaging requires remote auth config. Missing fields: $($missingKeys -join ', ')"
+    }
+}
+
 function New-ReleasePanelConfig {
     param(
         [Parameter(Mandatory = $true)]
@@ -244,6 +303,7 @@ function New-ReleasePanelConfig {
 
     $authConfig = Ensure-ObjectProperty -Target $baseConfig -Name "auth"
     Set-ObjectProperty -Target $authConfig -Name "required" -Value $RequireRemoteAuth
+    Ensure-ReleaseAuthConfig -AuthConfig $authConfig -RequireRemoteAuth $RequireRemoteAuth
 
     $bridgeConfig = Ensure-ObjectProperty -Target $baseConfig -Name "bridge"
     Set-ObjectProperty -Target $bridgeConfig -Name "enabled" -Value $true
@@ -907,6 +967,8 @@ try {
     Write-Host "[package] panel config source: $resolvedBaseConfigPath"
     Write-Host "[package] target user: $(if ([string]::IsNullOrWhiteSpace([string]$releaseConfig.external_target_user)) { '<blank>' } else { [string]$releaseConfig.external_target_user })"
     Write-Host "[package] auth required: $([bool]$releaseConfig.auth.required)"
+    Write-Host "[package] auth project: $([string]$releaseConfig.auth.firebase_project_id)"
+    Write-Host "[package] auth api base: $([string]$releaseConfig.auth.nisoje_api_base)"
     Write-PortableRequirementsFile -PackageRoot $packageRoot -Encoding $utf8
 
     $launchScript = @'

@@ -106,10 +106,9 @@ TtsMessage HostTtsService::build_chat_message(const events::HostEvent& event) co
     context.message = event.message;
     context.viewers = event.viewer_count;
 
-    // Chat TTS intentionally reads only the message body so usernames and icons
-    // coming from actor names never reach the spoken audio.
     std::string formatted{};
-    if (!policy_.chat_message_template.empty() && !chat_template_mentions_user(policy_.chat_message_template)) {
+    if (!policy_.chat_message_template.empty()
+        && (policy_.include_actor_name_for_chat || !chat_template_mentions_user(policy_.chat_message_template))) {
         formatted = format_tts_template(policy_.chat_message_template, context);
     }
     if (formatted.empty()) {

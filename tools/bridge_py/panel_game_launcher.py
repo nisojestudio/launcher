@@ -30,6 +30,37 @@ def resolve_default_games_root() -> Path:
 DEFAULT_GAMES_ROOT = resolve_default_games_root()
 
 
+def choose_newest_existing_path(candidates: list[Path]) -> Path | None:
+    ranked: list[tuple[float, int, Path]] = []
+    for index, candidate in enumerate(candidates):
+        if not candidate.exists():
+            continue
+        try:
+            modified = candidate.stat().st_mtime
+        except OSError:
+            modified = 0.0
+        ranked.append((modified, -index, candidate.resolve()))
+
+    if not ranked:
+        return None
+
+    return max(ranked)[2]
+
+
+def discover_versioned_panel_executables() -> list[Path]:
+    candidates: list[Path] = []
+
+    releases_root = REPO_ROOT / "dist" / "releases"
+    if releases_root.exists():
+        candidates.extend(releases_root.glob("*/NisojeStudio/NisojeStudio.exe"))
+
+    build_root = REPO_ROOT / "build"
+    if build_root.exists():
+        candidates.extend(build_root.glob("release-*/src/platform/NisojeStudio.exe"))
+
+    return candidates
+
+
 @dataclass
 class SelectedGame:
     game_root: Path
@@ -88,22 +119,27 @@ def find_panel_executable(override_path: str) -> Path:
             return candidate
         raise RuntimeError(f"Panel executable not found at {candidate}")
 
+    versioned_match = choose_newest_existing_path(discover_versioned_panel_executables())
+    if versioned_match is not None:
+        return versioned_match
+
     candidates = [
+        REPO_ROOT / "NisojeStudio.exe",
         REPO_ROOT / "build" / "release" / "src" / "platform" / "NisojeStudio.exe",
         REPO_ROOT / "build" / "Release" / "src" / "platform" / "NisojeStudio.exe",
         REPO_ROOT / "build" / "src" / "platform" / "NisojeStudio.exe",
         REPO_ROOT / "dist" / "NisojeStudio" / "NisojeStudio.exe",
     ]
-    for candidate in candidates:
-        if candidate.exists():
-            return candidate.resolve()
+    preferred_match = choose_newest_existing_path(candidates)
+    if preferred_match is not None:
+        return preferred_match
 
     for base in (REPO_ROOT / "dist", REPO_ROOT / "build"):
         if not base.exists():
             continue
-        matches = sorted(base.rglob("NisojeStudio.exe"))
-        if matches:
-            return matches[0].resolve()
+        fallback_match = choose_newest_existing_path(list(base.rglob("NisojeStudio.exe")))
+        if fallback_match is not None:
+            return fallback_match
 
     raise RuntimeError(
         "NisojeStudio.exe was not found. Build the panel first or pass --panel-exe explicitly."

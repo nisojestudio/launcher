@@ -41,6 +41,9 @@ class CanonicalActor:
     username: str = ""
     display_name: str = ""
     avatar_url: str = ""
+    is_follower: bool = False
+    is_subscriber: bool = False
+    is_moderator: bool = False
 
     def to_dict(self) -> dict[str, Any]:
         return {
@@ -48,6 +51,9 @@ class CanonicalActor:
             "username": self.username,
             "display_name": self.display_name,
             "avatar_url": self.avatar_url,
+            "is_follower": self.is_follower,
+            "is_subscriber": self.is_subscriber,
+            "is_moderator": self.is_moderator,
         }
 
 

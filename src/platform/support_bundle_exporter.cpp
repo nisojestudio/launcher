@@ -26,6 +26,7 @@
 
 #include "platform/panel_app.hpp"
 #include "platform/panel_http_json.hpp"
+#include "platform/support_bundle_sanitizer.hpp"
 
 namespace {
 
@@ -198,7 +199,7 @@ nlohmann::json build_log_json(const std::filesystem::path& path, std::string_vie
     }
 
     for (const auto& line : read_log_tail(path)) {
-        output["lines"].push_back(line);
+        output["lines"].push_back(nlp3::platform::sanitize_support_bundle_log_line(line));
     }
     return output;
 }
@@ -240,9 +241,9 @@ SupportBundleExportResult export_support_bundle(
             {"exportedAtMs", result.exported_at_ms},
             {"reason", std::string(reason)},
             {"includedLogs", result.included_logs},
-            {"state", parse_json_or_wrap(build_panel_http_state_json(app, http_status))},
-            {"metrics", parse_json_or_wrap(build_panel_http_metrics_json(app))},
-            {"events", parse_json_or_wrap(build_panel_http_events_json(app))},
+            {"state", sanitize_support_bundle_json(parse_json_or_wrap(build_panel_http_state_json(app, http_status)))},
+            {"metrics", sanitize_support_bundle_json(parse_json_or_wrap(build_panel_http_metrics_json(app)))},
+            {"events", sanitize_support_bundle_json(parse_json_or_wrap(build_panel_http_events_json(app)))},
             {"logs", logs},
         };
 

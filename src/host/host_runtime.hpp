@@ -62,6 +62,7 @@ public:
     HostBridgeStatus bridge_status() const;
     bool queue_tts_announcement(std::string_view message);
     std::size_t flush_tts(std::size_t max_messages = 0);
+    void clear_pending_tts() noexcept;
     void clear_pending_live_backlog() noexcept;
     void reset_session_metrics() noexcept;
     const HostAutomationConfig& automation_config() const noexcept;

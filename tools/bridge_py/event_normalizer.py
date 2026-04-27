@@ -66,13 +66,33 @@ def _base_event(
 
 def _actor_from_user(event: Any) -> CanonicalActor:
     user = safe_user(event)
-    actor_id, username, display_name, avatar_url, _is_follower, _is_subscriber, _is_moderator = _actor_fields(user)
+    actor_id, username, display_name, avatar_url, is_follower, is_subscriber, is_moderator = _actor_fields(user)
     return CanonicalActor(
         user_id=actor_id,
         username=username,
         display_name=display_name,
         avatar_url=avatar_url,
+        is_follower=is_follower,
+        is_subscriber=is_subscriber,
+        is_moderator=is_moderator,
     )
+
+
+def _actor_payload_flag(actor_payload: dict[str, Any], snake_key: str, camel_key: str) -> bool:
+    value = actor_payload.get(snake_key)
+    if value is None:
+        value = actor_payload.get(camel_key)
+    if isinstance(value, bool):
+        return value
+    if isinstance(value, (int, float)):
+        return value != 0
+    if isinstance(value, str):
+        normalized = value.strip().lower()
+        if normalized in ("true", "1", "yes", "on"):
+            return True
+        if normalized in ("false", "0", "no", "off", ""):
+            return False
+    return False
 
 
 def _metadata_from_tiktok_event(
@@ -418,6 +438,9 @@ def normalize_custom_raw_event(
         username=clamp_text(actor_payload.get("username"), target_user, 64),
         display_name=clamp_text(actor_payload.get("display_name"), target_user or "custom_raw", 80),
         avatar_url=clamp_text(actor_payload.get("avatar_url"), "", 4096),
+        is_follower=_actor_payload_flag(actor_payload, "is_follower", "isFollower"),
+        is_subscriber=_actor_payload_flag(actor_payload, "is_subscriber", "isSubscriber"),
+        is_moderator=_actor_payload_flag(actor_payload, "is_moderator", "isModerator"),
     )
     metadata_payload = payload.get("metadata", {}) if isinstance(payload.get("metadata"), dict) else {}
     final_timestamp_ms = clamp_int(

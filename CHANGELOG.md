@@ -6,6 +6,14 @@ Format follows a lightweight Keep a Changelog style. Versions use SemVer.
 
 ## Unreleased
 
+## 0.1.1 - 2026-04-24
+
+### Fixed
+
+- Kept the TTS apply action visible in the automatic messages header.
+- Tightened panel layout constraints so form controls and notice actions stay inside their cards.
+- Made the release validation script use the bridge Python runtime with the required TikTok dependencies.
+
 ### Added
 
 - Added project-level agent map and routing policy.
