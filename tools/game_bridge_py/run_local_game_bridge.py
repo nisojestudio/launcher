@@ -18,6 +18,15 @@ def now_ms() -> int:
     return int(time.time() * 1000)
 
 
+def coerce_int(value: Any, fallback: int = 0) -> int:
+    try:
+        if value is None or value == "":
+            return fallback
+        return int(float(value))
+    except (TypeError, ValueError):
+        return fallback
+
+
 def safe_mkdir(path: Path) -> None:
     path.mkdir(parents=True, exist_ok=True)
 
@@ -379,9 +388,37 @@ def normalize_panel_event(record: dict[str, Any]) -> dict[str, Any]:
     ).strip()
     timestamp_ms = int(record.get("ts") or record.get("timestampMs") or now_ms())
     message = str(record.get("message") or data.get("message") or data.get("comment") or "").strip()
-    count = int(data.get("count") or record.get("count") or record.get("magnitude") or 1)
+    count = coerce_int(data.get("count") or record.get("count") or record.get("magnitude") or 1, 1)
     gift_name = str(data.get("giftName") or record.get("giftName") or "").strip()
-    gift_value = int(data.get("diamond") or data.get("coins") or record.get("value") or record.get("diamond") or 0)
+    gift_value = coerce_int(
+        data.get("diamond")
+        or data.get("coins")
+        or data.get("value")
+        or data.get("giftValue")
+        or data.get("gift_value")
+        or data.get("diamondValue")
+        or data.get("price")
+        or record.get("value")
+        or record.get("diamond")
+        or record.get("coins")
+        or 0,
+        0,
+    )
+    side_hint = str(
+        data.get("sideHint")
+        or data.get("voteSide")
+        or data.get("side")
+        or data.get("team")
+        or data.get("teamId")
+        or data.get("targetTeam")
+        or record.get("sideHint")
+        or record.get("voteSide")
+        or record.get("side")
+        or record.get("team")
+        or record.get("teamId")
+        or record.get("targetTeam")
+        or ""
+    ).strip()
 
     if raw_kind == "avatar":
         outbound_kind = "join"
@@ -421,6 +458,14 @@ def normalize_panel_event(record: dict[str, Any]) -> dict[str, Any]:
             "comment": message or json_compact(record),
             "fallbackKind": raw_kind or "unknown",
         }
+
+    if side_hint:
+        payload_data.update({
+            "sideHint": side_hint,
+            "voteSide": side_hint,
+            "side": side_hint,
+            "team": side_hint,
+        })
 
     return {
         "kind": outbound_kind,
