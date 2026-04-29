@@ -6,6 +6,13 @@ Format follows a lightweight Keep a Changelog style. Versions use SemVer.
 
 ## Unreleased
 
+## 0.1.2 - 2026-04-29
+
+### Fixed
+
+- Refined the embedded game catalog UI actions and download states for the latest Panel Live 3.0 build.
+- Tightened catalog card styling so controls remain readable in the release installer.
+
 ## 0.1.1 - 2026-04-24
 
 ### Fixed
