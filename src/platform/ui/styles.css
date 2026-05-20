@@ -1254,6 +1254,14 @@ body::-webkit-scrollbar-corner,
     rgba(15, 23, 42, 0.92);
 }
 
+.game-thumb.preview-push {
+  background:
+    radial-gradient(circle at 26% 26%, rgba(255, 59, 95, 0.28), transparent 30%),
+    radial-gradient(circle at 76% 26%, rgba(25, 211, 255, 0.26), transparent 30%),
+    linear-gradient(90deg, rgba(77, 18, 43, 0.96), rgba(13, 25, 46, 0.98)),
+    rgba(15, 23, 42, 0.92);
+}
+
 .game-thumb.preview-null {
   background:
     linear-gradient(135deg, rgba(47, 58, 83, 0.96), rgba(12, 18, 31, 0.98)),

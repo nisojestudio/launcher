@@ -4,14 +4,14 @@
 
 Audit of the current `Arena Live` external-game integration against `Nisoje Studio` in:
 
-- `C:\Users\Nisoje\Desktop\Juegos\Arena Live`
+- `C:\Users\Nisoje\Desktop\panel-live-master\juegos\Arena Live`
 - `C:\Users\Nisoje\Desktop\Panel live 3.0`
 
 ## Verified contract
 
 - Discovery root is consistent:
   - panel source resolves `%USERPROFILE%\Desktop\Juegos` or `NLP3_LOCAL_GAMES_ROOT`
-  - `Arena Live` lives in `C:\Users\Nisoje\Desktop\Juegos\Arena Live`
+  - `Arena Live` lives in `C:\Users\Nisoje\Desktop\panel-live-master\juegos\Arena Live`
 - `module_manifest.json` is present and explicit for:
   - `id`
   - `displayName`
@@ -36,7 +36,7 @@ Audit of the current `Arena Live` external-game integration against `Nisoje Stud
 
 - `python -m unittest tools.game_bridge_py.tests.test_local_game_bridge`
   - Result: passed
-- `python .\tools\game_bridge_py\audit_external_game_contract.py --game-root "C:\Users\Nisoje\Desktop\Juegos\Arena Live"`
+- `python .\tools\game_bridge_py\audit_external_game_contract.py --game-root "C:\Users\Nisoje\Desktop\panel-live-master\juegos\Arena Live"`
   - Result: 0 failures, 1 warning
   - Warning: the bridge injects `--module-root` for this executable, which is correct for `Arena Live` but should be explicit for future legacy games
 

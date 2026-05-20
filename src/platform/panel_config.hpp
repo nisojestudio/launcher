@@ -16,7 +16,7 @@ struct PanelAuthConfig {
     std::string firebase_api_key = "AIzaSyBWRMoHbPNkOw0zvflcPb_dv9G1Bgg1uLc";
     std::string firebase_project_id = "nisoje-studio";
     std::string firebase_auth_domain = "nisoje-studio.firebaseapp.com";
-    std::string nisoje_api_base = "https://nisoje-api.nisojestudio.workers.dev";
+    std::string nisoje_api_base = "https://nisoje-api-dev.nisojestudio.workers.dev";
     std::string me_licenses_path = "/api/me/licenses";
     // Used by the panel to fetch the licensed remote catalog.
     std::string me_games_catalog_path = "/api/me/games/catalog";

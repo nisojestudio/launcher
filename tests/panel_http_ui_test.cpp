@@ -323,6 +323,7 @@ int main() {
     if (!require(game_previews.find("\"arena_live\"") != std::string::npos, "game previews arena image")) return 1;
     if (!require(game_previews.find("\"conquista\"") != std::string::npos, "game previews conquista image")) return 1;
     if (!require(game_previews.find("\"super_chat\"") != std::string::npos, "game previews super chat image")) return 1;
+    if (!require(game_previews.find("\"push_esferas\"") != std::string::npos, "game previews push esferas image")) return 1;
 
     const auto raw_chat = nlp3::testsupport::make_chat_event(
         "user-1",

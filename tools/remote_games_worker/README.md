@@ -25,12 +25,12 @@ Opcionales:
 
 ## Flujo recomendado
 
-1. Generar los paquetes de juegos en `C:\Users\Nisoje\Desktop\Juegos\_packages`
+1. Generar los paquetes de juegos en `C:\Users\Nisoje\Desktop\panel-live-master\juegos\_packages`
 2. Ejecutar:
 
 ```powershell
 powershell -ExecutionPolicy Bypass -File .\tools\remote_games_worker\generate_r2_catalog.ps1 `
-  -PackagesRoot "C:\Users\Nisoje\Desktop\Juegos\_packages" `
+  -PackagesRoot "C:\Users\Nisoje\Desktop\panel-live-master\juegos\_packages" `
   -OutputPath "C:\Users\Nisoje\Desktop\latest.json"
 ```
 

@@ -84,6 +84,22 @@
       description: "El live pelea por ganar terreno hasta dominar todo el mapa.",
       meta: [],
     },
+    "push_esferas": {
+      title: "Push Esferas",
+      previewLabel: "Push",
+      previewClass: "preview-push",
+      previewImage: GAME_PREVIEW_IMAGES.push_esferas || "",
+      description: "Dos equipos empujan la linea central con esferas, likes, regalos y poder del chat.",
+      meta: [],
+    },
+    "race_live": {
+      title: "Race Live",
+      previewLabel: "Race",
+      previewClass: "preview-race",
+      previewImage: GAME_PREVIEW_IMAGES.race_live || "",
+      description: "Carrera de 10 carriles con paises, impulsa a tu favorito con regalos.",
+      meta: [],
+    },
   };
 
   const state = {

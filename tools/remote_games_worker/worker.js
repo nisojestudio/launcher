@@ -1226,14 +1226,14 @@ function isGameAllowedForUser(game, activeLicenses, user) {
     return false;
   }
 
-  if (game.required_roles.length > 0) {
+  if (Array.isArray(game.required_roles) && game.required_roles.length > 0) {
     const userRole = trim(user?.role);
     if (!userRole || !game.required_roles.includes(userRole)) {
       return false;
     }
   }
 
-  if (game.required_license_keys.length > 0) {
+  if (Array.isArray(game.required_license_keys) && game.required_license_keys.length > 0) {
     const activeKeys = new Set(activeLicenses.map((item) => trim(item.license_key)));
     return game.required_license_keys.some((item) => activeKeys.has(item));
   }

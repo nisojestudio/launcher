@@ -157,7 +157,7 @@ function Build-ManifestPayload {
 }
 
 if ([string]::IsNullOrWhiteSpace($PackagesRoot)) {
-    $PackagesRoot = Join-Path $env:USERPROFILE "Desktop\\Juegos\\_packages"
+    $PackagesRoot = Join-Path $env:USERPROFILE "Desktop\\panel-live-master\\juegos\\_packages"
 }
 if ([string]::IsNullOrWhiteSpace($OutputPath)) {
     $OutputPath = Join-Path (Get-Location).Path "latest.json"
