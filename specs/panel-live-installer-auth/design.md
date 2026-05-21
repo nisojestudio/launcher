@@ -36,7 +36,7 @@ Se agrega una capa de autenticacion local en el host C++:
   - mantiene el `LicenseSnapshot`
   - guarda el estado de sesion autenticada del proceso
   - valida email/password contra Firebase Identity Toolkit via REST
-  - consulta `https://nisoje-api.nisojestudio.workers.dev/api/me/licenses?firebase_uid=...`
+  - consulta `https://nisoje-api-dev.nisojestudio.workers.dev/api/me/licenses?firebase_uid=...`
   - confirma que la licencia ingresada exista y este activa
 
 - `PanelApp`

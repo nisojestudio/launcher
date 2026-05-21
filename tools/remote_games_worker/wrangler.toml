@@ -3,13 +3,11 @@ main = "worker.js"
 compatibility_date = "2026-04-11"
 
 [vars]
-FIREBASE_API_KEY = "AIzaSyBWRMoHbPNkOw0zvflcPb_dv9G1Bgg1uLc"
 GAMES_CATALOG_OBJECT = "catalog/latest.json"
 GAME_DOWNLOAD_TTL_SECONDS = "300"
 ADMIN_EMAIL = "nisojestudio@gmail.com"
-INSTALLER_URL = "https://github.com/nisojestudio/launcher/releases/download/v0.1.3/panel-live-0.1.3-win-x64.exe"
+INSTALLER_URL = "https://github.com/nisojestudio/launcher/releases/download/v0.1.4/panel-live-0.1.4-win-x64.exe"
 CORS_ALLOW_ORIGIN = "https://nisoje.com"
-RESEND_API_KEY = "re_Ud1QCjw6_8rxWmJytdMSmSEpfF8VuVStd"
 RESEND_FROM_EMAIL = "soporte@nisoje.com"
 MOBILE_APK_URL = "https://github.com/nisojestudio/panel-live-mobil-releases/releases/download/v1.0.9-debug/panel-live-mobil-1.0.9-debug.apk"
 
