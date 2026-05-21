@@ -4,7 +4,7 @@ const DEFAULT_DOWNLOAD_TTL_SECONDS = 300;
 const DEFAULT_GAME_DOWNLOAD_ROUTE = "/api/me/games/download";
 const DEFAULT_ADMIN_EMAIL = "";
 const DEFAULT_INSTALLER_URL =
-  "https://github.com/nisojestudio/launcher/releases/download/v0.1.4/panel-live-0.1.4-win-x64.exe";
+  "https://github.com/nisojestudio/launcher/releases/download/v0.1.5/panel-live-0.1.5-win-x64.exe";
 const CORS_ALLOW_HEADERS = "authorization, content-type";
 const CORS_ALLOW_METHODS = "GET, POST, OPTIONS";
 let configuredCorsAllowOrigin = "";
