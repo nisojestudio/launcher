@@ -745,12 +745,14 @@ bool PanelApp::initialize(const std::string& config_path) {
         game_registry_->catalog() = game_catalog_source_->load_catalog();
         sync_remote_distribution_auth_context(false);
 
-        const auto preferred_game_id =
-            !config_.default_game_id.empty() ? config_.default_game_id : std::string{"event-counter"};
-        if (find_external_game_manifest(external_game_manifests_, preferred_game_id) != nullptr) {
-            game_runtime_controller_->activate("null-game");
-        } else if (!game_runtime_controller_->activate(preferred_game_id)) {
-            game_runtime_controller_->activate("null-game");
+        if (!auth_required() || access_granted()) {
+            const auto preferred_game_id =
+                !config_.default_game_id.empty() ? config_.default_game_id : std::string{"event-counter"};
+            if (find_external_game_manifest(external_game_manifests_, preferred_game_id) != nullptr) {
+                game_runtime_controller_->activate("null-game");
+            } else if (!game_runtime_controller_->activate(preferred_game_id)) {
+                game_runtime_controller_->activate("null-game");
+            }
         }
 
         host_runtime_ = std::make_unique<host::HostRuntime>(
@@ -1357,6 +1359,10 @@ std::vector<std::string> PanelApp::available_game_ids() const {
 }
 
 std::vector<gamesdk::GameCatalogEntry> PanelApp::available_games() const {
+    if (auth_required() && !access_granted()) {
+        return {};
+    }
+
     std::vector<gamesdk::GameCatalogEntry> entries{};
     if (game_catalog_source_ != nullptr) {
         entries = game_catalog_source_->load_catalog().entries();
