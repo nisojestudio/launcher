@@ -186,6 +186,14 @@ nlp3::platform::HttpResponse open_request(
         return response;
     }
 
+    if (parsed_url.secure) {
+        DWORD protocols = WINHTTP_FLAG_SECURE_PROTOCOL_TLS1_2 | WINHTTP_FLAG_SECURE_PROTOCOL_TLS1_3;
+        WinHttpSetOption(request, WINHTTP_OPTION_SECURE_PROTOCOLS, &protocols, sizeof(protocols));
+
+        DWORD security_flags = SECURITY_FLAG_IGNORE_REVOCATION;
+        WinHttpSetOption(request, WINHTTP_OPTION_SECURITY_FLAGS, &security_flags, sizeof(security_flags));
+    }
+
     const auto header_block = build_header_block(content_type, headers);
     const auto send_ok = WinHttpSendRequest(
         request,
