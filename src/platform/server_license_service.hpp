@@ -23,6 +23,7 @@ struct PanelAuthLoginResult {
     std::string error_code{};
     LicenseSnapshot license{};
     PanelAuthStatus auth{};
+    std::string remote_catalog_error{};
 };
 
 class ServerLicenseService final : public ILicenseService {

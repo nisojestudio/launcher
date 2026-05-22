@@ -4,6 +4,10 @@ set(NLP3_WEBVIEW2_SDK_DIR "${PROJECT_SOURCE_DIR}/third_party/webview2/sdk-1.0.38
 set(NLP3_WEBVIEW2_INCLUDE_DIR "${NLP3_WEBVIEW2_SDK_DIR}/build/native/include")
 set(NLP3_WEBVIEW2_LOADER_DLL "${NLP3_WEBVIEW2_SDK_DIR}/build/native/x64/WebView2Loader.dll")
 
+if(NOT DEFINED NLP3_PANEL_VERSION)
+    set(NLP3_PANEL_VERSION "0.1.0")
+endif()
+
 if(NOT TARGET nlohmann_json::nlohmann_json)
     find_package(nlohmann_json CONFIG REQUIRED)
 endif()
@@ -61,6 +65,7 @@ add_library(nlp3_platform
     panel_diagnostics_builder.cpp
     panel_snapshot_builder.cpp
     panel_ui_assets.cpp
+    panel_updater_service.cpp
     panel_view_model_builder.cpp
     remote_game_distribution_service.cpp
     server_license_service.cpp
@@ -78,6 +83,7 @@ set_source_files_properties(
             "${NLP3_PANEL_UI_INDEX_INC};${NLP3_PANEL_UI_STYLES_INC};${NLP3_PANEL_UI_APP_INC};${NLP3_PANEL_UI_GAME_PREVIEWS_INC}"
 )
 
+target_compile_definitions(nlp3_platform PRIVATE NLP3_PANEL_VERSION="${NLP3_PANEL_VERSION}")
 target_compile_features(nlp3_platform PUBLIC cxx_std_20)
 target_include_directories(
     nlp3_platform

@@ -91,6 +91,9 @@ struct PanelExternalWsStatus {
 
 struct PanelSnapshot {
     std::string panel_name = "Nisoje Studio";
+    std::string panel_version{};
+    std::string latest_version{};
+    std::string latest_installer_url{};
     std::string bridge_mode = "stub";
     std::size_t total_events = 0;
     host::HostBridgeStatus bridge{};

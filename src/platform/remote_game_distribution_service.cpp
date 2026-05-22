@@ -425,7 +425,7 @@ RemoteGameCatalogParseResult parse_remote_game_catalog_response(std::string_view
         record.manifest.description = manifest_json.value("description", std::string{});
         record.manifest.author = manifest_json.value("author", std::string{});
 
-        if (record.game_id.empty() || record.download_url.empty() || record.sha256.empty()) {
+        if (record.game_id.empty()) {
             continue;
         }
         if (!seen_ids.insert(record.game_id).second) {

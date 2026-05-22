@@ -9,7 +9,7 @@ ADMIN_EMAIL = "nisojestudio@gmail.com"
 INSTALLER_URL = "https://github.com/nisojestudio/launcher/releases/download/v0.1.5/panel-live-0.1.5-win-x64.exe"
 CORS_ALLOW_ORIGIN = "https://nisoje.com"
 RESEND_FROM_EMAIL = "soporte@nisoje.com"
-MOBILE_APK_URL = "https://github.com/nisojestudio/panel-live-mobil-releases/releases/download/v1.0.9-debug/panel-live-mobil-1.0.9-debug.apk"
+MOBILE_APK_URL = "https://github.com/nisojestudio/panel-live-mobil-releases/releases/download/v1.0.16-debug/panel-live-mobil-1.0.16-debug.apk"
 
 [[d1_databases]]
 binding = "DB"

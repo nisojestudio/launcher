@@ -26,6 +26,7 @@
 #include "platform/panel_run_result.hpp"
 #include "platform/panel_snapshot.hpp"
 #include "platform/panel_tick_result.hpp"
+#include "platform/panel_updater_service.hpp"
 
 namespace nlp3 {
 namespace bridge {
@@ -126,6 +127,7 @@ public:
     PanelAuthStatus auth_status() const;
     PanelAuthLoginResult authenticate_access(const PanelAuthLoginRequest& request);
     void logout_access() noexcept;
+    bool trigger_panel_update();
     PanelCommandResult start_remote_game_download(const std::string& game_id);
     bool activate_game_by_id(const std::string& game_id);
     bool pause_active_game();
@@ -143,7 +145,7 @@ private:
     void stop_external_game();
     void refresh_external_game_status();
     void refresh_external_game_manifests();
-    void sync_remote_distribution_auth_context(bool refresh_catalog);
+    void sync_remote_distribution_auth_context(bool refresh_catalog, std::string* catalog_error_out = nullptr);
     bool append_external_game_event_line(const std::string& line) const;
     bool forward_raw_event_to_external_game(const bridge::TikTokRawEvent& raw_event);
     bool forward_host_event_to_external_game(const events::HostEvent& event);
@@ -155,6 +157,7 @@ private:
     std::unique_ptr<IGameCatalogSource> game_catalog_source_{};
     std::unique_ptr<ServerLicenseService> license_service_{};
     std::unique_ptr<RemoteGameDistributionService> remote_game_distribution_service_{};
+    std::unique_ptr<PanelUpdaterService> panel_updater_service_{};
 
     std::unique_ptr<bridge::ITikTokBridgeSession> bridge_session_{};
     std::unique_ptr<bridge::TikTokBridgeController> bridge_controller_{};

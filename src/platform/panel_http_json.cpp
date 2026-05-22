@@ -360,6 +360,9 @@ std::string snapshot_json(const PanelSnapshot& snapshot) {
     std::ostringstream output;
     output << "{"
            << "\"panelName\":" << quote(snapshot.panel_name) << ","
+           << "\"panelVersion\":" << quote(snapshot.panel_version) << ","
+           << "\"latestVersion\":" << quote(snapshot.latest_version) << ","
+           << "\"latestInstallerUrl\":" << quote(snapshot.latest_installer_url) << ","
            << "\"bridgeMode\":" << quote(snapshot.bridge_mode) << ","
            << "\"totalEvents\":" << snapshot.total_events << ","
            << "\"bridge\":{"

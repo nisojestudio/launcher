@@ -40,14 +40,17 @@ int main() {
     })");
 
     NLP3_TEST_REQUIRE(parsed.ok);
-    NLP3_TEST_REQUIRE(parsed.games.size() == 1);
-    NLP3_TEST_REQUIRE(parsed.games.front().game_id == "arena_live");
-    NLP3_TEST_REQUIRE(parsed.games.front().display_name == "Arena Live");
-    NLP3_TEST_REQUIRE(parsed.games.front().version == "20260411-030455");
-    NLP3_TEST_REQUIRE(parsed.games.front().sha256 == "ABC123");
-    NLP3_TEST_REQUIRE(parsed.games.front().download_url == "https://example.invalid/download/arena");
-    NLP3_TEST_REQUIRE(parsed.games.front().manifest.display_name == "Arena Live");
-    NLP3_TEST_REQUIRE(parsed.games.front().manifest.description == "Juego live");
+    NLP3_TEST_REQUIRE(parsed.games.size() == 2);
+    NLP3_TEST_REQUIRE(parsed.games[0].game_id == "arena_live");
+    NLP3_TEST_REQUIRE(parsed.games[0].display_name == "Arena Live");
+    NLP3_TEST_REQUIRE(parsed.games[0].version == "20260411-030455");
+    NLP3_TEST_REQUIRE(parsed.games[0].sha256 == "ABC123");
+    NLP3_TEST_REQUIRE(parsed.games[0].download_url == "https://example.invalid/download/arena");
+    NLP3_TEST_REQUIRE(parsed.games[0].manifest.display_name == "Arena Live");
+    NLP3_TEST_REQUIRE(parsed.games[0].manifest.description == "Juego live");
+    /* missing_download passes through (no download_url, but game_id present) */
+    NLP3_TEST_REQUIRE(parsed.games[1].game_id == "missing_download");
+    NLP3_TEST_REQUIRE(parsed.games[1].sha256 == "FFF");
 
     const auto temp_root = std::filesystem::temp_directory_path() / "nlp3_remote_game_distribution_test";
     const auto registry_path = temp_root / "state" / "remote_game_installs.json";

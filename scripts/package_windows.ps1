@@ -175,7 +175,7 @@ function Get-ReleaseAuthDefaults {
         firebase_api_key = "AIzaSyBWRMoHbPNkOw0zvflcPb_dv9G1Bgg1uLc"
         firebase_project_id = "nisoje-studio"
         firebase_auth_domain = "nisoje-studio.firebaseapp.com"
-        nisoje_api_base = "https://nisoje-api-dev.nisojestudio.workers.dev"
+        nisoje_api_base = "https://nisoje.com"
         me_licenses_path = "/api/me/licenses"
         me_games_catalog_path = "/api/me/games/catalog"
     }

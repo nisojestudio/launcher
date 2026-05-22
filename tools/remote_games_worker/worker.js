@@ -80,6 +80,16 @@ export default {
         return json({ version: "v4-admin-dashboard" });
       }
 
+      if (url.pathname === "/api/version/latest") {
+        const installerUrl = trim(env.INSTALLER_URL) || DEFAULT_INSTALLER_URL;
+        const match = installerUrl.match(/\/releases\/download\/(v[\d.]+)\//);
+        const latestVersion = match ? match[1] : "v0.1.5";
+        return json({
+          latest_version: latestVersion,
+          installer_url: installerUrl
+        });
+      }
+
       if (url.pathname === "/api/db-test") {
         const result = await env.DB
           .prepare("SELECT COUNT(*) as total FROM users")

@@ -423,7 +423,8 @@ std::string make_auth_login_result(const PanelAuthLoginResult& result) {
         "\"message\":" + json_quote(result.auth.message) + ","
         "\"lastErrorCode\":" + json_quote(result.auth.last_error_code) + ","
         "\"lastValidatedTimestampMs\":" + std::to_string(result.auth.last_validated_timestamp_ms)
-        + "}"
+        + "},"
+        "\"remoteCatalogError\":" + json_quote(result.remote_catalog_error)
         + "}";
 }
 
@@ -949,6 +950,14 @@ std::string handle_system_reconnect(PanelApp* app) {
     return make_simple_result(ok, ok ? "system_reconnected" : "system_reconnect_failed");
 }
 
+std::string handle_update_trigger(PanelApp* app) {
+    if (app == nullptr) {
+        return nlp3::platform::build_panel_http_error_json("panel unavailable");
+    }
+    const auto ok = app->trigger_panel_update();
+    return make_simple_result(ok, ok ? "update_triggered" : "update_trigger_failed");
+}
+
 std::string handle_auth_login(PanelApp* app, std::string_view body) {
     if (app == nullptr) {
         return nlp3::platform::build_panel_http_error_json("panel unavailable");
@@ -1094,6 +1103,9 @@ std::string build_route_response(
     }
     if (request.method == "POST" && request.path == "/api/system/reconnect") {
         return make_http_response("200 OK", "application/json; charset=utf-8", handle_system_reconnect(app));
+    }
+    if (request.method == "POST" && request.path == "/api/update/trigger") {
+        return make_http_response("200 OK", "application/json; charset=utf-8", handle_update_trigger(app));
     }
 
     return make_http_response(

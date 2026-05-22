@@ -118,6 +118,8 @@
     uiPrefs: loadUiPrefs(),
     authDraft: loadAuthDraft(),
     uiInteractionHoldUntil: 0,
+    catalogErrorMessage: "",
+    catalogErrorTone: "",
     stickyMetrics: {
       viewers: 0,
     },
@@ -170,6 +172,7 @@
     authSessionRow: $("#auth-session-row"),
     authSessionNote: $("#auth-session-note"),
     authLogoutButton: $("#auth-logout-button"),
+    authPasswordToggle: $("#auth-password-toggle"),
 
     metricViewers: $("#metric-viewers"),
     metricLikes: $("#metric-likes"),
@@ -213,10 +216,13 @@
 
     gamesList: $("#games-list"),
     gamesCount: $("#games-count"),
+    gamesAlert: $("#games-alert"),
 
     titlebarLatencyPill: $("#titlebar-latency-pill"),
     statusLatency: $("#status-latency"),
     titlebarClockText: $("#titlebar-clock-text"),
+    brandVersion: $("#brand-version"),
+    updateButton: $("#update-button"),
     statusLastEvent: $("#status-last-event"),
     assistantSummaryPill: $("#assistant-summary-pill"),
     assistantSummaryDot: $("#assistant-summary-dot"),
@@ -2054,18 +2060,47 @@
     setHtml(els.recentActivityList, markup, "recentActivityMarkup");
   }
 
-  function renderAll(payload) {
+  function renderCatalogAlert() {
+    const message = state.catalogErrorMessage;
+    const tone = state.catalogErrorTone;
+    if (!message || !els.gamesAlert) {
+      if (els.gamesAlert) els.gamesAlert.hidden = true;
+      return;
+    }
+    els.gamesAlert.hidden = false;
+    els.gamesAlert.classList.remove("is-warn", "is-error");
+    if (tone === "warn") els.gamesAlert.classList.add("is-warn");
+    else els.gamesAlert.classList.add("is-error");
+    setText(els.gamesAlert, message);
+  }
+
+  function renderVersion(payload) {
+    const snapshot = payload?.snapshot || {};
+    const panelVersion = snapshot.panelVersion || "";
+    const latestVersion = snapshot.latestVersion || "";
+    const latestInstallerUrl = snapshot.latestInstallerUrl || "";
+    setText(els.brandVersion, panelVersion);
+    if (latestVersion && panelVersion && latestVersion !== panelVersion && latestInstallerUrl) {
+      els.updateButton.hidden = false;
+    } else {
+      els.updateButton.hidden = true;
+    }
+  }
+
+  function renderAll(payload, force) {
     state.payload = payload;
     renderAuth(payload);
+    renderVersion(payload);
     renderConnection(payload);
-    if (!uiInteractionLocked()) {
-      renderVoice(payload);
+    if (!uiInteractionLocked() || force) {
       renderGames(payload);
+      renderVoice(payload);
     }
     renderStreamMetrics(payload, state.metricsPayload || payload.metrics);
     renderRecentActivity(payload);
     renderExternalGame(payload);
     renderAdvancedLogs();
+    renderCatalogAlert();
   }
 
   async function loadState(force = false) {
@@ -2083,7 +2118,7 @@
       if (uiInteractionLocked() && !force) {
         return;
       }
-      renderAll(payload);
+      renderAll(payload, force);
       if (force) {
         renderRecentActivity(payload);
       }
@@ -2182,6 +2217,41 @@
     scheduleRealtimePoll(immediate ? 0 : currentRealtimePollMs());
   }
 
+  function humanizeAuthError(errorCode, message) {
+    const code = String(errorCode || "").toLowerCase();
+    if (code.includes("invalid_login_credentials") || code.includes("email_not_found") || code.includes("invalid_password")) {
+      return { text: "Usuario o contrase\u00f1a incorrectos. Verifica e intenta de nuevo.", tone: "error" };
+    }
+    if (code.includes("user_disabled")) {
+      return { text: "Esta cuenta est\u00e1 deshabilitada. Contacta a soporte.", tone: "error" };
+    }
+    if (code.includes("too_many_attempts")) {
+      return { text: "Demasiados intentos fallidos. Espera unos minutos e intenta de nuevo.", tone: "error" };
+    }
+    if (code.includes("network_request_failed") || code.includes("network")) {
+      return { text: "No se pudo contactar el servidor. Verifica tu conexi\u00f3n a internet.", tone: "error" };
+    }
+    if (code.includes("license_not_found")) {
+      return { text: "La licencia ingresada no pertenece a esta cuenta. Revisa el c\u00f3digo.", tone: "error" };
+    }
+    if (code.includes("license_inactive")) {
+      return { text: "La licencia no est\u00e1 activa. Verifica el estado de tu suscripci\u00f3n.", tone: "error" };
+    }
+    if (code.includes("license_account_invalid")) {
+      return { text: message || "La cuenta no tiene licencias v\u00e1lidas. Contacta a soporte.", tone: "error" };
+    }
+    if (code.includes("firebase_auth_failed")) {
+      return { text: "Error de autenticaci\u00f3n con el servidor. Intenta de nuevo.", tone: "error" };
+    }
+    if (code.includes("auth_config_missing")) {
+      return { text: "Error de configuraci\u00f3n del panel. Reinstala o contacta a soporte.", tone: "error" };
+    }
+    if (code.includes("missing_fields")) {
+      return { text: "Completa todos los campos antes de validar.", tone: "warn" };
+    }
+    return { text: message || "Error inesperado. Intenta de nuevo o contacta a soporte.", tone: "error" };
+  }
+
   async function submitAuthLogin() {
     const email = String(els.authEmail?.value || "").trim();
     const password = String(els.authPassword?.value || "");
@@ -2208,20 +2278,33 @@
       if (response?.ok) {
         clearAuthFeedback();
         appendLog("Acceso validado. El panel ya puede usarse.");
+        if (response?.remoteCatalogError) {
+          appendLog("Aviso: " + response.remoteCatalogError);
+          state.catalogErrorMessage = "El cat\u00e1logo de juegos remotos no se pudo cargar. Algunos juegos pueden no estar disponibles.";
+          state.catalogErrorTone = "warn";
+        } else {
+          state.catalogErrorMessage = "";
+          state.catalogErrorTone = "";
+        }
       } else {
-        setAuthFeedback(
-          response?.message || "No se pudo validar el acceso remoto.",
-          response?.errorCode === "missing_fields" ? "warn" : "error"
-        );
+        const human = humanizeAuthError(response?.errorCode, response?.message);
+        setAuthFeedback(human.text, human.tone);
         appendLog(response?.message || "No se pudo validar el acceso remoto.");
         await exportSupportBundle("auth_login_failed", { silent: true });
+        state.catalogErrorMessage = "";
+        state.catalogErrorTone = "";
       }
 
       await refreshAll(true);
     } catch (error) {
-      setAuthFeedback(`No se pudo contactar el servidor de acceso: ${error}`, "error");
+      setAuthFeedback(
+        "No se pudo contactar el servidor de acceso. Verifica tu conexi\u00f3n a internet e intenta de nuevo.",
+        "error"
+      );
       appendLog(`No se pudo validar el acceso: ${error}`);
       await exportSupportBundle("auth_login_unreachable", { silent: true });
+      state.catalogErrorMessage = "";
+      state.catalogErrorTone = "";
     } finally {
       state.authUi.busy = false;
       renderAuth(state.payload);
@@ -2357,6 +2440,21 @@
 
     els.authSupportButton?.addEventListener("click", () => {
       exportSupportBundle("auth_manual");
+    });
+
+    els.authPasswordToggle?.addEventListener("click", () => {
+      const input = els.authPassword;
+      if (!input) return;
+      const isPassword = input.type === "password";
+      input.type = isPassword ? "text" : "password";
+      els.authPasswordToggle.setAttribute(
+        "aria-label",
+        isPassword ? "Ocultar contrase\u00f1a" : "Mostrar contrase\u00f1a"
+      );
+      const iconShow = els.authPasswordToggle.querySelector(".eye-icon:not(.eye-off)");
+      const iconHide = els.authPasswordToggle.querySelector(".eye-off");
+      if (iconShow) iconShow.hidden = isPassword;
+      if (iconHide) iconHide.hidden = !isPassword;
     });
 
     els.connectForm?.addEventListener("submit", (event) => {
@@ -2617,6 +2715,10 @@
 
     els.refreshButton?.addEventListener("click", () => {
       refreshAll(true);
+    });
+
+    els.updateButton?.addEventListener("click", () => {
+      postJsonAction("/api/update/trigger", {}, "actualizar panel");
     });
 
     els.reconnectButton?.addEventListener("click", () => {

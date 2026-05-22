@@ -683,6 +683,8 @@ bool PanelApp::initialize(const std::string& config_path) {
         activity_log_ = std::make_unique<PanelActivityLog>(256);
         license_service_ = std::make_unique<ServerLicenseService>(config_.auth);
         remote_game_distribution_service_ = std::make_unique<RemoteGameDistributionService>(config_.auth);
+        panel_updater_service_ = std::make_unique<PanelUpdaterService>();
+        panel_updater_service_->start(config_.auth, NLP3_PANEL_VERSION);
 
         if (config_.bridge_mode == "external") {
             bridge_session_ = std::make_unique<bridge::TikTokBridgeExternalSession>(config_.bridge);
@@ -906,6 +908,11 @@ PanelSnapshot PanelApp::snapshot() const {
             empty_snapshot.auth = license_service_->auth_snapshot();
         }
         empty_snapshot.external_game = external_game_status_cache_;
+        if (panel_updater_service_ != nullptr) {
+            empty_snapshot.panel_version = panel_updater_service_->current_version();
+            empty_snapshot.latest_version = panel_updater_service_->latest_version();
+            empty_snapshot.latest_installer_url = panel_updater_service_->latest_installer_url();
+        }
         return empty_snapshot;
     }
 
@@ -926,7 +933,19 @@ PanelSnapshot PanelApp::snapshot() const {
             ws_status.rejected_messages,
         },
         std::move(external_game_status));
+    if (panel_updater_service_ != nullptr) {
+        snapshot.panel_version = panel_updater_service_->current_version();
+        snapshot.latest_version = panel_updater_service_->latest_version();
+        snapshot.latest_installer_url = panel_updater_service_->latest_installer_url();
+    }
     return snapshot;
+}
+
+bool PanelApp::trigger_panel_update() {
+    if (panel_updater_service_ == nullptr) {
+        return false;
+    }
+    return panel_updater_service_->trigger_update();
 }
 
 PanelCommandResult PanelApp::execute_command(const PanelCommand& command) {
@@ -1455,7 +1474,15 @@ PanelAuthLoginResult PanelApp::authenticate_access(const PanelAuthLoginRequest& 
         return result;
     }
     auto result = license_service_->authenticate(request);
-    sync_remote_distribution_auth_context(result.ok);
+    if (result.ok) {
+        std::string catalog_error{};
+        sync_remote_distribution_auth_context(true, &catalog_error);
+        if (!catalog_error.empty()) {
+            result.remote_catalog_error = std::move(catalog_error);
+        }
+    } else {
+        sync_remote_distribution_auth_context(false);
+    }
     return result;
 }
 
@@ -1656,7 +1683,7 @@ void PanelApp::refresh_external_game_manifests() {
     external_game_manifests_ = std::move(local_manifests);
 }
 
-void PanelApp::sync_remote_distribution_auth_context(bool refresh_catalog) {
+void PanelApp::sync_remote_distribution_auth_context(bool refresh_catalog, std::string* catalog_error_out) {
     if (remote_game_distribution_service_ == nullptr) {
         return;
     }
@@ -1676,7 +1703,9 @@ void PanelApp::sync_remote_distribution_auth_context(bool refresh_catalog) {
         auth.license_key);
     if (refresh_catalog) {
         std::string error_message{};
-        remote_game_distribution_service_->refresh_catalog(&error_message);
+        if (!remote_game_distribution_service_->refresh_catalog(&error_message) && catalog_error_out != nullptr) {
+            *catalog_error_out = std::move(error_message);
+        }
     }
     refresh_external_game_manifests();
 }
