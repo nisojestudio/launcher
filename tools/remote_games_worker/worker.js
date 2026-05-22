@@ -3,8 +3,7 @@ const DEFAULT_GAMES_CATALOG_OBJECT = "catalog/latest.json";
 const DEFAULT_DOWNLOAD_TTL_SECONDS = 300;
 const DEFAULT_GAME_DOWNLOAD_ROUTE = "/api/me/games/download";
 const DEFAULT_ADMIN_EMAIL = "";
-const DEFAULT_INSTALLER_URL =
-  "https://github.com/nisojestudio/launcher/releases/download/v0.1.6/panel-live-0.1.6-win-x64.exe";
+const DEFAULT_INSTALLER_URL = "";
 const CORS_ALLOW_HEADERS = "authorization, content-type";
 const CORS_ALLOW_METHODS = "GET, POST, OPTIONS";
 let configuredCorsAllowOrigin = "";
@@ -91,6 +90,11 @@ export default {
       }
 
       if (url.pathname === "/api/db-test") {
+        const testToken = trim(request.headers.get("x-db-test-token") || "");
+        const expected = trim(env.DB_TEST_TOKEN || "");
+        if (expected && testToken !== expected) {
+          return json({ error: "db_test_token_required" }, 403);
+        }
         const result = await env.DB
           .prepare("SELECT COUNT(*) as total FROM users")
           .first();
@@ -811,7 +815,8 @@ function trim(value) {
 async function parseJsonBody(request) {
   try {
     return await request.json();
-  } catch {
+  } catch (error) {
+    console.error("parseJsonBody: invalid JSON in request", error);
     return null;
   }
 }
@@ -905,7 +910,11 @@ function extractBearerToken(request) {
 }
 
 function getAdminEmail(env) {
-  return trim(env.ADMIN_EMAIL || DEFAULT_ADMIN_EMAIL) || DEFAULT_ADMIN_EMAIL;
+  const email = trim(env.ADMIN_EMAIL || DEFAULT_ADMIN_EMAIL) || DEFAULT_ADMIN_EMAIL;
+  if (!email) {
+    console.warn("ADMIN_EMAIL not configured — admin routes will deny all access");
+  }
+  return email;
 }
 
 function getGamesCatalogBucket(env) {
