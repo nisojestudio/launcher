@@ -210,7 +210,7 @@ export default {
       }
 
       if (url.pathname === "/api/license-check") {
-        const licenseKey = trim(url.searchParams.get("key"));
+        const licenseKey = trim(url.searchParams.get("key")).toUpperCase();
         if (!licenseKey) {
           return json({ error: "Falta key en la URL" }, 400);
         }
@@ -229,7 +229,7 @@ export default {
 
       if (url.pathname === "/api/license/activate" && request.method === "POST") {
         const body = await parseJsonBody(request);
-        const licenseKey = trim(body?.license_key);
+        const licenseKey = trim(body?.license_key).toUpperCase();
         const deviceId = trim(body?.device_id);
         const deviceName = trim(body?.device_name) || "PC sin nombre";
 
@@ -464,8 +464,10 @@ export default {
           object.writeHttpMetadata(headers);
         }
         headers.set("content-type", headers.get("content-type") || "application/zip");
-        headers.set("content-disposition", `attachment; filename="${fileName}"`);
+        headers.set("content-disposition", `attachment; filename="${fileName.replace(/["\r\n]/g, '_')}"`);
         headers.set("cache-control", "private, max-age=60");
+        headers.set("x-content-type-options", "nosniff");
+        headers.set("referrer-policy", "no-referrer");
         if (object.httpEtag) {
           headers.set("etag", object.httpEtag);
         }
@@ -561,7 +563,7 @@ export default {
       }
 
       if (url.pathname === "/api/admin/license-by-key") {
-        const licenseKey = trim(url.searchParams.get("key"));
+        const licenseKey = trim(url.searchParams.get("key")).toUpperCase();
         if (!licenseKey) {
           return json({ error: "Falta key en la URL" }, 400);
         }
@@ -790,6 +792,7 @@ export default {
         })
       });
     } catch (error) {
+      console.error("Unhandled error in fetch handler:", error);
       return json({
         error: "internal_error",
         message: error instanceof Error ? error.message : "Unexpected error"
@@ -983,7 +986,8 @@ async function upsertUserProfile(env, input) {
     .first();
 }
 
-async function findLicenseWithUser(env, licenseKey) {
+async function findLicenseWithUser(env, rawKey) {
+  const licenseKey = trim(rawKey).toUpperCase();
   return env.DB
     .prepare(
       `SELECT
@@ -1215,7 +1219,7 @@ function normalizeCatalogGame(input) {
     description: trim(input.description) || "Juego live distribuido por Nisoje Studio",
     manifest: input.manifest && typeof input.manifest === "object" ? input.manifest : null,
     required_license_keys: Array.isArray(input.required_license_keys)
-      ? input.required_license_keys.map((item) => trim(String(item))).filter(Boolean)
+      ? input.required_license_keys.map((item) => trim(String(item)).toUpperCase()).filter(Boolean)
       : [],
     required_roles: Array.isArray(input.required_roles)
       ? input.required_roles.map((item) => trim(String(item))).filter(Boolean)
@@ -1244,7 +1248,7 @@ function isGameAllowedForUser(game, activeLicenses, user) {
   }
 
   if (Array.isArray(game.required_license_keys) && game.required_license_keys.length > 0) {
-    const activeKeys = new Set(activeLicenses.map((item) => trim(item.license_key)));
+    const activeKeys = new Set(activeLicenses.map((item) => trim(item.license_key).toUpperCase()));
     return game.required_license_keys.some((item) => activeKeys.has(item));
   }
 
@@ -1645,7 +1649,10 @@ function json(data, status = 200) {
   return new Response(JSON.stringify(data), {
     status,
     headers: buildCorsHeaders({
-      "content-type": "application/json"
+      "content-type": "application/json",
+      "x-content-type-options": "nosniff",
+      "x-frame-options": "DENY",
+      "referrer-policy": "no-referrer"
     })
   });
 }
@@ -1684,7 +1691,8 @@ function corsResponse() {
       {
         status: 403,
         headers: {
-          "content-type": "application/json; charset=utf-8"
+          "content-type": "application/json; charset=utf-8",
+          "x-content-type-options": "nosniff"
         }
       }
     );

@@ -399,7 +399,11 @@ std::optional<std::string> read_text_file(const std::filesystem::path& path) {
 
     std::string contents;
     input.seekg(0, std::ios::end);
-    contents.resize(static_cast<std::size_t>(input.tellg()));
+    const auto size = input.tellg();
+    if (size == static_cast<std::streampos>(-1)) {
+        return std::nullopt;
+    }
+    contents.resize(static_cast<std::size_t>(size));
     input.seekg(0, std::ios::beg);
     if (!contents.empty()) {
         input.read(contents.data(), static_cast<std::streamsize>(contents.size()));
