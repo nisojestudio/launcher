@@ -477,10 +477,21 @@ export default {
         }
         applyCorsHeaders(headers);
 
-        return new Response(object.body, {
-          status: 200,
-          headers
-        });
+        const peek = await bucket.get(signedDownload.package_path, { onlyIf: {}, range: { length: 2000 } });
+        const peekText = peek ? await peek.text() : "";
+        const trimmedPeek = peekText.trimStart();
+        if (trimmedPeek.startsWith("{") && trimmedPeek.includes('"file"')) {
+          const full = await bucket.get(signedDownload.package_path);
+          const fullText = await full.text();
+          const parsed = JSON.parse(fullText);
+          if (parsed && typeof parsed.file === "string") {
+            const binaryStr = atob(parsed.file);
+            const bytes = new Uint8Array(binaryStr.length);
+            for (let i = 0; i < binaryStr.length; i++) bytes[i] = binaryStr.charCodeAt(i);
+            return new Response(bytes, { status: 200, headers });
+          }
+        }
+        return new Response(object.body, { status: 200, headers });
       }
 
       if (url.pathname === "/api/admin/users") {
@@ -1173,6 +1184,15 @@ async function verifyFirebaseIdToken(idToken, env) {
   };
 }
 
+async function unwrapR2Json(rawText) {
+  const first = JSON.parse(rawText);
+  if (first && typeof first.file === "string") {
+    const decoded = atob(first.file);
+    return JSON.parse(decoded);
+  }
+  return first;
+}
+
 async function loadGamesCatalog(env) {
   const bucket = getGamesCatalogBucket(env);
   if (!bucket) {
@@ -1191,7 +1211,7 @@ async function loadGamesCatalog(env) {
   const rawText = await catalogObject.text();
   let parsed = null;
   try {
-    parsed = JSON.parse(rawText);
+    parsed = await unwrapR2Json(rawText);
   } catch {
     return {
       response: json({ error: "games_catalog_invalid", message: "latest.json no es JSON valido" }, 500)
