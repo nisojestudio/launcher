@@ -1,5 +1,6 @@
 #pragma once
 
+#include <condition_variable>
 #include <mutex>
 #include <string>
 #include <thread>
@@ -30,6 +31,7 @@ private:
     void check_worker();
 
     mutable std::mutex mutex_{};
+    std::condition_variable cv_{};
     PanelAuthConfig config_{};
     std::string current_version_{};
     std::string latest_version_{};

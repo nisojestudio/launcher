@@ -17,6 +17,9 @@ Format follows a lightweight Keep a Changelog style. Versions use SemVer.
 
 - Removed `SECURITY_FLAG_IGNORE_REVOCATION` usage in `win_http_client.cpp` — constant was removed in Windows 11 24H2 SDK (10.0.26100.0).
   WinHTTP now uses default certificate revocation checking, which is the correct security posture.
+- Fixed `PanelUpdaterService` shutdown hang: the worker thread used `sleep_for(6h)` between update checks, blocking the
+  destructor's `join()` for up to 6 hours. Replaced with `wait_for()` + `condition_variable` so `stop()` wakes the
+  thread immediately and shutdown is instant. This fixes the `panel_app_smoke_test` hang.
 
 ## Unreleased
 

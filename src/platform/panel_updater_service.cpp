@@ -1,6 +1,7 @@
 #include "platform/panel_updater_service.hpp"
 
 #include <chrono>
+#include <condition_variable>
 #include <cstdlib>
 #include <regex>
 #include <string>
@@ -44,6 +45,7 @@ void PanelUpdaterService::stop() {
         std::lock_guard<std::mutex> lock(mutex_);
         running_ = false;
     }
+    cv_.notify_all();
     if (worker_thread_ && worker_thread_->joinable()) {
         worker_thread_->join();
         worker_thread_.reset();
@@ -106,7 +108,10 @@ void PanelUpdaterService::check_worker() {
             }
         }
 
-        std::this_thread::sleep_for(std::chrono::hours(6));
+        {
+            std::unique_lock<std::mutex> lock(mutex_);
+            cv_.wait_for(lock, std::chrono::hours(6), [this]() { return !running_; });
+        }
     }
 }
 
