@@ -4,6 +4,14 @@ All notable Panel Live changes should be recorded here.
 
 Format follows a lightweight Keep a Changelog style. Versions use SemVer.
 
+## 0.1.9 - 2026-06-12
+
+### Fixed
+
+- **Infinite update loop**: The Worker returns `latest_version` with a `v` prefix ("v0.1.8") but the panel's internal
+  version has no prefix ("0.1.8"). The comparison always failed, so the update button never hid after updating.
+  Fixed by normalizing: the panel now strips the leading `v` when parsing the Worker response.
+
 ## 0.1.8 - 2026-06-12
 
 ### Fixed

@@ -99,8 +99,12 @@ void PanelUpdaterService::check_worker() {
             const auto parsed = nlohmann::json::parse(response.body, nullptr, false);
             if (!parsed.is_discarded() && parsed.is_object()) {
                 std::lock_guard<std::mutex> lock(mutex_);
-                const auto ver = parsed.value("latest_version", std::string{});
+                auto ver = parsed.value("latest_version", std::string{});
                 const auto url = parsed.value("installer_url", std::string{});
+                // Normalize: strip leading 'v' or 'V' prefix so "v0.1.8" == "0.1.8"
+                if (!ver.empty() && (ver[0] == 'v' || ver[0] == 'V')) {
+                    ver = ver.substr(1);
+                }
                 if (!ver.empty()) {
                     latest_version_ = ver;
                 }
