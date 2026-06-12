@@ -403,7 +403,54 @@ PanelAuthLoginResult ServerLicenseService::authenticate(const PanelAuthLoginRequ
     }
     id_token_ = id_token;
 
-    return make_login_result(true, "auth_success", {}, license_snapshot_, auth_snapshot_);
+    auto result = make_login_result(true, "auth_success", {}, license_snapshot_, auth_snapshot_);
+
+    {
+        // Register this device against the activated license via POST /api/license/activate.
+        const auto activate_url = join_url(config_.nisoje_api_base, config_.license_activate_path);
+        std::vector<HttpHeader> activate_headers{};
+        if (!id_token.empty()) {
+            activate_headers.push_back(HttpHeader{"Authorization", "Bearer " + id_token});
+        }
+        const auto activate_body = nlohmann::json{
+            {"license_key", request.license_key},
+            {"device_id", request.device_id},
+            {"device_name", request.device_name.empty() ? "Panel Live 3.0" : request.device_name},
+        }.dump();
+        const auto activate_response = http_request("POST", activate_url, activate_body, "application/json; charset=utf-8", activate_headers);
+        if (!activate_response.error.empty()) {
+            result.device_activation_error = "No se pudo contactar el servidor para registrar el dispositivo: " + activate_response.error;
+        } else if (activate_response.status_code >= 200 && activate_response.status_code < 300) {
+            result.device_activation_error = {}; // Device registered successfully.
+        } else if (activate_response.status_code == 403) {
+            const auto activate_json = nlohmann::json::parse(activate_response.body, nullptr, false);
+            if (!activate_json.is_discarded()) {
+                if (activate_json.contains("device_conflict") && activate_json["device_conflict"].is_object()) {
+                    const auto& conflict = activate_json["device_conflict"];
+                    const auto owner_email = conflict.value("owner_email", std::string{});
+                    const auto owner_name = conflict.value("owner_name", std::string{});
+                    result.device_activation_error = "Este dispositivo ya esta registrado en otra cuenta";
+                    if (!owner_email.empty()) {
+                        result.device_activation_error += " (" + owner_email + ")";
+                    } else if (!owner_name.empty()) {
+                        result.device_activation_error += " (" + owner_name + ")";
+                    }
+                } else if (activate_json.contains("devices_used") && activate_json.contains("devices_limit")) {
+                    const auto used = activate_json.value("devices_used", 0);
+                    const auto limit = activate_json.value("devices_limit", 0);
+                    result.device_activation_error = "Limite de dispositivos alcanzado: " + std::to_string(used) + "/" + std::to_string(limit);
+                } else {
+                    result.device_activation_error = activate_json.value("message", "El servidor rechazo el registro del dispositivo");
+                }
+            } else {
+                result.device_activation_error = "El servidor rechazo el registro del dispositivo";
+            }
+        } else {
+            result.device_activation_error = "Error " + std::to_string(activate_response.status_code) + " al registrar el dispositivo";
+        }
+    }
+
+    return result;
 #else
     auth_snapshot_ = locked_auth_snapshot();
     auth_snapshot_.last_error_code = "windows_only_auth_runtime";

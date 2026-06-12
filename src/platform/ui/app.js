@@ -2278,6 +2278,10 @@
       if (response?.ok) {
         clearAuthFeedback();
         appendLog("Acceso validado. El panel ya puede usarse.");
+        if (response?.deviceActivationError) {
+          appendLog("Aviso: " + response.deviceActivationError);
+          setAuthFeedback(response.deviceActivationError, "warn");
+        }
         if (response?.remoteCatalogError) {
           appendLog("Aviso: " + response.remoteCatalogError);
           state.catalogErrorMessage = "El cat\u00e1logo de juegos remotos no se pudo cargar. Algunos juegos pueden no estar disponibles.";

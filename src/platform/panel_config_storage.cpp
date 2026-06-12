@@ -246,6 +246,7 @@ ordered_json auth_to_json(const PanelAuthConfig& config) {
     auth["nisoje_api_base"] = config.nisoje_api_base;
     auth["me_licenses_path"] = config.me_licenses_path;
     auth["me_games_catalog_path"] = config.me_games_catalog_path;
+    auth["license_activate_path"] = config.license_activate_path;
     return auth;
 }
 
@@ -342,7 +343,8 @@ bool load_auth_object(
         && try_read_string(object, "firebase_auth_domain", config.firebase_auth_domain)
         && try_read_string(object, "nisoje_api_base", config.nisoje_api_base)
         && try_read_string(object, "me_licenses_path", config.me_licenses_path)
-        && try_read_string(object, "me_games_catalog_path", config.me_games_catalog_path);
+        && try_read_string(object, "me_games_catalog_path", config.me_games_catalog_path)
+        && try_read_string(object, "license_activate_path", config.license_activate_path);
 }
 
 } // namespace

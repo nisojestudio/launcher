@@ -20,6 +20,8 @@ struct PanelAuthConfig {
     std::string me_licenses_path = "/api/me/licenses";
     // Used by the panel to fetch the licensed remote catalog.
     std::string me_games_catalog_path = "/api/me/games/catalog";
+    // Called after login to register this device against the activated license.
+    std::string license_activate_path = "/api/license/activate";
 };
 
 struct PanelConfig {

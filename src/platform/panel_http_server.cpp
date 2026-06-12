@@ -424,7 +424,8 @@ std::string make_auth_login_result(const PanelAuthLoginResult& result) {
         "\"lastErrorCode\":" + json_quote(result.auth.last_error_code) + ","
         "\"lastValidatedTimestampMs\":" + std::to_string(result.auth.last_validated_timestamp_ms)
         + "},"
-        "\"remoteCatalogError\":" + json_quote(result.remote_catalog_error)
+        "\"remoteCatalogError\":" + json_quote(result.remote_catalog_error) + ","
+        "\"deviceActivationError\":" + json_quote(result.device_activation_error)
         + "}";
 }
 

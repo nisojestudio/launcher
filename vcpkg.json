@@ -1,6 +1,6 @@
 {
   "name": "nisoje-livepanel-v3",
-  "version-string": "0.1.1",
+  "version-string": "0.1.7",
   "builtin-baseline": "296b89248ad13be09e9324488eb4f74dd322d26c",
   "dependencies": [
     "fmt",
