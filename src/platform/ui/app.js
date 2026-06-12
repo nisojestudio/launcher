@@ -2721,8 +2721,18 @@
       refreshAll(true);
     });
 
-    els.updateButton?.addEventListener("click", () => {
-      postJsonAction("/api/update/trigger", {}, "actualizar panel");
+    els.updateButton?.addEventListener("click", async () => {
+      els.updateButton.disabled = true;
+      els.updateButton.textContent = "Descargando...";
+      const result = await postJsonAction("/api/update/trigger", {}, "actualizar panel");
+      if (!result?.ok) {
+        els.updateButton.textContent = "Error";
+        setTimeout(() => {
+          els.updateButton.textContent = "Actualizar";
+          els.updateButton.disabled = false;
+        }, 4000);
+      }
+      // If ok, the app will restart automatically
     });
 
     els.reconnectButton?.addEventListener("click", () => {

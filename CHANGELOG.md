@@ -4,6 +4,19 @@ All notable Panel Live changes should be recorded here.
 
 Format follows a lightweight Keep a Changelog style. Versions use SemVer.
 
+## 0.1.8 - 2026-06-12
+
+### Fixed
+
+- **Update button now works correctly**: Replaced `std::system()` with `ShellExecuteExW` (no CMD window, UAC via `runas`).
+  After installing, the panel automatically relaunches itself and shuts down the old instance (`PostQuitMessage`).
+
+- **Visual feedback when updating**: The update button now shows "Descargando..." while downloading, and "Error" if
+  something goes wrong (with auto-reset after 4 seconds).
+
+- **Fixed version mismatch**: `NLP3_PANEL_VERSION` in `CMakeLists.txt` now correctly reads `0.1.8` (was stuck at `0.1.6`
+  even though the release metadata said `0.1.7`). The panel now reports its internal version correctly.
+
 ## 0.1.7 - 2026-06-11
 
 ### Added

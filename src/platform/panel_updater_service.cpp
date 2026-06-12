@@ -2,9 +2,11 @@
 
 #include <chrono>
 #include <condition_variable>
-#include <cstdlib>
 #include <regex>
 #include <string>
+
+#include <windows.h>
+#include <shellapi.h>
 
 #include <nlohmann/json.hpp>
 
@@ -129,14 +131,45 @@ bool PanelUpdaterService::trigger_update() {
     const auto temp_dir = std::filesystem::temp_directory_path();
     const auto update_path = temp_dir / "panel-live-update.exe";
 
+    // Clean up any previous failed download
+    std::error_code ec;
+    std::filesystem::remove(update_path, ec);
+
     const auto result = download_to_file(installer_url, update_path, {}, {});
     if (!result.error.empty() || result.status_code < 200 || result.status_code >= 300) {
         return false;
     }
 
-    const auto cmd = std::string("\"") + update_path.string() + "\" /VERYSILENT /SUPPRESSMSGBOXES /CLOSEAPPLICATIONS /NORESTART";
+    // Launch installer elevated via UAC — no CMD window, no /NORESTART
+    SHELLEXECUTEINFOW sei = { sizeof(sei) };
+    sei.lpVerb = L"runas";
+    sei.lpFile = update_path.wstring().c_str();
+    sei.lpParameters = L"/VERYSILENT /SUPPRESSMSGBOXES /CLOSEAPPLICATIONS";
+    sei.nShow = SW_HIDE;
+    sei.fMask = SEE_MASK_NOCLOSEPROCESS;
 
-    std::system(cmd.c_str());
+    if (!ShellExecuteExW(&sei)) {
+        return false;
+    }
+
+    // Wait for installer to finish
+    if (sei.hProcess) {
+        WaitForSingleObject(sei.hProcess, INFINITE);
+        CloseHandle(sei.hProcess);
+    }
+
+    // Launch the updated panel executable
+    wchar_t exe_path[MAX_PATH];
+    if (GetModuleFileNameW(nullptr, exe_path, MAX_PATH) > 0) {
+        SHELLEXECUTEINFOW run_sei = { sizeof(run_sei) };
+        run_sei.lpVerb = L"open";
+        run_sei.lpFile = exe_path;
+        run_sei.nShow = SW_SHOWNORMAL;
+        ShellExecuteExW(&run_sei);
+    }
+
+    // Signal current instance to shut down
+    PostQuitMessage(0);
     return true;
 }
 
