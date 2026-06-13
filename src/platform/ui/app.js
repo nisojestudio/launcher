@@ -11,6 +11,7 @@
     "nisoje-remote-access",
     "livepanel-auth-form",
   ];
+  const AUTH_PERSISTENT_KEY = "nlp3-auth-persistent-v1";
   const VOICE_NOTICES_STORAGE_KEY = "nlp3-custom-voice-notices-v1";
   const AUDIO_NOTICE_MAX_BYTES = 1572864;
   const MAX_RECENT_ITEMS = 20;
@@ -128,6 +129,7 @@
       feedback: "",
       feedbackTone: "warn",
     },
+    autoLoginAttempted: false,
     support: {
       autoExportedIssueKeys: new Set(),
     },
@@ -383,6 +385,46 @@
         licenseKey: normalizeLicenseKey(state.authDraft?.licenseKey),
       };
       window.localStorage.setItem(AUTH_FORM_STORAGE_KEY, JSON.stringify(payload));
+    } catch (_) {
+      // Ignore local storage issues.
+    }
+  }
+
+  function loadPersistentCredentials() {
+    try {
+      const raw = window.localStorage.getItem(AUTH_PERSISTENT_KEY);
+      if (!raw) {
+        return { email: "", licenseKey: "" };
+      }
+      const parsed = JSON.parse(raw);
+      return {
+        email: typeof parsed.email === "string" ? parsed.email.trim() : "",
+        licenseKey: typeof parsed.licenseKey === "string" ? normalizeLicenseKey(parsed.licenseKey) : "",
+      };
+    } catch (_) {
+      return { email: "", licenseKey: "" };
+    }
+  }
+
+  function savePersistentCredentials(email, licenseKey) {
+    try {
+      const payload = {
+        email: String(email || "").trim(),
+        licenseKey: normalizeLicenseKey(licenseKey),
+      };
+      if (payload.email && payload.licenseKey) {
+        window.localStorage.setItem(AUTH_PERSISTENT_KEY, JSON.stringify(payload));
+      } else {
+        window.localStorage.removeItem(AUTH_PERSISTENT_KEY);
+      }
+    } catch (_) {
+      // Ignore local storage issues.
+    }
+  }
+
+  function clearPersistentCredentials() {
+    try {
+      window.localStorage.removeItem(AUTH_PERSISTENT_KEY);
     } catch (_) {
       // Ignore local storage issues.
     }
@@ -2219,43 +2261,72 @@
 
   function humanizeAuthError(errorCode, message) {
     const code = String(errorCode || "").toLowerCase();
+    const rawMessage = String(message || "").trim();
+
+    // Firebase auth failures
     if (code.includes("invalid_login_credentials") || code.includes("email_not_found") || code.includes("invalid_password")) {
       return { text: "Usuario o contrase\u00f1a incorrectos. Verifica e intenta de nuevo.", tone: "error" };
     }
     if (code.includes("user_disabled")) {
-      return { text: "Esta cuenta est\u00e1 deshabilitada. Contacta a soporte.", tone: "error" };
+      return { text: "Esta cuenta de usuario est\u00e1 deshabilitada. No es posible acceder. Contacta a soporte con el c\u00f3digo: USER_DISABLED.", tone: "error" };
     }
-    if (code.includes("too_many_attempts")) {
-      return { text: "Demasiados intentos fallidos. Espera unos minutos e intenta de nuevo.", tone: "error" };
+    if (code.includes("too_many_attempts") || code.includes("too_many_attempts_try_later")) {
+      return { text: "Demasiados intentos fallidos de acceso. Espera al menos 5 minutos e intenta de nuevo.", tone: "error" };
     }
     if (code.includes("network_request_failed") || code.includes("network")) {
-      return { text: "No se pudo contactar el servidor. Verifica tu conexi\u00f3n a internet.", tone: "error" };
+      return { text: "No se pudo contactar el servidor de autenticaci\u00f3n. Verifica tu conexi\u00f3n a internet y que el panel pueda alcanzar los servidores de Firebase.", tone: "error" };
     }
-    if (code.includes("license_not_found")) {
-      return { text: "La licencia ingresada no pertenece a esta cuenta. Revisa el c\u00f3digo.", tone: "error" };
+    if (code.includes("firebase_parse_failed")) {
+      return { text: "La respuesta del servidor de autenticaci\u00f3n no se pudo interpretar. Intenta de nuevo o contacta a soporte.", tone: "error" };
     }
-    if (code.includes("license_inactive")) {
-      return { text: "La licencia no est\u00e1 activa. Verifica el estado de tu suscripci\u00f3n.", tone: "error" };
-    }
-    if (code.includes("license_account_invalid")) {
-      return { text: message || "La cuenta no tiene licencias v\u00e1lidas. Contacta a soporte.", tone: "error" };
+    if (code.includes("firebase_uid_missing")) {
+      return { text: "La autenticaci\u00f3n con Firebase no devolvi\u00f3 un identificador de cuenta v\u00e1lido. Contacta a soporte.", tone: "error" };
     }
     if (code.includes("firebase_auth_failed")) {
-      return { text: "Error de autenticaci\u00f3n con el servidor. Intenta de nuevo.", tone: "error" };
+      return { text: "Error al autenticar con el servidor. Puede ser un problema temporal. Intenta de nuevo.", tone: "error" };
     }
     if (code.includes("auth_config_missing")) {
-      return { text: "Error de configuraci\u00f3n del panel. Reinstala o contacta a soporte.", tone: "error" };
+      return { text: "Error de configuraci\u00f3n del panel: faltan datos de conexi\u00f3n remota. Reinstala el panel o contacta a soporte con el c\u00f3digo: AUTH_CONFIG_MISSING.", tone: "error" };
     }
-    if (code.includes("missing_fields")) {
-      return { text: "Completa todos los campos antes de validar.", tone: "warn" };
+
+    // License lookup / validation failures
+    if (code.includes("license_lookup_failed")) {
+      return { text: rawMessage || "No se pudieron consultar las licencias en el servidor. Verifica tu conexi\u00f3n a internet.", tone: "error" };
     }
+    if (code.includes("license_parse_failed")) {
+      return { text: "La respuesta de licencias del servidor no se pudo interpretar. Contacta a soporte.", tone: "error" };
+    }
+    if (code.includes("license_not_found")) {
+      return { text: "La licencia ingresada no pertenece a esta cuenta o no existe. Verifica que el c\u00f3digo de licencia sea correcto.", tone: "error" };
+    }
+    if (code.includes("license_inactive")) {
+      return { text: "La licencia no est\u00e1 activa o est\u00e1 vencida. Verifica el estado de tu suscripci\u00f3n en el \u00e1rea de cliente.", tone: "error" };
+    }
+    if (code.includes("license_account_invalid")) {
+      return { text: rawMessage || "La cuenta no tiene licencias v\u00e1lidas activas. Contacta a soporte para revisar tu suscripci\u00f3n.", tone: "error" };
+    }
+
+    // Device errors
     if (code.includes("device_conflict")) {
-      return { text: message || "Este dispositivo ya est\u00e1 registrado en otra cuenta. Usa otro equipo o contacta a soporte.", tone: "error" };
+      return { text: rawMessage || "Este dispositivo ya est\u00e1 registrado en otra cuenta. Para usar este equipo, desactiva el dispositivo anterior desde tu panel de administraci\u00f3n o contacta a soporte.", tone: "error" };
     }
     if (code.includes("device_limit_exceeded")) {
-      return { text: message || "Has alcanzado el l\u00edmite de dispositivos para esta licencia. Desactiva un dispositivo desde el panel de administraci\u00f3n.", tone: "error" };
+      return { text: rawMessage || "Has alcanzado el l\u00edmite de dispositivos para esta licencia. Desactiva un dispositivo desde el panel de administraci\u00f3n o contacta a soporte.", tone: "error" };
     }
-    return { text: message || "Error inesperado. Intenta de nuevo o contacta a soporte.", tone: "error" };
+
+    // General / fallback
+    if (code.includes("missing_fields")) {
+      return { text: "Completa todos los campos (email, contrase\u00f1a y licencia) antes de validar.", tone: "warn" };
+    }
+    if (code.includes("windows_only_auth_runtime")) {
+      return { text: "La validaci\u00f3n remota solo est\u00e1 disponible en Windows. No es posible acceder desde este sistema operativo.", tone: "error" };
+    }
+    if (code.includes("license_service_unavailable")) {
+      return { text: "El servicio de licencias no est\u00e1 disponible. Reinstala el panel o contacta a soporte.", tone: "error" };
+    }
+
+    // Fallback: show the raw message if available, otherwise generic.
+    return { text: rawMessage || "Error inesperado. Intenta de nuevo o contacta a soporte.", tone: "error" };
   }
 
   async function submitAuthLogin() {
@@ -2280,7 +2351,10 @@
       });
 
       if (response?.ok) {
+        // Save persistent credentials for auto-login on next startup.
+        savePersistentCredentials(email, licenseKey);
         clearAuthFeedback();
+        const source = state.autoLoginAttempted ? "auto" : "manual";
         appendLog("Acceso validado. El panel ya puede usarse.");
         if (response?.registeredDeviceId) {
           appendLog("Dispositivo registrado: " + response.registeredDeviceId);
@@ -2297,7 +2371,28 @@
           state.catalogErrorMessage = "";
           state.catalogErrorTone = "";
         }
+        state.autoLoginAttempted = false;
       } else {
+        // On credential errors (invalid email/pass/license), clear persistent
+        // credentials so the panel doesn't keep trying to auto-login.
+        // Network/transient errors keep the saved credentials.
+        const code = String(response?.errorCode || "").toLowerCase();
+        const isCredentialError = [
+          "invalid_login_credentials",
+          "email_not_found",
+          "invalid_password",
+          "user_disabled",
+          "too_many_attempts",
+          "license_not_found",
+          "license_inactive",
+          "license_account_invalid",
+          "device_conflict",
+          "device_limit_exceeded",
+          "auth_config_missing",
+        ].some((key) => code.includes(key));
+        if (isCredentialError) {
+          clearPersistentCredentials();
+        }
         const human = humanizeAuthError(response?.errorCode, response?.message);
         setAuthFeedback(human.text, human.tone);
         appendLog(response?.message || "No se pudo validar el acceso remoto.");
@@ -2308,6 +2403,7 @@
 
       await refreshAll(true);
     } catch (error) {
+      // Network error — keep persistent credentials, don't clear them.
       setAuthFeedback(
         "No se pudo contactar el servidor de acceso. Verifica tu conexi\u00f3n a internet e intenta de nuevo.",
         "error"
@@ -2318,6 +2414,7 @@
       state.catalogErrorTone = "";
     } finally {
       state.authUi.busy = false;
+      state.autoLoginAttempted = false;
       renderAuth(state.payload);
     }
   }
@@ -2329,6 +2426,7 @@
       await apiPostJson("/api/auth/logout", {});
       state.activityClearBeforeMs = 0;
       state.eventsPayload = { total: 0, items: [] };
+      clearPersistentCredentials();
       setAuthFeedback("El acceso fue cerrado en este equipo. Vuelve a validar para continuar.", "warn");
       appendLog("La sesi\u00f3n remota fue cerrada en este equipo.");
       await refreshAll(true);
@@ -2421,6 +2519,7 @@
   function bindEvents() {
     els.authForm?.addEventListener("submit", (event) => {
       event.preventDefault();
+      state.autoLoginAttempted = false;
       submitAuthLogin();
     });
 
@@ -2877,6 +2976,40 @@
     });
   }
 
+  async function attemptAutoLogin() {
+    // Only attempt once per session.
+    if (state.autoLoginAttempted) {
+      return;
+    }
+    state.autoLoginAttempted = true;
+
+    // Check if the panel is actually locked.
+    if (!authIsLocked(state.payload)) {
+      return;
+    }
+
+    // Check if we have the minimum saved data to attempt login.
+    const savedEmail = String(els.authEmail?.value || "").trim();
+    const savedPassword = String(els.authPassword?.value || "");
+    const savedLicenseKey = normalizeLicenseKey(els.authLicenseKey?.value);
+
+    if (!savedEmail || !savedPassword || !savedLicenseKey) {
+      appendLog("No hay credenciales guardadas para entrada autom\u00e1tica.");
+      return;
+    }
+
+    // Check if persistent credentials exist (email+licenseKey), meaning
+    // this session had a prior successful login before restart.
+    const persistent = loadPersistentCredentials();
+    if (!persistent.email || !persistent.licenseKey) {
+      appendLog("Se requieren credenciales para reingresar autom\u00e1ticamente.");
+      return;
+    }
+
+    appendLog("Reingresando autom\u00e1ticamente...");
+    await submitAuthLogin();
+  }
+
   function init() {
     syncViewportMetrics();
     updateTitlebarClock();
@@ -2916,7 +3049,13 @@
     window.addEventListener("beforeunload", cancelPollingLoops);
     updateChatReadingVisibility();
     updateTemplateSummary();
-    refreshAll(true);
+
+    // Step 1: Load initial state (fills auth snapshot & form fields).
+    refreshAll(true).then(() => {
+      // Step 2: If the panel is locked, attempt auto-login with saved credentials.
+      attemptAutoLogin();
+    });
+
     restartPollingLoops(false);
     window.setInterval(updateTitlebarClock, 1000);
   }

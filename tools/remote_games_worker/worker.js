@@ -241,6 +241,14 @@ export default {
           return json({ error: "license_key y device_id son obligatorios" }, 400);
         }
 
+        // Verify Firebase Bearer token if present — enforces that the caller
+        // owns the license and prevents direct endpoint abuse.
+        const auth = await resolveAuthenticatedUserContext(request, env, url, {
+          allowFirebaseUidFallback: false,
+          requireBearer: false
+        });
+        const authenticatedUserId = auth.response ? null : Number(auth.user?.id);
+
         const license = await env.DB
           .prepare("SELECT * FROM licenses WHERE license_key = ?")
           .bind(licenseKey)
@@ -254,13 +262,24 @@ export default {
           return json({ valid: false, message: "Licencia inactiva o vencida" }, 403);
         }
 
+        // If the caller presented a valid Bearer token, verify that this
+        // license_key actually belongs to the authenticated user.
+        if (authenticatedUserId !== null && Number(license.user_id) !== authenticatedUserId) {
+          return json({
+            valid: false,
+            message: "La licencia no pertenece a la cuenta autenticada"
+          }, 403);
+        }
+
+        const targetUserId = authenticatedUserId !== null ? authenticatedUserId : Number(license.user_id);
+
         // Cross-user check: reject if this device_id is already active for another user.
         const conflictDevice = await env.DB
           .prepare("SELECT * FROM devices WHERE device_id = ? AND status = 'active'")
           .bind(deviceId)
           .first();
 
-        if (conflictDevice && Number(conflictDevice.user_id) !== Number(license.user_id)) {
+        if (conflictDevice && Number(conflictDevice.user_id) !== targetUserId) {
           const conflictUser = await env.DB
             .prepare("SELECT id, email, name FROM users WHERE id = ?")
             .bind(conflictDevice.user_id)
@@ -280,7 +299,7 @@ export default {
           .prepare(
             "SELECT * FROM devices WHERE user_id = ? AND device_id = ? AND status = 'active'"
           )
-          .bind(license.user_id, deviceId)
+          .bind(targetUserId, deviceId)
           .first();
 
         if (existingDevice) {
@@ -292,7 +311,7 @@ export default {
           });
         }
 
-        const usedDevices = await countActiveDevices(env, license.user_id);
+        const usedDevices = await countActiveDevices(env, targetUserId);
         if (usedDevices >= Number(license.devices_limit || 0)) {
           return json({
             valid: false,
@@ -306,15 +325,15 @@ export default {
           .prepare(
             "INSERT INTO devices (user_id, device_name, device_id, status, last_seen_at) VALUES (?, ?, ?, 'active', CURRENT_TIMESTAMP)"
           )
-          .bind(license.user_id, deviceName, deviceId)
+          .bind(targetUserId, deviceName, deviceId)
           .run();
 
         const newDevice = await env.DB
           .prepare("SELECT * FROM devices WHERE user_id = ? AND device_id = ? ORDER BY id DESC")
-          .bind(license.user_id, deviceId)
+          .bind(targetUserId, deviceId)
           .first();
 
-        const updatedDevices = await countActiveDevices(env, license.user_id);
+        const updatedDevices = await countActiveDevices(env, targetUserId);
         return json({
           valid: true,
           message: "Dispositivo activado",

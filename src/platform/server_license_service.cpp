@@ -474,7 +474,23 @@ PanelAuthLoginResult ServerLicenseService::authenticate(const PanelAuthLoginRequ
                 result.device_activation_error = "El servidor rechazo el registro del dispositivo";
             }
         } else {
-            result.device_activation_error = "Error " + std::to_string(activate_response.status_code) + " al registrar el dispositivo";
+            // Try to extract the message from the Worker response body
+            // for any non-200/403 status (e.g. 400, 404, 500).
+            std::string worker_msg;
+            try {
+                const auto activate_json = nlohmann::json::parse(activate_response.body, nullptr, false);
+                if (!activate_json.is_discarded() && activate_json.contains("message") && activate_json["message"].is_string()) {
+                    worker_msg = activate_json["message"].get<std::string>();
+                }
+            } catch (...) {
+                // Ignore parse failures.
+            }
+            if (!worker_msg.empty()) {
+                result.device_activation_error = std::move(worker_msg);
+            } else {
+                result.device_activation_error = "Error " + std::to_string(activate_response.status_code)
+                    + " al registrar el dispositivo";
+            }
         }
     }
 
