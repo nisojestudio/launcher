@@ -425,7 +425,9 @@ std::string make_auth_login_result(const PanelAuthLoginResult& result) {
         "\"lastValidatedTimestampMs\":" + std::to_string(result.auth.last_validated_timestamp_ms)
         + "},"
         "\"remoteCatalogError\":" + json_quote(result.remote_catalog_error) + ","
-        "\"deviceActivationError\":" + json_quote(result.device_activation_error)
+        "\"deviceActivationError\":" + json_quote(result.device_activation_error) + ","
+        "\"registeredDeviceId\":" + json_quote(result.registered_device_id) + ","
+        "\"registeredDeviceName\":" + json_quote(result.registered_device_name)
         + "}";
 }
 
@@ -969,10 +971,6 @@ std::string handle_auth_login(PanelApp* app, std::string_view body) {
     request.password = parse_json_string(body, "password").value_or("");
     request.license_key = parse_json_string(body, "licenseKey")
         .value_or(parse_json_string(body, "license_key").value_or(""));
-    request.device_name = parse_json_string(body, "deviceName")
-        .value_or(parse_json_string(body, "device_name").value_or(""));
-    request.device_id = parse_json_string(body, "deviceId")
-        .value_or(parse_json_string(body, "device_id").value_or(""));
 
     return make_auth_login_result(app->authenticate_access(request));
 }

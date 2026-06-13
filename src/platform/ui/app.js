@@ -2249,6 +2249,12 @@
     if (code.includes("missing_fields")) {
       return { text: "Completa todos los campos antes de validar.", tone: "warn" };
     }
+    if (code.includes("device_conflict")) {
+      return { text: message || "Este dispositivo ya est\u00e1 registrado en otra cuenta. Usa otro equipo o contacta a soporte.", tone: "error" };
+    }
+    if (code.includes("device_limit_exceeded")) {
+      return { text: message || "Has alcanzado el l\u00edmite de dispositivos para esta licencia. Desactiva un dispositivo desde el panel de administraci\u00f3n.", tone: "error" };
+    }
     return { text: message || "Error inesperado. Intenta de nuevo o contacta a soporte.", tone: "error" };
   }
 
@@ -2271,13 +2277,14 @@
         email,
         password,
         licenseKey,
-        deviceName: buildAuthDeviceName(),
-        deviceId: buildAuthDeviceId(),
       });
 
       if (response?.ok) {
         clearAuthFeedback();
         appendLog("Acceso validado. El panel ya puede usarse.");
+        if (response?.registeredDeviceId) {
+          appendLog("Dispositivo registrado: " + response.registeredDeviceId);
+        }
         if (response?.deviceActivationError) {
           appendLog("Aviso: " + response.deviceActivationError);
           setAuthFeedback(response.deviceActivationError, "warn");

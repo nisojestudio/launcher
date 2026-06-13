@@ -254,6 +254,28 @@ export default {
           return json({ valid: false, message: "Licencia inactiva o vencida" }, 403);
         }
 
+        // Cross-user check: reject if this device_id is already active for another user.
+        const conflictDevice = await env.DB
+          .prepare("SELECT * FROM devices WHERE device_id = ? AND status = 'active'")
+          .bind(deviceId)
+          .first();
+
+        if (conflictDevice && Number(conflictDevice.user_id) !== Number(license.user_id)) {
+          const conflictUser = await env.DB
+            .prepare("SELECT id, email, name FROM users WHERE id = ?")
+            .bind(conflictDevice.user_id)
+            .first();
+
+          return json({
+            valid: false,
+            message: "Este dispositivo ya esta registrado en otra cuenta",
+            device_conflict: {
+              owner_email: conflictUser?.email || null,
+              owner_name: conflictUser?.name || null
+            }
+          }, 403);
+        }
+
         const existingDevice = await env.DB
           .prepare(
             "SELECT * FROM devices WHERE user_id = ? AND device_id = ? AND status = 'active'"

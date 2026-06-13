@@ -69,6 +69,7 @@ add_library(nlp3_platform
     panel_view_model_builder.cpp
     remote_game_distribution_service.cpp
     server_license_service.cpp
+    device_identifier.cpp
     support_bundle_exporter.cpp
     support_bundle_sanitizer.cpp
     win_http_client.cpp

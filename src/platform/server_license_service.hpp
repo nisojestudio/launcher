@@ -13,8 +13,6 @@ struct PanelAuthLoginRequest {
     std::string email{};
     std::string password{};
     std::string license_key{};
-    std::string device_name{};
-    std::string device_id{};
 };
 
 struct PanelAuthLoginResult {
@@ -25,6 +23,8 @@ struct PanelAuthLoginResult {
     PanelAuthStatus auth{};
     std::string remote_catalog_error{};
     std::string device_activation_error{};
+    std::string registered_device_id{};
+    std::string registered_device_name{};
 };
 
 class ServerLicenseService final : public ILicenseService {

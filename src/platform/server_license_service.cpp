@@ -9,6 +9,7 @@
 #include <nlohmann/json.hpp>
 
 #include "platform/win_http_client.hpp"
+#include "platform/device_identifier.hpp"
 
 namespace {
 
@@ -412,10 +413,14 @@ PanelAuthLoginResult ServerLicenseService::authenticate(const PanelAuthLoginRequ
         if (!id_token.empty()) {
             activate_headers.push_back(HttpHeader{"Authorization", "Bearer " + id_token});
         }
+        // Device identity: always use C++ persistent ID (UUID + MachineGUID)
+        // for a hardware-bound identifier that survives reinstalls.
+        result.registered_device_id = get_composite_device_id();
+        result.registered_device_name = get_device_name();
         const auto activate_body = nlohmann::json{
             {"license_key", request.license_key},
-            {"device_id", request.device_id},
-            {"device_name", request.device_name.empty() ? "Panel Live 3.0" : request.device_name},
+            {"device_id", result.registered_device_id},
+            {"device_name", result.registered_device_name},
         }.dump();
         const auto activate_response = http_request("POST", activate_url, activate_body, "application/json; charset=utf-8", activate_headers);
         if (!activate_response.error.empty()) {
@@ -429,16 +434,39 @@ PanelAuthLoginResult ServerLicenseService::authenticate(const PanelAuthLoginRequ
                     const auto& conflict = activate_json["device_conflict"];
                     const auto owner_email = conflict.value("owner_email", std::string{});
                     const auto owner_name = conflict.value("owner_name", std::string{});
-                    result.device_activation_error = "Este dispositivo ya esta registrado en otra cuenta";
-                    if (!owner_email.empty()) {
-                        result.device_activation_error += " (" + owner_email + ")";
-                    } else if (!owner_name.empty()) {
-                        result.device_activation_error += " (" + owner_name + ")";
-                    }
+                    const auto conflict_msg = [&] {
+                        auto msg = std::string{"Este dispositivo ya esta registrado en otra cuenta"};
+                        if (!owner_email.empty()) {
+                            msg += " (" + owner_email + ")";
+                        } else if (!owner_name.empty()) {
+                            msg += " (" + owner_name + ")";
+                        }
+                        return msg;
+                    }();
+                    license_snapshot_ = locked_license_snapshot();
+                    auth_snapshot_ = locked_auth_snapshot();
+                    auth_snapshot_.last_error_code = "device_conflict";
+                    auth_snapshot_.message = conflict_msg;
+                    result.ok = false;
+                    result.message = "device_conflict";
+                    result.error_code = "device_conflict";
+                    result.device_activation_error = conflict_msg;
+                    result.license = license_snapshot_;
+                    result.auth = auth_snapshot_;
                 } else if (activate_json.contains("devices_used") && activate_json.contains("devices_limit")) {
                     const auto used = activate_json.value("devices_used", 0);
                     const auto limit = activate_json.value("devices_limit", 0);
-                    result.device_activation_error = "Limite de dispositivos alcanzado: " + std::to_string(used) + "/" + std::to_string(limit);
+                    const auto limit_msg = "Limite de dispositivos alcanzado: " + std::to_string(used) + "/" + std::to_string(limit);
+                    license_snapshot_ = locked_license_snapshot();
+                    auth_snapshot_ = locked_auth_snapshot();
+                    auth_snapshot_.last_error_code = "device_limit_exceeded";
+                    auth_snapshot_.message = limit_msg;
+                    result.ok = false;
+                    result.message = "device_limit_exceeded";
+                    result.error_code = "device_limit_exceeded";
+                    result.device_activation_error = limit_msg;
+                    result.license = license_snapshot_;
+                    result.auth = auth_snapshot_;
                 } else {
                     result.device_activation_error = activate_json.value("message", "El servidor rechazo el registro del dispositivo");
                 }
