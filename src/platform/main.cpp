@@ -227,7 +227,10 @@ void emit_startup_log(std::string_view phase, std::string_view message, bool ok 
         std::filesystem::create_directories(log_dir);
         std::ofstream output(log_dir / "embedded_ui.log", std::ios::app | std::ios::binary);
         output << line.str() << "\n";
+    } catch (const std::exception& ex) {
+        OutputDebugStringA(("emit_startup_log: failed to write log file: " + std::string(ex.what()) + "\n").c_str());
     } catch (...) {
+        OutputDebugStringA("emit_startup_log: failed to write log file (unknown error)\n");
     }
 }
 

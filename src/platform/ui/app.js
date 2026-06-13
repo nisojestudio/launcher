@@ -458,6 +458,7 @@
       contentType,
       message: normalizeLegacyNoticeMessage(trigger, raw?.message || ""),
       seconds,
+      enabled: raw?.enabled !== false,
       audioName: String(raw?.audioName || ""),
       audioMimeType: String(raw?.audioMimeType || ""),
       audioDataUrl: typeof raw?.audioDataUrl === "string" ? raw.audioDataUrl : "",
@@ -910,6 +911,7 @@
 
   function updateTemplateSummary() {
     const count = state.voiceNotices.length;
+    const enabledCount = state.voiceNotices.filter((n) => n.enabled !== false).length;
     const audioCount = state.voiceNotices.filter((notice) => notice.contentType === "audio").length;
     const periodicCount = timerNoticeCount();
     if (!els.templateSummaryText) {
@@ -920,6 +922,9 @@
       return;
     }
     const fragments = [`${count} ${count === 1 ? "mensaje" : "mensajes"}`];
+    if (enabledCount !== count) {
+      fragments.push(`${enabledCount} activos`);
+    }
     if (audioCount) {
       fragments.push(`${audioCount} ${audioCount === 1 ? "audio" : "audios"}`);
     }
@@ -1123,12 +1128,18 @@
         `<option value="${escapeHtml(item.value)}"${item.value === notice.contentType ? " selected" : ""}>${escapeHtml(item.label)}</option>`
       )).join("");
 
+      const isEnabled = notice.enabled !== false;
       return (
-        `<details class="notice-accordion"${isOpen ? " open" : ""} data-notice-id="${escapeHtml(notice.id)}" data-notice-index="${index}">` +
+        `<details class="notice-accordion${isEnabled ? "" : " is-disabled"}"${isOpen ? " open" : ""} data-notice-id="${escapeHtml(notice.id)}" data-notice-index="${index}">` +
           `<summary class="notice-summary">` +
             `<div class="notice-summary-main">` +
-              `<strong class="notice-summary-title">${escapeHtml(noticeTriggerLabel(notice.trigger))}</strong>` +
-              `<span class="notice-summary-subtitle">${escapeHtml(noticeSubtitle(notice))}</span>` +
+              `<label class="notice-toggle" data-notice-toggle="${index}" title="${isEnabled ? "Desactivar aviso" : "Activar aviso"}">` +
+                `<input type="checkbox" data-notice-enabled="${index}"${isEnabled ? " checked" : ""}>` +
+              `</label>` +
+              `<div class="notice-summary-text">` +
+                `<strong class="notice-summary-title">${escapeHtml(noticeTriggerLabel(notice.trigger))}</strong>` +
+                `<span class="notice-summary-subtitle">${escapeHtml(noticeSubtitle(notice))}</span>` +
+              `</div>` +
             `</div>` +
             `<div class="notice-summary-meta">` +
               `<span class="notice-pill">${escapeHtml(noticeTypeLabel(notice))}</span>` +
@@ -1204,6 +1215,9 @@
     let timerIntervalCaptured = false;
 
     state.voiceNotices.forEach((notice) => {
+      if (notice.enabled === false) {
+        return;
+      }
       const textValue = notice.contentType === "text" ? notice.message.trim() : "";
       if (notice.trigger === "gift" && textValue && !els.messageGiftTemplate.value) {
         els.voiceReadGifts.checked = true;
@@ -1410,6 +1424,8 @@
       notice.contentType = NOTICE_CONTENT_TYPES.some((item) => item.value === value) ? value : "text";
     } else if (field === "message") {
       notice.message = String(value || "");
+    } else if (field === "enabled") {
+      notice.enabled = value === true || value === "true";
     }
     touchVoiceNoticeState(options);
   }
@@ -2139,6 +2155,7 @@
       renderVoice(payload);
     }
     renderStreamMetrics(payload, state.metricsPayload || payload.metrics);
+    renderSystemStatus(payload, state.metricsPayload || payload.metrics);
     renderRecentActivity(payload);
     renderExternalGame(payload);
     renderAdvancedLogs();
@@ -2663,12 +2680,16 @@
         return;
       }
       holdUiInteraction(6000);
-      if (target.dataset.noticeAudio) {
+      if (target.dataset.noticeAudio !== undefined) {
         try {
           await attachVoiceNoticeAudio(index, target.files?.[0] || null);
         } catch (error) {
           appendLog(`No se pudo adjuntar el audio del aviso: ${error}`);
         }
+        return;
+      }
+      if (target.dataset.noticeEnabled !== undefined) {
+        updateVoiceNoticeField(index, "enabled", target.checked, { rerender: true });
         return;
       }
       const field = target.dataset.noticeField || "";

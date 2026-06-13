@@ -22,7 +22,23 @@
 namespace {
 
 std::wstring widen(std::string_view text) {
+    if (text.empty()) {
+        return {};
+    }
+#ifdef _WIN32
+    const auto required = MultiByteToWideChar(
+        CP_UTF8, 0, text.data(), static_cast<int>(text.size()), nullptr, 0);
+    if (required <= 0) {
+        return {};
+    }
+    std::wstring result(static_cast<std::size_t>(required), L'\0');
+    MultiByteToWideChar(
+        CP_UTF8, 0, text.data(), static_cast<int>(text.size()),
+        result.data(), required);
+    return result;
+#else
     return std::wstring(text.begin(), text.end());
+#endif
 }
 
 std::string read_env_value(const char* name) {

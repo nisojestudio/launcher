@@ -1608,9 +1608,47 @@ body::-webkit-scrollbar-corner,
 }
 
 .notice-summary-main {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+
+.notice-summary-text {
   display: grid;
   gap: 3px;
   min-width: 0;
+}
+
+.notice-toggle {
+  flex: 0 0 auto;
+  width: 18px;
+  height: 18px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+}
+
+.notice-toggle input {
+  width: 16px;
+  height: 16px;
+  margin: 0;
+  accent-color: var(--accent);
+  cursor: pointer;
+}
+
+.notice-accordion.is-disabled {
+  opacity: 0.55;
+  border-color: rgba(148, 163, 184, 0.06);
+}
+
+.notice-accordion.is-disabled .notice-summary::after {
+  opacity: 0.4;
+}
+
+.notice-accordion.is-disabled[open] {
+  opacity: 0.7;
 }
 
 .notice-summary-title {
