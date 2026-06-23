@@ -211,6 +211,22 @@ target_link_libraries(nlp3_local_game_registry_test PRIVATE nlp3_platform)
 
 add_test(NAME nlp3_local_game_registry_test COMMAND nlp3_local_game_registry_test)
 
+add_executable(nlp3_live_timer_game_test
+    live_timer_game_test.cpp
+)
+
+target_link_libraries(nlp3_live_timer_game_test PRIVATE nlp3_platform)
+
+add_test(NAME nlp3_live_timer_game_test COMMAND nlp3_live_timer_game_test)
+
+add_executable(nlp3_live_timer_api_smoke_test
+    live_timer_api_smoke_test.cpp
+)
+
+target_link_libraries(nlp3_live_timer_api_smoke_test PRIVATE nlp3_platform)
+
+add_test(NAME nlp3_live_timer_api_smoke_test COMMAND nlp3_live_timer_api_smoke_test)
+
 add_executable(nlp3_tiktok_external_event_codec_test
     tiktok_external_event_codec_test.cpp
 )

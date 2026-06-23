@@ -149,6 +149,106 @@
           </div>
         </section>
 
+        <section class="panel timer-panel" aria-labelledby="timer-title">
+          <header class="panel-header">
+            <div class="panel-title-group">
+              <p class="panel-kicker">Live Timer</p>
+              <h2 id="timer-title">Timer</h2>
+            </div>
+            <div class="panel-header-actions">
+              <button class="secondary-button" id="timer-overlay-copy" type="button" title="Copiar URL del overlay">Copiar URL</button>
+            </div>
+          </header>
+
+          <div class="timer-status-bar">
+            <strong class="timer-value" id="timer-value">00:00:00</strong>
+            <span class="timer-state" id="timer-state">Inactivo</span>
+          </div>
+
+          <div class="timer-controls-row">
+            <button class="primary-button" id="timer-start" type="button" title="Iniciar cuenta regresiva">Iniciar</button>
+            <button class="secondary-button" id="timer-pause" type="button" title="Pausar">Pausa</button>
+            <button class="secondary-button" id="timer-resume" type="button" title="Reanudar">Reanudar</button>
+            <button class="secondary-button" id="timer-reset" type="button" title="Reiniciar">Reiniciar</button>
+            <button class="danger-button" id="timer-stop" type="button" title="Detener">Detener</button>
+            <label class="option-chip">
+              <input id="timer-enabled" type="checkbox" checked>
+              <span>Activo</span>
+            </label>
+          </div>
+
+          <details class="timer-config-details">
+            <summary class="timer-config-summary">Configuraci&oacute;n</summary>
+            <div class="timer-controls">
+              <div class="timer-grid">
+                <div class="timer-config-section">
+                  <h3 class="timer-config-title">Tiempos por evento</h3>
+                  <label class="timer-field">
+                    <span>Tiempo inicial (s)</span>
+                    <input class="timer-input" id="timer-initial-time" type="number" step="0.0001" min="0" value="300">
+                  </label>
+                  <label class="timer-field">
+                    <span>Por like (s)</span>
+                    <input class="timer-input" id="timer-per-like" type="number" step="0.0001" min="-10" max="10" value="2.0">
+                  </label>
+                  <label class="timer-field">
+                    <span>Por share (s)</span>
+                    <input class="timer-input" id="timer-per-share" type="number" step="0.0001" min="-10" max="10" value="5.0">
+                  </label>
+                  <label class="timer-field">
+                    <span>Por follow (s)</span>
+                    <input class="timer-input" id="timer-per-follow" type="number" step="0.0001" min="-10" max="10" value="10.0">
+                  </label>
+                  <label class="timer-field">
+                    <span>Por coin de gift (s)</span>
+                    <input class="timer-input" id="timer-per-gift-coin" type="number" step="0.0001" min="-10" max="10" value="0.5">
+                  </label>
+                  <label class="timer-field">
+                    <span>Por chat (s)</span>
+                    <input class="timer-input" id="timer-per-chat" type="number" step="0.0001" min="-10" max="10" value="0.0">
+                  </label>
+                </div>
+
+                <div class="timer-config-section">
+                  <h3 class="timer-config-title">Visual</h3>
+                  <label class="timer-field">
+                    <span>T&iacute;tulo</span>
+                    <input class="timer-input" id="timer-title-text" type="text" value="🎯 Extiende el Live">
+                  </label>
+                  <label class="timer-field">
+                    <span>Subt&iacute;tulo</span>
+                    <input class="timer-input" id="timer-subtitle-text" type="text" value="📌 Cada coin suma {time_per_gift_coin}s">
+                  </label>
+                </div>
+
+                <div class="timer-config-section">
+                  <h3 class="timer-config-title">Sonido al completar</h3>
+                  <label class="timer-field">
+                    <span>Archivo .wav</span>
+                    <input class="timer-input" id="timer-sound-path" type="text" value="" placeholder="Ruta o vac&iacute;o para beep">
+                    <button class="secondary-button" id="timer-sound-browse" type="button" style="margin-top:4px">Examinar...</button>
+                  </label>
+                  <label class="timer-field">
+                    <span class="option-chip">
+                      <input id="timer-sound-repeat" type="checkbox">
+                      <span>Repetir</span>
+                    </span>
+                  </label>
+                  <label class="timer-field">
+                    <span>Volumen</span>
+                    <input class="timer-input" id="timer-sound-volume" type="number" step="0.1" min="0" max="1" value="1.0">
+                  </label>
+                </div>
+              </div>
+
+              <div class="timer-action-row">
+                <button class="primary-button" id="timer-apply-config" type="button">Aplicar configuraci&oacute;n</button>
+                <span class="summary-note" id="timer-config-status"></span>
+              </div>
+            </div>
+          </details>
+        </section>
+
         <section class="panel metrics-panel" aria-labelledby="metrics-title">
           <header class="panel-header panel-header-compact">
             <div class="panel-title-group">

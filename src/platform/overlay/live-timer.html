@@ -1,0 +1,195 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<title>Live Timer</title>
+<style>
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body {
+  background: transparent !important;
+  overflow: hidden;
+  width: 100vw;
+  height: 100vh;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  font-family: 'Segoe UI', sans-serif;
+  color: white;
+  text-shadow: 0 0 20px rgba(0,0,0,0.8), 0 0 40px rgba(0,0,0,0.6);
+}
+#title {
+  font-size: 48px;
+  margin-bottom: 8px;
+  text-align: center;
+}
+#counter {
+  font-size: 120px;
+  font-weight: bold;
+  font-family: 'Segoe UI', monospace;
+  text-align: center;
+  line-height: 1.1;
+  transition: color 0.3s ease;
+}
+#counter.warning { color: #ff8c00 !important; }
+#counter.danger {
+  color: #ff4444 !important;
+  animation: pulse 0.5s ease-in-out infinite;
+}
+#counter.completed {
+  color: #ff4444 !important;
+  animation: pulse 0.3s ease-in-out infinite;
+}
+#subtitle {
+  font-size: 32px;
+  margin-top: 8px;
+  text-align: center;
+}
+@keyframes pulse {
+  50% { transform: scale(1.05); }
+}
+.event-popup {
+  position: fixed;
+  bottom: 80px;
+  right: 30px;
+  font-size: 28px;
+  font-weight: bold;
+  text-shadow: 0 0 15px rgba(0,0,0,0.9);
+  opacity: 1;
+  animation: none;
+  pointer-events: none;
+}
+.event-popup.add { color: #00AAFF; }
+.event-popup.subtract { color: #FF4444; }
+.event-popup.fade {
+  animation: popFade 3s ease-out forwards;
+}
+@keyframes popFade {
+  0% { opacity: 1; transform: translateY(0) scale(1); }
+  20% { opacity: 1; transform: translateY(-10px) scale(1.1); }
+  100% { opacity: 0; transform: translateY(-40px) scale(0.9); }
+}
+#completed-banner {
+  display: none;
+  font-size: 48px;
+  font-weight: bold;
+  color: #FFD700;
+  text-align: center;
+  margin-top: 16px;
+  animation: pulse 0.6s ease-in-out infinite;
+}
+#completed-banner.visible { display: block; }
+</style>
+</head>
+<body>
+<div id="title"></div>
+<div id="counter">00:00:00</div>
+<div id="subtitle"></div>
+<div id="completed-banner">TIEMPO CUMPLIDO</div>
+<div id="event-container"></div>
+
+<script>
+const API_STATE = '/api/overlay/live-timer/state';
+
+let styles = {};
+
+function applyStyles(el, styleObj) {
+  el.style.fontSize = (styleObj.font_size_px || 48) + 'px';
+  el.style.color = styleObj.font_color || '#FFFFFF';
+  el.style.fontFamily = styleObj.font_family || 'Segoe UI, sans-serif';
+  el.style.fontWeight = styleObj.bold ? 'bold' : 'normal';
+}
+
+function formatTime(seconds) {
+  const total = Math.max(0, Math.ceil(seconds));
+  const DAY = 86400, HOUR = 3600, MIN = 60;
+  const days = Math.floor(total / DAY);
+  const rem = total % DAY;
+  const hh = String(Math.floor(rem / HOUR)).padStart(2, '0');
+  const mm = String(Math.floor((rem % HOUR) / MIN)).padStart(2, '0');
+  const ss = String(rem % MIN).padStart(2, '0');
+  if (days > 0) return 'Dia ' + days + ' ' + hh + ':' + mm + ':' + ss;
+  return hh + ':' + mm + ':' + ss;
+}
+
+function showPopup(icon, label, delta) {
+  const container = document.getElementById('event-container');
+  const el = document.createElement('div');
+  el.className = 'event-popup ' + (delta >= 0 ? 'add' : 'subtract');
+  el.textContent = icon + ' ' + (delta >= 0 ? '+' : '') + delta.toFixed(4) + 's';
+  container.appendChild(el);
+  requestAnimationFrame(() => { el.classList.add('fade'); });
+  setTimeout(() => { if (el.parentNode) el.parentNode.removeChild(el); }, 3000);
+}
+
+function updateOverlay() {
+  fetch(API_STATE)
+    .then(r => r.json())
+    .then(data => {
+      const titleEl = document.getElementById('title');
+      const counterEl = document.getElementById('counter');
+      const subtitleEl = document.getElementById('subtitle');
+      const bannerEl = document.getElementById('completed-banner');
+
+      if (data.title !== undefined && titleEl.textContent !== data.title) {
+        titleEl.textContent = data.title;
+      }
+      if (data.subtitle !== undefined && subtitleEl.textContent !== data.subtitle) {
+        subtitleEl.textContent = data.subtitle;
+      }
+
+      if (styles.title !== data.titleStyle) {
+        applyStyles(titleEl, data.titleStyle || {font_size_px: 48, font_color: '#FFFFFF', font_family: 'Segoe UI, sans-serif', bold: true});
+        styles.title = data.titleStyle;
+      }
+      if (styles.counter !== data.counterStyle) {
+        applyStyles(counterEl, data.counterStyle || {font_size_px: 120, font_color: '#00FF88', font_family: 'Segoe UI, monospace', bold: true});
+        styles.counter = data.counterStyle;
+      }
+      if (styles.subtitle !== data.subtitleStyle) {
+        applyStyles(subtitleEl, data.subtitleStyle || {font_size_px: 32, font_color: '#AAAAAA', font_family: 'Segoe UI, sans-serif', bold: false});
+        styles.subtitle = data.subtitleStyle;
+      }
+
+      if (data.bgColor) {
+        document.body.style.backgroundColor = data.bgColor;
+      }
+
+      if (data.enabled === false) {
+        counterEl.textContent = '--:--:--';
+        counterEl.className = '';
+        bannerEl.classList.remove('visible');
+      } else if (data.paused) {
+        counterEl.className = 'warning';
+        bannerEl.classList.remove('visible');
+      } else if (data.completed) {
+        counterEl.textContent = '00:00:00';
+        counterEl.className = 'completed';
+        bannerEl.classList.add('visible');
+      } else {
+        const formatted = data.format || formatTime(data.remainingSeconds);
+        counterEl.textContent = formatted;
+        if (data.remainingSeconds <= 10) {
+          counterEl.className = 'danger';
+        } else if (data.remainingSeconds <= 60) {
+          counterEl.className = 'warning';
+        } else {
+          counterEl.className = '';
+        }
+        bannerEl.classList.remove('visible');
+      }
+
+      if (data.recentEvents) {
+        data.recentEvents.forEach(ev => {
+          showPopup(ev.icon, ev.label, ev.delta);
+        });
+      }
+    })
+    .catch(() => {});
+}
+
+updateOverlay();
+setInterval(updateOverlay, 500);
+</script>
+</body>
+</html>

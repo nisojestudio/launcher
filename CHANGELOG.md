@@ -50,7 +50,33 @@ Format follows a lightweight Keep a Changelog style. Versions use SemVer.
   destructor's `join()` for up to 6 hours. Replaced with `wait_for()` + `condition_variable` so `stop()` wakes the
   thread immediately and shutdown is instant. This fixes the `panel_app_smoke_test` hang.
 
-## Unreleased
+## 0.1.11 - 2026-06-23
+
+### Added
+
+- **Live Timer**: New standalone countdown timer module independent of the game system.
+  Always visible in UI (center column), always running regardless of active game.
+  - `LiveTimerGame` class with real-time countdown (`steady_clock`), configurable time,
+    time-per-event extensions (like/share/follow/gift/chat), completion sound polling.
+  - Panel UI section between "Actividad del live" and "Métricas" with collapsible config.
+  - Overlay HTML (`/overlay/live-timer`) for TikTok Live Studio browser source:
+    transparent background, color thresholds, animated popups on event, completion banner.
+  - REST endpoints: `GET /api/timer/config`, `POST /api/timer/configure`,
+    `GET /api/overlay/live-timer/state`.
+  - `PanelTimerStatus` in snapshot with `has_timer`, `remaining_seconds`, `running`, etc.
+  - 14 unit tests + 1 API smoke test.
+
+### Fixed
+
+- **UI asset embedding**: `embed_text_asset.cmake` now generates `.inc` files for new
+  overlay text assets automatically.
+- **Live Timer**: `overlay_host` in `panel_config` replaces hardcoded `127.0.0.1` in overlay URL,
+  allowing configurable bind address for TikTok Live Studio browser source access.
+- **Live Timer**: `SND_LOOP` sound now stops properly on reset/disable/stop via `PlaySound(nullptr,0,0)`.
+- **Live Timer**: Added `POST /api/timer/stop` endpoint; `total_time_added` telemetry now accumulates real deltas.
+- **Live Timer**: `on_complete_video_url` and all visual style fields (font size/color/family/bold for
+  title/counter/subtitle) now accepted by `POST /api/timer/configure`.
+- **Live Timer**: Completion sound beep fallback restored when no sound file is configured.
 
 ## 0.1.2 - 2026-04-29
 

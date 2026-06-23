@@ -37,6 +37,7 @@ struct PanelConfig {
     std::uint64_t embedded_ui_startup_timeout_ms = 8000;
     std::string host_energy_level = "balanced";
     std::string host_tone_style = "neutral";
+    std::string overlay_host = "127.0.0.1";
 
     PanelAuthConfig auth{};
     bridge::TikTokBridgeConfig bridge{};

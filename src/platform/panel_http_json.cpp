@@ -26,6 +26,7 @@ using nlp3::platform::PanelAuthStatus;
 using nlp3::platform::PanelHttpServerStatus;
 using nlp3::platform::PanelLicenseStatus;
 using nlp3::platform::PanelSnapshot;
+using nlp3::platform::PanelTimerStatus;
 using nlp3::platform::PanelViewModel;
 using nlp3::platform::PanelViewSection;
 using nlp3::platform::PanelViewSectionItem;
@@ -356,6 +357,22 @@ std::string auth_json(const PanelAuthStatus& status) {
         + "}";
 }
 
+std::string timer_json(const PanelTimerStatus& timer) {
+    return "{"
+        "\"hasTimer\":" + bool_json(timer.has_timer) + ","
+        "\"timerId\":" + quote(timer.timer_id) + ","
+        "\"remainingSeconds\":" + std::to_string(timer.remaining_seconds) + ","
+        "\"remainingFormatted\":" + quote(timer.remaining_formatted) + ","
+        "\"running\":" + bool_json(timer.running) + ","
+        "\"paused\":" + bool_json(timer.paused) + ","
+        "\"enabled\":" + bool_json(timer.enabled) + ","
+        "\"completed\":" + bool_json(timer.completed) + ","
+        "\"title\":" + quote(timer.title) + ","
+        "\"subtitle\":" + quote(timer.subtitle) + ","
+        "\"overlayUrl\":" + quote(timer.overlay_url)
+        + "}";
+}
+
 std::string snapshot_json(const PanelSnapshot& snapshot) {
     std::ostringstream output;
     output << "{"
@@ -402,8 +419,9 @@ std::string snapshot_json(const PanelSnapshot& snapshot) {
            << "\"auth\":" << auth_json(snapshot.auth) << ","
            << "\"externalBridge\":" << external_bridge_json(snapshot.external_bridge) << ","
            << "\"externalWs\":" << external_ws_json(snapshot.external_ws) << ","
-           << "\"externalGame\":" << external_game_json(snapshot.external_game) << ","
-           << "\"recentActivity\":[";
+            << "\"externalGame\":" << external_game_json(snapshot.external_game) << ","
+            << "\"timer\":" << timer_json(snapshot.timer) << ","
+            << "\"recentActivity\":[";
     for (std::size_t index = 0; index < snapshot.recent_activity.size(); ++index) {
         if (index > 0) {
             output << ",";

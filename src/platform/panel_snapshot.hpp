@@ -89,6 +89,20 @@ struct PanelExternalWsStatus {
     std::size_t rejected_messages = 0;
 };
 
+struct PanelTimerStatus {
+    bool has_timer = false;
+    std::string timer_id{};
+    double remaining_seconds = 0.0;
+    std::string remaining_formatted{};
+    bool running = false;
+    bool paused = false;
+    bool enabled = false;
+    bool completed = false;
+    std::string title{};
+    std::string subtitle{};
+    std::string overlay_url{};
+};
+
 struct PanelSnapshot {
     std::string panel_name = "Nisoje Studio";
     std::string panel_version{};
@@ -104,6 +118,7 @@ struct PanelSnapshot {
     PanelExternalBridgeStatus external_bridge{};
     PanelExternalWsStatus external_ws{};
     PanelExternalGameStatus external_game{};
+    PanelTimerStatus timer{};
     std::vector<PanelActivityEntry> recent_activity{};
 };
 

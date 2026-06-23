@@ -36,9 +36,12 @@
 #include "bridge/tiktok_bridge_stub_session.hpp"
 #include "events/host_event.hpp"
 #include "games/event_counter_game.hpp"
+#include "games/live_timer_game.hpp"
 #include "gamesdk/game_factory.hpp"
+#include "gamesdk/game_input_mapper.hpp"
 #include "gamesdk/game_registry.hpp"
 #include "gamesdk/game_runtime_controller.hpp"
+#include "bridge/tiktok_event_mapper.hpp"
 #include "host/host_runtime.hpp"
 #include "platform/game_catalog_source.hpp"
 #include "platform/license_service.hpp"
@@ -739,6 +742,10 @@ bool PanelApp::initialize(const std::string& config_path) {
             event_counter_manifest,
         });
 
+        live_timer_game_ = std::make_unique<games::LiveTimerGame>();
+        live_timer_game_->apply_config(live_timer_game_->default_config());
+        live_timer_game_->on_activated();
+
         refresh_external_game_manifests();
 
         auto local_catalog_source = std::make_unique<LocalGameCatalogSource>();
@@ -938,6 +945,22 @@ PanelSnapshot PanelApp::snapshot() const {
         snapshot.latest_version = panel_updater_service_->latest_version();
         snapshot.latest_installer_url = panel_updater_service_->latest_installer_url();
     }
+
+    if (live_timer_game_ != nullptr) {
+        const auto& s = live_timer_game_->state();
+        snapshot.timer.has_timer = true;
+        snapshot.timer.timer_id = "live-timer";
+        snapshot.timer.remaining_seconds = live_timer_game_->remaining_seconds();
+        snapshot.timer.remaining_formatted = live_timer_game_->format_time();
+        snapshot.timer.running = live_timer_game_->is_running();
+        snapshot.timer.paused = s.paused;
+        snapshot.timer.enabled = live_timer_game_->is_enabled();
+        snapshot.timer.completed = s.completed;
+        snapshot.timer.title = s.title_text;
+        snapshot.timer.subtitle = s.subtitle_text;
+        snapshot.timer.overlay_url = "http://" + config_.overlay_host + ":" + std::to_string(http_ui_server_ != nullptr ? http_ui_server_->status().port : 18913) + "/overlay/live-timer";
+    }
+
     return snapshot;
 }
 
@@ -1005,6 +1028,11 @@ PanelTickResult PanelApp::tick(std::uint64_t now_ms) {
     if (host_runtime_ != nullptr) {
         host_runtime_->flush_tts();
     }
+
+    if (live_timer_game_ != nullptr) {
+        live_timer_game_->poll_completion_sound();
+    }
+
     return result;
 }
 
@@ -1188,6 +1216,15 @@ bool PanelApp::submit_external_bridge_event(const bridge::TikTokRawEvent& raw_ev
         const bridge::TikTokExternalEventRecorder recorder{};
         if (!recorder.append_jsonl(external_bridge_recording_path_, raw_event)) {
             stop_external_bridge_recording();
+        }
+    }
+
+    // Forward to timer if enabled
+    if (live_timer_game_ != nullptr) {
+        bridge::TikTokEventMapper raw_mapper{config_.bridge};
+        auto host_event = raw_mapper.map(raw_event);
+        if (host_event.has_value()) {
+            forward_event_to_timer(host_event.value());
         }
     }
 
@@ -1399,6 +1436,20 @@ std::vector<gamesdk::GameCatalogEntry> PanelApp::available_games() const {
     }
 
     return entries;
+}
+
+const gamesdk::IGameModule* PanelApp::active_runtime_game() const noexcept {
+    if (game_runtime_controller_ == nullptr) return nullptr;
+    return game_runtime_controller_->active_game();
+}
+
+gamesdk::IGameModule* PanelApp::active_runtime_game() noexcept {
+    if (game_runtime_controller_ == nullptr) return nullptr;
+    return game_runtime_controller_->active_game();
+}
+
+games::LiveTimerGame* PanelApp::live_timer() const noexcept {
+    return live_timer_game_.get();
 }
 
 gamesdk::GameManifest PanelApp::active_game_manifest() const {
@@ -1661,6 +1712,8 @@ bool PanelApp::inject_host_event(const events::HostEvent& event) {
     if (!initialized_) {
         return false;
     }
+
+    forward_event_to_timer(event);
 
     const auto forwarded_to_external = forward_host_event_to_external_game(event);
     if (host_runtime_ != nullptr) {
@@ -1959,6 +2012,18 @@ bool PanelApp::forward_host_event_to_external_game(const events::HostEvent& even
         event.actor.avatar_url,
         data,
         event.metadata.source_timestamp_ms > 0 ? event.metadata.source_timestamp_ms : now_wall_clock_ms()));
+}
+
+void PanelApp::forward_event_to_timer(const events::HostEvent& event) {
+    if (live_timer_game_ == nullptr) return;
+
+    gamesdk::GameInputEventMapper mapper;
+    auto game_event = mapper.map(event);
+    host::HostSessionSnapshot snapshot{};
+    if (host_runtime_ != nullptr) {
+        snapshot = host_runtime_->snapshot();
+    }
+    live_timer_game_->on_game_input_event(game_event, snapshot);
 }
 
 } // namespace nlp3::platform

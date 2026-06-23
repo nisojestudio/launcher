@@ -5,7 +5,7 @@ set(NLP3_WEBVIEW2_INCLUDE_DIR "${NLP3_WEBVIEW2_SDK_DIR}/build/native/include")
 set(NLP3_WEBVIEW2_LOADER_DLL "${NLP3_WEBVIEW2_SDK_DIR}/build/native/x64/WebView2Loader.dll")
 
 if(NOT DEFINED NLP3_PANEL_VERSION)
-    set(NLP3_PANEL_VERSION "0.1.10")
+    set(NLP3_PANEL_VERSION "0.1.11")
 endif()
 
 if(NOT TARGET nlohmann_json::nlohmann_json)
@@ -27,15 +27,22 @@ function(nlp3_embed_text_asset INPUT_PATH OUTPUT_PATH)
     )
 endfunction()
 
+set(NLP3_PANEL_UI_SOURCE_DIR "${CMAKE_CURRENT_SOURCE_DIR}/ui")
+set(NLP3_PANEL_UI_GENERATED_DIR "${CMAKE_CURRENT_BINARY_DIR}/generated/panel_ui")
+set(NLP3_PANEL_OVERLAY_DIR "${CMAKE_CURRENT_SOURCE_DIR}/overlay")
+set(NLP3_PANEL_OVERLAY_GENERATED_DIR "${CMAKE_CURRENT_BINARY_DIR}/generated/overlay")
+
 set(NLP3_PANEL_UI_INDEX_INC "${NLP3_PANEL_UI_GENERATED_DIR}/panel_ui_index_html.inc")
 set(NLP3_PANEL_UI_STYLES_INC "${NLP3_PANEL_UI_GENERATED_DIR}/panel_ui_styles_css.inc")
 set(NLP3_PANEL_UI_APP_INC "${NLP3_PANEL_UI_GENERATED_DIR}/panel_ui_app_js.inc")
 set(NLP3_PANEL_UI_GAME_PREVIEWS_INC "${NLP3_PANEL_UI_GENERATED_DIR}/panel_ui_game_previews_js.inc")
+set(NLP3_PANEL_OVERLAY_LIVE_TIMER_INC "${NLP3_PANEL_OVERLAY_GENERATED_DIR}/overlay_live_timer_html.inc")
 
 nlp3_embed_text_asset("${NLP3_PANEL_UI_SOURCE_DIR}/index.html" "${NLP3_PANEL_UI_INDEX_INC}")
 nlp3_embed_text_asset("${NLP3_PANEL_UI_SOURCE_DIR}/styles.css" "${NLP3_PANEL_UI_STYLES_INC}")
 nlp3_embed_text_asset("${NLP3_PANEL_UI_SOURCE_DIR}/app.js" "${NLP3_PANEL_UI_APP_INC}")
 nlp3_embed_text_asset("${NLP3_PANEL_UI_SOURCE_DIR}/game-previews.js" "${NLP3_PANEL_UI_GAME_PREVIEWS_INC}")
+nlp3_embed_text_asset("${NLP3_PANEL_OVERLAY_DIR}/live-timer.html" "${NLP3_PANEL_OVERLAY_LIVE_TIMER_INC}")
 
 add_custom_target(
     nlp3_panel_ui_assets
@@ -44,6 +51,7 @@ add_custom_target(
         "${NLP3_PANEL_UI_STYLES_INC}"
         "${NLP3_PANEL_UI_APP_INC}"
         "${NLP3_PANEL_UI_GAME_PREVIEWS_INC}"
+        "${NLP3_PANEL_OVERLAY_LIVE_TIMER_INC}"
 )
 
 add_library(nlp3_platform
@@ -55,6 +63,7 @@ add_library(nlp3_platform
     external_game_bridge_runner.cpp
     external_game_manifest.cpp
     external_game_state.cpp
+    overlay_assets.cpp
     panel_http_json.cpp
     panel_http_server.cpp
     panel_activity.cpp
@@ -83,6 +92,12 @@ set_source_files_properties(
         OBJECT_DEPENDS
             "${NLP3_PANEL_UI_INDEX_INC};${NLP3_PANEL_UI_STYLES_INC};${NLP3_PANEL_UI_APP_INC};${NLP3_PANEL_UI_GAME_PREVIEWS_INC}"
 )
+set_source_files_properties(
+    overlay_assets.cpp
+    PROPERTIES
+        OBJECT_DEPENDS
+            "${NLP3_PANEL_OVERLAY_LIVE_TIMER_INC}"
+)
 
 target_compile_definitions(nlp3_platform PRIVATE NLP3_PANEL_VERSION="${NLP3_PANEL_VERSION}")
 target_compile_features(nlp3_platform PUBLIC cxx_std_20)
@@ -92,6 +107,7 @@ target_include_directories(
         ${PROJECT_SOURCE_DIR}/src
     PRIVATE
         "${NLP3_PANEL_UI_GENERATED_DIR}"
+        "${NLP3_PANEL_OVERLAY_GENERATED_DIR}"
 )
 if(WIN32)
     target_include_directories(

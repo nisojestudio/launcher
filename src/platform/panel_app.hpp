@@ -26,6 +26,7 @@
 #include "platform/panel_run_result.hpp"
 #include "platform/panel_snapshot.hpp"
 #include "platform/panel_tick_result.hpp"
+#include "games/live_timer_game.hpp"
 #include "platform/panel_updater_service.hpp"
 
 namespace nlp3 {
@@ -114,6 +115,8 @@ public:
     std::vector<gamesdk::GameCatalogEntry> available_games() const;
     gamesdk::GameManifest active_game_manifest() const;
     std::vector<gamesdk::GameTelemetryItem> active_game_telemetry() const;
+    const gamesdk::IGameModule* active_runtime_game() const noexcept;
+    gamesdk::IGameModule* active_runtime_game() noexcept;
     host::HostSessionSnapshot host_session_snapshot() const;
     host::HostAutomationConfig host_automation_config() const;
     host::HostPeriodicTtsConfig host_periodic_tts_config() const;
@@ -140,7 +143,10 @@ public:
     PanelExternalGameStatus external_game_status() const;
     bool has_active_external_game() const noexcept;
 
+    games::LiveTimerGame* live_timer() const noexcept;
+
 private:
+    void forward_event_to_timer(const events::HostEvent& event);
     bool activate_external_game_by_id(const std::string& game_id);
     void stop_external_game();
     void refresh_external_game_status();
@@ -175,6 +181,7 @@ private:
 
     std::unique_ptr<host::HostRuntime> host_runtime_{};
     std::unique_ptr<PanelController> panel_controller_{};
+    std::unique_ptr<games::LiveTimerGame> live_timer_game_{};
 
     std::string config_path_ = "panel_config.json";
     std::vector<ExternalGameManifest> external_game_manifests_{};

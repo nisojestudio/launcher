@@ -255,6 +255,31 @@
     windowMinimizeButton: $("#window-minimize-button"),
     windowMaximizeButton: $("#window-maximize-button"),
     windowCloseButton: $("#window-close-button"),
+
+    timerPanel: $(".timer-panel"),
+    timerValue: $("#timer-value"),
+    timerState: $("#timer-state"),
+    timerInitialTime: $("#timer-initial-time"),
+    timerPerLike: $("#timer-per-like"),
+    timerPerShare: $("#timer-per-share"),
+    timerPerFollow: $("#timer-per-follow"),
+    timerPerGiftCoin: $("#timer-per-gift-coin"),
+    timerPerChat: $("#timer-per-chat"),
+    timerTitleText: $("#timer-title-text"),
+    timerSubtitleText: $("#timer-subtitle-text"),
+    timerSoundPath: $("#timer-sound-path"),
+    timerSoundRepeat: $("#timer-sound-repeat"),
+    timerSoundVolume: $("#timer-sound-volume"),
+    timerSoundBrowse: $("#timer-sound-browse"),
+    timerApplyConfig: $("#timer-apply-config"),
+    timerConfigStatus: $("#timer-config-status"),
+    timerOverlayCopy: $("#timer-overlay-copy"),
+    timerStart: $("#timer-start"),
+    timerPause: $("#timer-pause"),
+    timerResume: $("#timer-resume"),
+    timerReset: $("#timer-reset"),
+    timerStop: $("#timer-stop"),
+    timerEnabled: $("#timer-enabled"),
   };
 
   const SAMPLE_AVATAR_DATA_URL =
@@ -2031,6 +2056,33 @@
     }
   }
 
+  function renderTimer(payload) {
+    const timer = payload?.snapshot?.timer || {};
+
+    if (!els.timerPanel) return;
+
+    setText(els.timerValue, timer.remainingFormatted || "00:00:00");
+    if (!timer.enabled) {
+      setText(els.timerState, "Desactivado");
+      els.timerValue.style.color = "var(--text-muted)";
+    } else if (timer.running && timer.paused) {
+      setText(els.timerState, "Pausado");
+      els.timerValue.style.color = "var(--warn)";
+    } else if (timer.running) {
+      setText(els.timerState, "En curso");
+      els.timerValue.style.color = "";
+    } else if (timer.completed) {
+      setText(els.timerState, "Completado");
+      els.timerValue.style.color = "var(--danger)";
+    } else {
+      setText(els.timerState, "Inactivo");
+      els.timerValue.style.color = "var(--text-muted)";
+    }
+    if (els.timerEnabled) {
+      els.timerEnabled.checked = timer.enabled;
+    }
+  }
+
   function renderSystemStatus(payload, metricsPayload) {
     const external = payload?.snapshot?.externalBridge || {};
     const metrics = metricsPayload || payload?.metrics || {};
@@ -2158,6 +2210,7 @@
     renderSystemStatus(payload, state.metricsPayload || payload.metrics);
     renderRecentActivity(payload);
     renderExternalGame(payload);
+    renderTimer(payload);
     renderAdvancedLogs();
     renderCatalogAlert();
   }
@@ -2994,6 +3047,68 @@
         return;
       }
       sendWindowAction("toggle-maximize");
+    });
+
+    // --- Live Timer handlers ---
+    els.timerApplyConfig?.addEventListener("click", async () => {
+      const config = {
+        initial_time_s: parseFloat(els.timerInitialTime?.value) || 300,
+        time_per_like_s: parseFloat(els.timerPerLike?.value) || 2.0,
+        time_per_share_s: parseFloat(els.timerPerShare?.value) || 5.0,
+        time_per_follow_s: parseFloat(els.timerPerFollow?.value) || 10.0,
+        time_per_gift_coin_s: parseFloat(els.timerPerGiftCoin?.value) || 0.5,
+        time_per_chat_s: parseFloat(els.timerPerChat?.value) || 0.0,
+        title_text: els.timerTitleText?.value || "🎯 Extiende el Live",
+        subtitle_text: els.timerSubtitleText?.value || "📌 Cada coin suma {time_per_gift_coin}s",
+        on_complete_sound_path: els.timerSoundPath?.value || "",
+        on_complete_repeat: !!els.timerSoundRepeat?.checked,
+        on_complete_volume: parseFloat(els.timerSoundVolume?.value) || 1.0,
+      };
+      try {
+        const result = await apiPostJson("/api/timer/configure", config);
+        if (result.ok) {
+          setText(els.timerConfigStatus, "Configuraci\u00f3n aplicada", { animate: true });
+        } else {
+          setText(els.timerConfigStatus, "Error al aplicar configuraci\u00f3n", { animate: true });
+        }
+      } catch (e) {
+        setText(els.timerConfigStatus, "Error de red", { animate: true });
+      }
+    });
+
+    els.timerOverlayCopy?.addEventListener("click", async () => {
+      const url = `${window.location.origin}/overlay/live-timer`;
+      try {
+        await navigator.clipboard.writeText(url);
+        setText(els.timerOverlayCopy, "Copiado!", { animate: true });
+        setTimeout(() => setText(els.timerOverlayCopy, "Copiar URL"), 1500);
+      } catch {
+        setText(els.timerOverlayCopy, "Error", { animate: true });
+      }
+    });
+
+    // --- Timer control buttons ---
+    const timerAction = (path) => {
+      apiPostJson(path, {}).catch(() => {});
+    };
+    els.timerStart?.addEventListener("click", () => timerAction("/api/timer/start"));
+    els.timerPause?.addEventListener("click", () => timerAction("/api/timer/pause"));
+    els.timerResume?.addEventListener("click", () => timerAction("/api/timer/resume"));
+    els.timerReset?.addEventListener("click", () => timerAction("/api/timer/reset"));
+    els.timerStop?.addEventListener("click", () => timerAction("/api/timer/stop"));
+    els.timerEnabled?.addEventListener("change", () => timerAction("/api/timer/toggle"));
+
+    // --- Timer sound file picker ---
+    els.timerSoundBrowse?.addEventListener("click", () => {
+      const input = document.createElement("input");
+      input.type = "file";
+      input.accept = ".wav,.mp3,.ogg";
+      input.addEventListener("change", () => {
+        if (input.files && input.files[0]) {
+          els.timerSoundPath.value = input.files[0].name;
+        }
+      });
+      input.click();
     });
   }
 

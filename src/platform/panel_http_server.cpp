@@ -28,6 +28,7 @@
 #include "platform/panel_app.hpp"
 #include "platform/panel_console.hpp"
 #include "platform/panel_http_json.hpp"
+#include "platform/overlay_assets.hpp"
 #include "platform/panel_ui_assets.hpp"
 #include "platform/server_license_service.hpp"
 #include "platform/support_bundle_exporter.hpp"
@@ -40,10 +41,14 @@ using nlp3::events::GiftEventData;
 using nlp3::events::HostActor;
 using nlp3::events::HostEvent;
 using nlp3::events::HostEventKind;
+using nlp3::gamesdk::GameConfig;
 using nlp3::platform::PanelApp;
 using nlp3::platform::PanelAuthLoginResult;
 using nlp3::platform::PanelConsole;
 using nlp3::platform::PanelHttpServerStatus;
+
+// forward declarations
+std::string handle_game_trigger_rest(PanelApp* app, std::string_view body, HostEvent& event);
 
 bool ensure_winsock_initialized() {
     static const bool initialized = []() {
@@ -289,6 +294,42 @@ std::optional<bool> parse_json_bool(std::string_view body, std::string_view key)
         return false;
     }
     return std::nullopt;
+}
+
+std::optional<double> parse_json_double(std::string_view body, std::string_view key) {
+    const auto value_cursor = find_json_key(body, key);
+    if (!value_cursor.has_value()) {
+        return std::nullopt;
+    }
+
+    const auto cursor = *value_cursor;
+    std::size_t end = cursor;
+    bool has_dot = false;
+    bool has_digit = false;
+    if (end < body.size() && body[end] == '-') {
+        ++end;
+    }
+    while (end < body.size()) {
+        const auto ch = body[end];
+        if (std::isdigit(static_cast<unsigned char>(ch)) != 0) {
+            has_digit = true;
+            ++end;
+        } else if (ch == '.' && !has_dot) {
+            has_dot = true;
+            ++end;
+        } else {
+            break;
+        }
+    }
+    if (!has_digit) {
+        return std::nullopt;
+    }
+
+    try {
+        return std::stod(std::string(body.substr(cursor, end - cursor)));
+    } catch (...) {
+        return std::nullopt;
+    }
 }
 
 std::optional<std::uint64_t> parse_json_uint64(std::string_view body, std::string_view key) {
@@ -772,6 +813,144 @@ std::string handle_game_trigger(PanelApp* app, std::string_view body) {
     event.metadata.source_event_id = "panel-ui-" + std::to_string(now_wall_clock_ms());
     event.metadata.source_room_id = app->snapshot().external_bridge.current_room_id;
     event.metadata.source_timestamp_ms = static_cast<std::int64_t>(now_wall_clock_ms());
+
+    return handle_game_trigger_rest(app, body, event);
+}
+
+std::string build_live_timer_config_json(const nlp3::games::LiveTimerGame* game) {
+    if (game == nullptr) {
+        return "null";
+    }
+    const auto& cfg = game->config();
+    const auto q = [](std::string_view s) { return "\"" + json_escape(s) + "\""; };
+    std::ostringstream out;
+    out << "{";
+    auto add = [&](std::string_view key) {
+        const auto* val = cfg.find(key);
+        if (val == nullptr) return;
+        if (std::holds_alternative<double>(*val)) {
+            out << q(key) << ":" << std::get<double>(*val);
+        } else if (std::holds_alternative<std::int64_t>(*val)) {
+            out << q(key) << ":" << std::get<std::int64_t>(*val);
+        } else if (std::holds_alternative<bool>(*val)) {
+            out << q(key) << ":" << (std::get<bool>(*val) ? "true" : "false");
+        } else if (std::holds_alternative<std::string>(*val)) {
+            out << q(key) << ":" << q(std::get<std::string>(*val));
+        }
+    };
+    add("initial_time_s"); out << ",";
+    add("time_per_like_s"); out << ",";
+    add("time_per_share_s"); out << ",";
+    add("time_per_follow_s"); out << ",";
+    add("time_per_gift_coin_s"); out << ",";
+    add("time_per_chat_s"); out << ",";
+    add("title_text"); out << ",";
+    add("subtitle_text"); out << ",";
+    add("on_complete_sound_path"); out << ",";
+    add("on_complete_repeat"); out << ",";
+    add("on_complete_volume"); out << ",";
+    add("background_color"); out << ",";
+    add("on_complete_video_url"); out << ",";
+    add("title_font_size"); out << ",";
+    add("title_font_color"); out << ",";
+    add("title_font_family"); out << ",";
+    add("title_bold"); out << ",";
+    add("counter_font_size"); out << ",";
+    add("counter_font_color"); out << ",";
+    add("counter_font_family"); out << ",";
+    add("counter_bold"); out << ",";
+    add("subtitle_font_size"); out << ",";
+    add("subtitle_font_color"); out << ",";
+    add("subtitle_font_family"); out << ",";
+    add("subtitle_bold");
+    out << "}";
+    return out.str();
+}
+
+std::string handle_timer_get_config(PanelApp* app) {
+    if (app == nullptr) {
+        return nlp3::platform::build_panel_http_error_json("panel unavailable");
+    }
+    const auto* timer = app->live_timer();
+    if (timer == nullptr) {
+        return make_simple_result(false, "timer unavailable");
+    }
+    return "{"
+        "\"ok\":true,"
+        "\"config\":" + build_live_timer_config_json(timer) +
+    "}";
+}
+
+std::string handle_timer_configure(PanelApp* app, std::string_view body) {
+    if (app == nullptr) {
+        return nlp3::platform::build_panel_http_error_json("panel unavailable");
+    }
+    auto* timer = app->live_timer();
+    if (timer == nullptr) {
+        return make_simple_result(false, "timer unavailable");
+    }
+    GameConfig config;
+
+    auto maybe_bool = parse_json_bool(body, "on_complete_repeat");
+    if (maybe_bool.has_value()) config.set("on_complete_repeat", *maybe_bool);
+
+    auto maybe_d = parse_json_double(body, "initial_time_s");
+    if (maybe_d.has_value()) config.set("initial_time_s", *maybe_d);
+    maybe_d = parse_json_double(body, "time_per_like_s");
+    if (maybe_d.has_value()) config.set("time_per_like_s", *maybe_d);
+    maybe_d = parse_json_double(body, "time_per_share_s");
+    if (maybe_d.has_value()) config.set("time_per_share_s", *maybe_d);
+    maybe_d = parse_json_double(body, "time_per_follow_s");
+    if (maybe_d.has_value()) config.set("time_per_follow_s", *maybe_d);
+    maybe_d = parse_json_double(body, "time_per_gift_coin_s");
+    if (maybe_d.has_value()) config.set("time_per_gift_coin_s", *maybe_d);
+    maybe_d = parse_json_double(body, "time_per_chat_s");
+    if (maybe_d.has_value()) config.set("time_per_chat_s", *maybe_d);
+    maybe_d = parse_json_double(body, "on_complete_volume");
+    if (maybe_d.has_value()) config.set("on_complete_volume", *maybe_d);
+
+    auto maybe_str = parse_json_string(body, "title_text");
+    if (maybe_str.has_value()) config.set("title_text", *maybe_str);
+    maybe_str = parse_json_string(body, "subtitle_text");
+    if (maybe_str.has_value()) config.set("subtitle_text", *maybe_str);
+    maybe_str = parse_json_string(body, "on_complete_sound_path");
+    if (maybe_str.has_value()) config.set("on_complete_sound_path", *maybe_str);
+    maybe_str = parse_json_string(body, "background_color");
+    if (maybe_str.has_value()) config.set("background_color", *maybe_str);
+    maybe_str = parse_json_string(body, "on_complete_video_url");
+    if (maybe_str.has_value()) config.set("on_complete_video_url", *maybe_str);
+    maybe_str = parse_json_string(body, "title_font_color");
+    if (maybe_str.has_value()) config.set("title_font_color", *maybe_str);
+    maybe_str = parse_json_string(body, "title_font_family");
+    if (maybe_str.has_value()) config.set("title_font_family", *maybe_str);
+    maybe_str = parse_json_string(body, "counter_font_color");
+    if (maybe_str.has_value()) config.set("counter_font_color", *maybe_str);
+    maybe_str = parse_json_string(body, "counter_font_family");
+    if (maybe_str.has_value()) config.set("counter_font_family", *maybe_str);
+    maybe_str = parse_json_string(body, "subtitle_font_color");
+    if (maybe_str.has_value()) config.set("subtitle_font_color", *maybe_str);
+    maybe_str = parse_json_string(body, "subtitle_font_family");
+    if (maybe_str.has_value()) config.set("subtitle_font_family", *maybe_str);
+
+    auto maybe_i64 = parse_json_uint64(body, "title_font_size");
+    if (maybe_i64.has_value()) config.set("title_font_size", static_cast<std::int64_t>(*maybe_i64));
+    maybe_i64 = parse_json_uint64(body, "counter_font_size");
+    if (maybe_i64.has_value()) config.set("counter_font_size", static_cast<std::int64_t>(*maybe_i64));
+    maybe_i64 = parse_json_uint64(body, "subtitle_font_size");
+    if (maybe_i64.has_value()) config.set("subtitle_font_size", static_cast<std::int64_t>(*maybe_i64));
+
+    maybe_bool = parse_json_bool(body, "title_bold");
+    if (maybe_bool.has_value()) config.set("title_bold", *maybe_bool);
+    maybe_bool = parse_json_bool(body, "counter_bold");
+    if (maybe_bool.has_value()) config.set("counter_bold", *maybe_bool);
+    maybe_bool = parse_json_bool(body, "subtitle_bold");
+    if (maybe_bool.has_value()) config.set("subtitle_bold", *maybe_bool);
+
+    timer->apply_config(config);
+    return make_simple_result(true, "config_applied");
+}
+
+std::string handle_game_trigger_rest(PanelApp* app, std::string_view body, HostEvent& event) {
     event.message = parse_json_string(body, "message").value_or(parse_json_string(body, "text").value_or(""));
     event.magnitude = static_cast<int>(parse_json_uint64(body, "magnitude").value_or(1));
     event.viewer_count = static_cast<int>(parse_json_uint64(body, "viewerCount").value_or(0));
@@ -1049,6 +1228,15 @@ std::string build_route_response(
             "application/json; charset=utf-8",
             nlp3::platform::build_panel_http_tts_json(*app));
     }
+    if (request.method == "GET" && request.path == "/overlay/live-timer") {
+        return make_http_response("200 OK", "text/html; charset=utf-8", std::string(nlp3::platform::panel_overlay_live_timer_html()));
+    }
+    if (request.method == "GET" && request.path == "/api/overlay/live-timer/state") {
+        if (app == nullptr) {
+            return make_http_response("200 OK", "application/json; charset=utf-8", nlp3::platform::build_live_timer_state_json(nullptr));
+        }
+        return make_http_response("200 OK", "application/json; charset=utf-8", nlp3::platform::build_live_timer_state_json(app->live_timer()));
+    }
     if (request.method == "GET" && request.path == "/health") {
         return make_http_response("200 OK", "application/json; charset=utf-8", "{\"ok\":true}");
     }
@@ -1090,6 +1278,42 @@ std::string build_route_response(
     }
     if (request.method == "POST" && request.path == "/api/game/trigger") {
         return make_http_response("200 OK", "application/json; charset=utf-8", handle_game_trigger(app, request.body));
+    }
+    if (request.method == "GET" && request.path == "/api/timer/config") {
+        return make_http_response("200 OK", "application/json; charset=utf-8", handle_timer_get_config(app));
+    }
+    if (request.method == "POST" && request.path == "/api/timer/configure") {
+        return make_http_response("200 OK", "application/json; charset=utf-8", handle_timer_configure(app, request.body));
+    }
+    if (request.method == "POST" && request.path == "/api/timer/start") {
+        auto* timer = app->live_timer();
+        if (timer != nullptr) { timer->on_activated(); }
+        return make_http_response("200 OK", "application/json; charset=utf-8", make_simple_result(timer != nullptr, timer ? "started" : "unavailable"));
+    }
+    if (request.method == "POST" && request.path == "/api/timer/pause") {
+        auto* timer = app->live_timer();
+        if (timer != nullptr) { timer->pause(); }
+        return make_http_response("200 OK", "application/json; charset=utf-8", make_simple_result(timer != nullptr, timer ? "paused" : "unavailable"));
+    }
+    if (request.method == "POST" && request.path == "/api/timer/resume") {
+        auto* timer = app->live_timer();
+        if (timer != nullptr) { timer->resume(); }
+        return make_http_response("200 OK", "application/json; charset=utf-8", make_simple_result(timer != nullptr, timer ? "resumed" : "unavailable"));
+    }
+    if (request.method == "POST" && request.path == "/api/timer/reset") {
+        auto* timer = app->live_timer();
+        if (timer != nullptr) { timer->reset(); }
+        return make_http_response("200 OK", "application/json; charset=utf-8", make_simple_result(timer != nullptr, timer ? "reset" : "unavailable"));
+    }
+    if (request.method == "POST" && request.path == "/api/timer/stop") {
+        auto* timer = app->live_timer();
+        if (timer != nullptr) { timer->stop(); }
+        return make_http_response("200 OK", "application/json; charset=utf-8", make_simple_result(timer != nullptr, timer ? "stopped" : "unavailable"));
+    }
+    if (request.method == "POST" && request.path == "/api/timer/toggle") {
+        auto* timer = app->live_timer();
+        if (timer != nullptr) { timer->set_enabled(!timer->is_enabled()); }
+        return make_http_response("200 OK", "application/json; charset=utf-8", make_simple_result(timer != nullptr, timer ? (timer->is_enabled() ? "enabled" : "disabled") : "unavailable"));
     }
     if (request.method == "POST" && request.path == "/api/host/tts") {
         return make_http_response("200 OK", "application/json; charset=utf-8", handle_host_tts(app, request.body));
