@@ -4,6 +4,28 @@ All notable Panel Live changes should be recorded here.
 
 Format follows a lightweight Keep a Changelog style. Versions use SemVer.
 
+## 0.2.3 - 2026-06-24
+
+### Fixed
+
+- **app.js**: Added 12 missing `els` cases in Live Timer type column switch.
+- **Live Timer UI**: Popup overlay z-index fixed to appear above panel header.
+- **CHANGELOG**: Added missing 0.2.2 entry.
+
+## 0.2.2 - 2026-06-24
+
+### Added
+
+- **Cloudflare Tunnel Service**: New `cloudflare_tunnel_service.cpp/hpp` — manages a Child Process running `cloudflared tunnel` for each game session, with lifecycle tracked in `TunnelInfo` (token, URL, pid).
+- **Platform**: `cloudflare_tunnel_service` wired into `PanelApp` — tunnel starts on session start, stops on session stop.
+- **HTTP JSON**: New `overlayTunnelUrl` field in panel responses.
+- **Snapshot**: `overlay_tunnel_url` header added to `PanelSnapshot` / `GameSnapshot`.
+- **Package**: `cloudflared.exe` auto-download bundled in `package_windows.ps1`.
+
+### Changed
+
+- **Build**: `cloudflare_tunnel_service.cpp` added to `src/platform/CMakeLists.txt`.
+
 ## 0.2.1 - 2026-06-23
 
 ### Fixed

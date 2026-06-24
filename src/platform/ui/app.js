@@ -285,6 +285,18 @@
     timerAdjustApply: $("#timer-adjust-apply"),
     timerAdjustNeg: $("#timer-adjust-neg"),
     timerAdjustPos: $("#timer-adjust-pos"),
+    timerTitleFontSize: $("#timer-title-font-size"),
+    timerTitleFontColor: $("#timer-title-font-color"),
+    timerTitleFontFamily: $("#timer-title-font-family"),
+    timerTitleBold: $("#timer-title-bold"),
+    timerCounterFontSize: $("#timer-counter-font-size"),
+    timerCounterFontColor: $("#timer-counter-font-color"),
+    timerCounterFontFamily: $("#timer-counter-font-family"),
+    timerCounterBold: $("#timer-counter-bold"),
+    timerSubtitleFontSize: $("#timer-subtitle-font-size"),
+    timerSubtitleFontColor: $("#timer-subtitle-font-color"),
+    timerSubtitleFontFamily: $("#timer-subtitle-font-family"),
+    timerSubtitleBold: $("#timer-subtitle-bold"),
   };
 
   const SAMPLE_AVATAR_DATA_URL =

@@ -101,6 +101,7 @@ struct PanelTimerStatus {
     std::string title{};
     std::string subtitle{};
     std::string overlay_url{};
+    std::string overlay_tunnel_url{};
 };
 
 struct PanelSnapshot {
