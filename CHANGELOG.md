@@ -4,6 +4,12 @@ All notable Panel Live changes should be recorded here.
 
 Format follows a lightweight Keep a Changelog style. Versions use SemVer.
 
+## 0.2.4 - 2026-06-24
+
+### Fixed
+
+- **Cloudflare Tunnel**: Restored `_timerOverlayUrl` variable, assignment, and copy-button preference in `app.js` that were accidentally removed in v0.2.3. The "Copiar URL" button now correctly copies the tunnel URL when available.
+
 ## 0.2.3 - 2026-06-24
 
 ### Fixed
