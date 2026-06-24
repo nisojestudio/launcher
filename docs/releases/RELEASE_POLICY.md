@@ -62,6 +62,10 @@ Before publishing a release:
 9. Checksums are generated.
 10. Release manifest is generated.
 11. Backup exists or is created.
+12. **GitHub Release created**: `gh release create` draft → upload assets → publish prerelease.
+13. **`INSTALLER_URL` updated**: `wrangler.api.jsonc`, `.env`, `deploy-pages.yml` in `sitio/`.
+14. **Worker deployed**: `wrangler deploy --config wrangler.api.jsonc` in `sitio/`.
+15. **Verification**: `curl https://nisoje.com/api/version/latest` returns the new version.
 
 ## Existing Commands
 
@@ -102,6 +106,26 @@ Release manifest:
 ```powershell
 powershell -ExecutionPolicy Bypass -File .\scripts\release\new_release_manifest.ps1 -Version 0.2.0 -ArtifactPaths .\dist\releases\0.2.0\panel-live-0.2.0-win-x64-portable.zip,.\dist\releases\0.2.0\installer\panel-live-0.2.0-win-x64.exe
 ```
+
+GitHub Release:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File .\scripts\release\github_release.ps1 -Version 0.2.0 -Changelog "Short description of changes"
+```
+
+Creates a draft GitHub Release, uploads `.exe` + `.zip` + `SHA256SUMS.txt` to `nisojestudio/launcher`, then publishes as prerelease. Requires `gh` CLI authenticated.
+
+Deploy launcher (full pipeline — build → tests → installer → GitHub Release → sitio update → Worker deploy):
+
+```powershell
+powershell -ExecutionPolicy Bypass -File .\scripts\release\deploy_launcher.ps1 -Version 0.2.0 -Changelog "Short description of changes"
+```
+
+This is the recommended single-command release. It runs all previous steps plus:
+- Updates `INSTALLER_URL` in `sitio/wrangler.api.jsonc`, `sitio/.env`, `sitio/.github/workflows/deploy-pages.yml`
+- Commits and pushes sitio changes
+- Runs `wrangler deploy --config wrangler.api.jsonc` to update the Worker
+- Verifies the production endpoint returns the new version
 
 ## Artifact Naming
 
