@@ -4,6 +4,18 @@ All notable Panel Live changes should be recorded here.
 
 Format follows a lightweight Keep a Changelog style. Versions use SemVer.
 
+## 0.2.1 - 2026-06-23
+
+### Fixed
+
+- **Live Timer UI**: Manual adjust simplified — removed preset buttons (+30s/+60s/+5min/-30s/-60s), replaced with `−` / `+` sign buttons + numeric input.
+- **Live Timer UI**: Font color inputs changed from text field to native `<input type="color">` picker.
+- **Live Timer UI**: Font family inputs changed from text field to `<select>` dropdown with 10 web-safe options (Segoe UI, Arial, Helvetica, Verdana, Trebuchet MS, Courier New, Consolas, Georgia, Impact, Times New Roman).
+- **Live Timer UI**: Background color removed entirely — overlay stays transparent (hardcoded `"bgColor":"transparent"`).
+- **Live Timer UI**: Config details panel overflow fixed (`max-height: 380px; overflow-y: auto`).
+- **C++**: Removed `background_color` from `LiveTimerGameState`, config key `kBackgroundColor`, and all parser/serializer code.
+- **Tests**: Removed `test_default_config_background_color`.
+
 ## 0.2.0 - 2026-06-23
 
 ### Added
