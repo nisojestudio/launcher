@@ -50,6 +50,7 @@
 #include "platform/external_game_manifest.hpp"
 #include "platform/external_game_state.hpp"
 #include "platform/external_game_bridge_runner.hpp"
+#include "platform/cloudflare_tunnel_service.hpp"
 #include "platform/panel_activity.hpp"
 #include "platform/panel_config_storage.hpp"
 #include "platform/panel_controller.hpp"
@@ -962,6 +963,9 @@ PanelSnapshot PanelApp::snapshot() const {
             auto host = config_.overlay_host.empty() ? "localhost" : config_.overlay_host;
             auto port = http_ui_server_ != nullptr ? http_ui_server_->status().port : 18913;
             snapshot.timer.overlay_url = "http://" + host + ":" + std::to_string(port) + "/overlay/live-timer";
+            if (tunnel_service_ != nullptr) {
+                snapshot.timer.overlay_tunnel_url = tunnel_service_->tunnel_url();
+            }
         }
     }
 
@@ -1352,10 +1356,22 @@ bool PanelApp::start_http_ui(std::uint16_t port) {
         http_ui_server_ = std::make_unique<PanelHttpServer>(this);
     }
 
-    return http_ui_server_->start(port);
+    if (!http_ui_server_->start(port)) {
+        return false;
+    }
+
+    if (tunnel_service_ == nullptr) {
+        tunnel_service_ = std::make_unique<CloudflareTunnelService>();
+    }
+    tunnel_service_->start_tunnel(port, nullptr);
+
+    return true;
 }
 
 void PanelApp::stop_http_ui() {
+    if (tunnel_service_ != nullptr) {
+        tunnel_service_->stop_tunnel();
+    }
     if (http_ui_server_ != nullptr) {
         http_ui_server_->stop();
     }

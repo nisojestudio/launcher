@@ -4,6 +4,19 @@ All notable Panel Live changes should be recorded here.
 
 Format follows a lightweight Keep a Changelog style. Versions use SemVer.
 
+## 0.2.2 - 2026-06-24
+
+### Added
+
+- **Cloudflare Tunnel**: Automatic tunnel via `cloudflared` on HTTP UI start, tunnel URL exposed as `overlayTunnelUrl` in timer snapshot, `cloudflared.exe` bundled in portable package.
+- **Popup label**: Overlay now shows event type label (e.g. "like", "gift") when delta is exactly 1s, avoiding text spam on rapid events.
+
+### Fixed
+
+- **Timer config**: 12 missing `els` references for visual style controls (font size, color, family, bold) — changes now actually take effect.
+- **Popup overlay position**: Moved from hardcoded bottom-right to centered near the counter with vertical stacking so multiple popups don't overlap.
+- **Popup font size**: Increased from 28px to 36px for better readability.
+
 ## 0.2.1 - 2026-06-23
 
 ### Fixed
