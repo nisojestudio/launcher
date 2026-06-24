@@ -93,11 +93,12 @@ Invoke-GitHub @(
 )
 
 Write-Host "[github] Uploading $($assets.Count) assets..."
-Invoke-GitHub @(
+$uploadArgs = @(
     "release", "upload", $tag,
     "--repo", $Repo,
     "--clobber"
 ) + $assets
+Invoke-GitHub @uploadArgs
 
 Write-Host "[github] Verifying upload..."
 Start-Sleep -Seconds 3
