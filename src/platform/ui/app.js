@@ -261,7 +261,6 @@
     timerState: $("#timer-state"),
     timerInitialTime: $("#timer-initial-time"),
     timerMaxTime: $("#timer-max-time"),
-    timerBgColor: $("#timer-bg-color"),
     timerPerLike: $("#timer-per-like"),
     timerPerShare: $("#timer-per-share"),
     timerPerFollow: $("#timer-per-follow"),
@@ -284,6 +283,8 @@
     timerEnabled: $("#timer-enabled"),
     timerAdjustCustom: $("#timer-adjust-custom"),
     timerAdjustApply: $("#timer-adjust-apply"),
+    timerAdjustNeg: $("#timer-adjust-neg"),
+    timerAdjustPos: $("#timer-adjust-pos"),
   };
 
   const SAMPLE_AVATAR_DATA_URL =
@@ -3059,7 +3060,6 @@
       const config = {
         initial_time_s: parseFloat(els.timerInitialTime?.value) || 300,
         max_time_s: parseFloat(els.timerMaxTime?.value) || 0,
-        background_color: els.timerBgColor?.value || "#000000",
         time_per_like_s: parseFloat(els.timerPerLike?.value) || 2.0,
         time_per_share_s: parseFloat(els.timerPerShare?.value) || 5.0,
         time_per_follow_s: parseFloat(els.timerPerFollow?.value) || 10.0,
@@ -3122,19 +3122,22 @@
     els.timerEnabled?.addEventListener("change", () => timerAction("/api/timer/toggle"));
 
     // --- Timer manual adjust ---
-    document.querySelectorAll(".timer-adjust-btn").forEach(btn => {
-      btn.addEventListener("click", () => {
-        const delta = parseFloat(btn.dataset.delta) || 0;
-        if (delta !== 0) {
-          apiPostJson("/api/timer/adjust", { delta }).catch(() => {});
-        }
-      });
-    });
-    els.timerAdjustApply?.addEventListener("click", () => {
-      const delta = parseFloat(els.timerAdjustCustom?.value) || 0;
+    const applyAdjust = (delta) => {
       if (delta !== 0) {
         apiPostJson("/api/timer/adjust", { delta }).catch(() => {});
       }
+    };
+    els.timerAdjustNeg?.addEventListener("click", () => {
+      const val = parseFloat(els.timerAdjustCustom?.value) || 0;
+      applyAdjust(-Math.abs(val));
+    });
+    els.timerAdjustPos?.addEventListener("click", () => {
+      const val = parseFloat(els.timerAdjustCustom?.value) || 0;
+      applyAdjust(Math.abs(val));
+    });
+    els.timerAdjustApply?.addEventListener("click", () => {
+      const val = parseFloat(els.timerAdjustCustom?.value) || 0;
+      applyAdjust(val);
     });
     els.timerAdjustCustom?.addEventListener("keydown", (e) => {
       if (e.key === "Enter") {

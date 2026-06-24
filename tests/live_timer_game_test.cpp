@@ -363,18 +363,6 @@ void test_reset_restarts_timer() {
     std::cout << "PASS: reset_restarts_timer\n";
 }
 
-void test_default_config_background_color() {
-    LiveTimerGame game;
-    auto config = game.default_config();
-    assert(config.get_string("background_color", "") == "#000000");
-
-    config.set("background_color", std::string("#ff0000"));
-    game.apply_config(config);
-    assert(game.state().background_color == "#ff0000");
-
-    std::cout << "PASS: default_config_background_color\n";
-}
-
 void test_factory_creates() {
     LiveTimerGameFactory factory;
     auto created_game = factory.create();
@@ -487,7 +475,6 @@ int main() {
     test_event_blocked_when_paused();
     test_event_blocked_when_disabled();
     test_reset_restarts_timer();
-    test_default_config_background_color();
     test_factory_creates();
     test_stop();
     test_max_time_s_limits_addition();

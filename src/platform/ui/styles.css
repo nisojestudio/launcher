@@ -2669,9 +2669,12 @@ body::-webkit-scrollbar-corner,
   margin-right: 4px;
 }
 
-.timer-adjust-btn {
-  font-size: 12px !important;
-  padding: 4px 10px !important;
+.timer-adjust-sign {
+  font-size: 16px !important;
+  font-weight: 700;
+  width: 32px;
+  padding: 4px 0 !important;
+  text-align: center;
 }
 
 .timer-adjust-custom {
@@ -2683,11 +2686,40 @@ body::-webkit-scrollbar-corner,
   color: var(--text);
   font-size: 13px;
   text-align: center;
+  -moz-appearance: textfield;
+}
+.timer-adjust-custom::-webkit-outer-spin-button,
+.timer-adjust-custom::-webkit-inner-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
 }
 
 .timer-adjust-apply {
   font-size: 12px !important;
   padding: 4px 12px !important;
+}
+
+.timer-color-picker {
+  width: 48px !important;
+  height: 30px;
+  padding: 2px !important;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--bg);
+  cursor: pointer;
+}
+
+select.timer-input,
+.timer-select {
+  width: 140px;
+  padding: 4px 8px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--bg);
+  color: var(--text);
+  font-family: var(--font-mono);
+  font-size: 12px;
+  cursor: pointer;
 }
 
 .timer-config-details {
@@ -2714,5 +2746,7 @@ body::-webkit-scrollbar-corner,
 }
 
 .timer-config-details .timer-controls {
+  max-height: 380px;
+  overflow-y: auto;
   padding: 10px 12px;
 }

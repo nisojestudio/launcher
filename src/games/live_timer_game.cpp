@@ -52,7 +52,6 @@ constexpr std::string_view kSoundPath = "on_complete_sound_path";
 constexpr std::string_view kSoundRepeat = "on_complete_repeat";
 constexpr std::string_view kSoundVolume = "on_complete_volume";
 constexpr std::string_view kVideoUrl = "on_complete_video_url";
-constexpr std::string_view kBackgroundColor = "background_color";
 constexpr std::string_view kMaxTimeS = "max_time_s";
 
 constexpr double kMaxRecentEventsAgeS = 4.0;
@@ -182,7 +181,6 @@ gamesdk::GameConfig LiveTimerGame::default_config() const {
     config.set(std::string(kSoundRepeat), false);
     config.set(std::string(kSoundVolume), 1.0);
     config.set(std::string(kVideoUrl), std::string(""));
-    config.set(std::string(kBackgroundColor), std::string("#000000"));
     config.set(std::string(kMaxTimeS), 0.0);
 
     return config;
@@ -244,7 +242,6 @@ void LiveTimerGame::apply_config(const gamesdk::GameConfig& config) {
     apply_bool(kSoundRepeat);
     apply_double(kSoundVolume);
     apply_string(kVideoUrl);
-    apply_string(kBackgroundColor);
 
     config_ = std::move(effective);
 
@@ -266,7 +263,6 @@ void LiveTimerGame::apply_config(const gamesdk::GameConfig& config) {
     state_.on_complete_repeat = config_.get_bool(kSoundRepeat, false);
     state_.on_complete_volume = config_.get_double(kSoundVolume, 1.0);
     state_.on_complete_video_url = config_.get_string(kVideoUrl, "");
-    state_.background_color = config_.get_string(kBackgroundColor, "#000000");
 
     apply_visual_style(config_, state_.title_style,
         kTitleFontSize, kTitleFontColor, kTitleFontFamily, kTitleBold,

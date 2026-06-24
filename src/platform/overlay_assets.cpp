@@ -30,7 +30,7 @@ std::string build_live_timer_state_json(const games::LiveTimerGame* game) {
             "\"titleStyle\":{},"
             "\"counterStyle\":{},"
             "\"subtitleStyle\":{},"
-            "\"bgColor\":\"#000000\","
+            "\"bgColor\":\"transparent\","
             "\"recentEvents\":[]"
             "}";
     }
@@ -96,7 +96,7 @@ std::string build_live_timer_state_json(const games::LiveTimerGame* game) {
         << "\"titleStyle\":" << style_json(s.title_style) << ","
         << "\"counterStyle\":" << style_json(s.counter_style) << ","
         << "\"subtitleStyle\":" << style_json(s.subtitle_style) << ","
-        << "\"bgColor\":" << json_quote(s.background_color) << ","
+        << "\"bgColor\":\"transparent\","
         << "\"recentEvents\":" << events_json.str()
         << "}";
     return oss.str();

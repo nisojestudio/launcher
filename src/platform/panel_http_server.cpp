@@ -852,7 +852,6 @@ std::string build_live_timer_config_json(const nlp3::games::LiveTimerGame* game)
     add("on_complete_sound_path"); out << ",";
     add("on_complete_repeat"); out << ",";
     add("on_complete_volume"); out << ",";
-    add("background_color"); out << ",";
     add("on_complete_video_url"); out << ",";
     add("title_font_size"); out << ",";
     add("title_font_color"); out << ",";
@@ -920,8 +919,6 @@ std::string handle_timer_configure(PanelApp* app, std::string_view body) {
     if (maybe_str.has_value()) config.set("subtitle_text", *maybe_str);
     maybe_str = parse_json_string(body, "on_complete_sound_path");
     if (maybe_str.has_value()) config.set("on_complete_sound_path", *maybe_str);
-    maybe_str = parse_json_string(body, "background_color");
-    if (maybe_str.has_value()) config.set("background_color", *maybe_str);
     maybe_str = parse_json_string(body, "on_complete_video_url");
     if (maybe_str.has_value()) config.set("on_complete_video_url", *maybe_str);
     maybe_str = parse_json_string(body, "title_font_color");

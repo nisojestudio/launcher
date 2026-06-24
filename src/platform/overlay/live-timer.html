@@ -164,10 +164,6 @@ function updateOverlay() {
         styles.subtitle = data.subtitleStyle;
       }
 
-      if (data.bgColor) {
-        document.body.style.backgroundColor = data.bgColor;
-      }
-
       if (data.enabled === false) {
         counterEl.textContent = '--:--:--';
         counterEl.className = '';

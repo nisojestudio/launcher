@@ -60,8 +60,6 @@ struct LiveTimerGameState {
     double on_complete_volume = 1.0;
     std::string on_complete_video_url;
 
-    std::string background_color = "#000000";
-
     std::vector<LiveTimerRecentEvent> recent_events;
 };
 

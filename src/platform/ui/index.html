@@ -179,13 +179,10 @@
 
           <div class="timer-adjust-row">
             <span class="timer-adjust-label">Ajuste manual:</span>
-            <button class="secondary-button timer-adjust-btn" data-delta="30" type="button" title="Agregar 30s">+30s</button>
-            <button class="secondary-button timer-adjust-btn" data-delta="60" type="button" title="Agregar 60s">+60s</button>
-            <button class="secondary-button timer-adjust-btn" data-delta="300" type="button" title="Agregar 5min">+5min</button>
-            <input class="timer-input timer-adjust-custom" id="timer-adjust-custom" type="number" step="1" value="30" min="-3600" max="3600" title="Segundos a sumar/restar">
+            <button class="secondary-button timer-adjust-sign" id="timer-adjust-neg" type="button" title="Restar tiempo">&minus;</button>
+            <input class="timer-input timer-adjust-custom" id="timer-adjust-custom" type="number" step="1" value="30" min="1" max="3600" title="Cantidad de tiempo">
+            <button class="secondary-button timer-adjust-sign" id="timer-adjust-pos" type="button" title="Sumar tiempo">+</button>
             <button class="primary-button timer-adjust-apply" id="timer-adjust-apply" type="button" title="Aplicar ajuste">Aplicar</button>
-            <button class="secondary-button timer-adjust-btn" data-delta="-30" type="button" title="Restar 30s">-30s</button>
-            <button class="secondary-button timer-adjust-btn" data-delta="-60" type="button" title="Restar 60s">-60s</button>
           </div>
 
           <details class="timer-config-details">
@@ -234,10 +231,6 @@
                     <span>Subt&iacute;tulo</span>
                     <input class="timer-input" id="timer-subtitle-text" type="text" value="📌 Cada coin suma {time_per_gift_coin}s">
                   </label>
-                  <label class="timer-field">
-                    <span>Color de fondo</span>
-                    <input class="timer-input" id="timer-bg-color" type="text" value="#000000" placeholder="#000000">
-                  </label>
                 </div>
 
                 <div class="timer-config-section">
@@ -248,11 +241,22 @@
                   </label>
                   <label class="timer-field">
                     <span>T&iacute;tulo: color</span>
-                    <input class="timer-input" id="timer-title-font-color" type="text" value="#FFFFFF">
+                    <input class="timer-input timer-color-picker" id="timer-title-font-color" type="color" value="#FFFFFF">
                   </label>
                   <label class="timer-field">
                     <span>T&iacute;tulo: fuente</span>
-                    <input class="timer-input" id="timer-title-font-family" type="text" value="Segoe UI, sans-serif">
+                    <select class="timer-input timer-select" id="timer-title-font-family">
+                      <option value="Segoe UI, sans-serif">Segoe UI</option>
+                      <option value="Arial, sans-serif">Arial</option>
+                      <option value="Helvetica, sans-serif">Helvetica</option>
+                      <option value="Verdana, sans-serif">Verdana</option>
+                      <option value="&quot;Trebuchet MS&quot;, sans-serif">Trebuchet MS</option>
+                      <option value="&quot;Courier New&quot;, monospace">Courier New</option>
+                      <option value="Consolas, monospace">Consolas</option>
+                      <option value="Georgia, serif">Georgia</option>
+                      <option value="Impact, sans-serif">Impact</option>
+                      <option value="&quot;Times New Roman&quot;, serif">Times New Roman</option>
+                    </select>
                   </label>
                   <label class="timer-field">
                     <span class="option-chip">
@@ -266,11 +270,22 @@
                   </label>
                   <label class="timer-field">
                     <span>Contador: color</span>
-                    <input class="timer-input" id="timer-counter-font-color" type="text" value="#00FF88">
+                    <input class="timer-input timer-color-picker" id="timer-counter-font-color" type="color" value="#00FF88">
                   </label>
                   <label class="timer-field">
                     <span>Contador: fuente</span>
-                    <input class="timer-input" id="timer-counter-font-family" type="text" value="Segoe UI, monospace">
+                    <select class="timer-input timer-select" id="timer-counter-font-family">
+                      <option value="Segoe UI, sans-serif">Segoe UI</option>
+                      <option value="Arial, sans-serif">Arial</option>
+                      <option value="Helvetica, sans-serif">Helvetica</option>
+                      <option value="Verdana, sans-serif">Verdana</option>
+                      <option value="&quot;Trebuchet MS&quot;, sans-serif">Trebuchet MS</option>
+                      <option value="&quot;Courier New&quot;, monospace">Courier New</option>
+                      <option value="Consolas, monospace">Consolas</option>
+                      <option value="Georgia, serif">Georgia</option>
+                      <option value="Impact, sans-serif">Impact</option>
+                      <option value="&quot;Times New Roman&quot;, serif">Times New Roman</option>
+                    </select>
                   </label>
                   <label class="timer-field">
                     <span class="option-chip">
@@ -284,11 +299,22 @@
                   </label>
                   <label class="timer-field">
                     <span>Subt&iacute;tulo: color</span>
-                    <input class="timer-input" id="timer-subtitle-font-color" type="text" value="#AAAAAA">
+                    <input class="timer-input timer-color-picker" id="timer-subtitle-font-color" type="color" value="#AAAAAA">
                   </label>
                   <label class="timer-field">
                     <span>Subt&iacute;tulo: fuente</span>
-                    <input class="timer-input" id="timer-subtitle-font-family" type="text" value="Segoe UI, sans-serif">
+                    <select class="timer-input timer-select" id="timer-subtitle-font-family">
+                      <option value="Segoe UI, sans-serif" selected>Segoe UI</option>
+                      <option value="Arial, sans-serif">Arial</option>
+                      <option value="Helvetica, sans-serif">Helvetica</option>
+                      <option value="Verdana, sans-serif">Verdana</option>
+                      <option value="&quot;Trebuchet MS&quot;, sans-serif">Trebuchet MS</option>
+                      <option value="&quot;Courier New&quot;, monospace">Courier New</option>
+                      <option value="Consolas, monospace">Consolas</option>
+                      <option value="Georgia, serif">Georgia</option>
+                      <option value="Impact, sans-serif">Impact</option>
+                      <option value="&quot;Times New Roman&quot;, serif">Times New Roman</option>
+                    </select>
                   </label>
                   <label class="timer-field">
                     <span class="option-chip">
