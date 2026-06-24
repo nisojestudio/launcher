@@ -19,6 +19,7 @@ El agente debe ayudar a:
 - Escribir primero contratos de interfaz cuando una capa nueva aparezca.
 - Mantener trazabilidad de decisiones.
 - No confundir hipótesis con validación real.
+- No re-configurar lo que ya está configurado — verificar builds existentes antes de ejecutar cmake o vcpkg.
 
 ## 4. Libertad operativa
 En esta fase inicial **no existen restricciones especiales sobre cambios visuales** salvo que:
@@ -52,6 +53,20 @@ El agente debe asumir que el sistema final puede incluir:
 - bridge Python o Node
 - integración WebSocket / eventos live
 - salida WebAssembly futura
+
+### 5.5 Build sin reinstalación
+Antes de ejecutar `cmake --preset`, `cmake -B`, `vcpkg install`, o cualquier comando
+que re-configure el toolchain, el agente debe:
+
+a) Verificar si existe un build previsto en `build/release-0.1.1/` (u otro
+   directorio de build válido) con `build.ninja` y `CMakeCache.txt`.
+b) Si existe, usar `ninja -C <build_dir>` directamente — jamás re-ejecutar
+   cmake configure ni vcpkg bootstrap.
+c) Si no existe build o hay error de compilación, consultar primero `README.md`
+   y `docs/WORKING_CONTRACT.md` para las instrucciones exactas de build antes
+   de probar comandos alternativos.
+d) Esta regla tiene prioridad sobre cualquier impulso de "fresh config" o
+   "preset por defecto".
 
 ## 6. Organización técnica deseada
 - `src/core` → reglas y simulación

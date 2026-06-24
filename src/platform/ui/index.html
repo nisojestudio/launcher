@@ -177,6 +177,17 @@
             </label>
           </div>
 
+          <div class="timer-adjust-row">
+            <span class="timer-adjust-label">Ajuste manual:</span>
+            <button class="secondary-button timer-adjust-btn" data-delta="30" type="button" title="Agregar 30s">+30s</button>
+            <button class="secondary-button timer-adjust-btn" data-delta="60" type="button" title="Agregar 60s">+60s</button>
+            <button class="secondary-button timer-adjust-btn" data-delta="300" type="button" title="Agregar 5min">+5min</button>
+            <input class="timer-input timer-adjust-custom" id="timer-adjust-custom" type="number" step="1" value="30" min="-3600" max="3600" title="Segundos a sumar/restar">
+            <button class="primary-button timer-adjust-apply" id="timer-adjust-apply" type="button" title="Aplicar ajuste">Aplicar</button>
+            <button class="secondary-button timer-adjust-btn" data-delta="-30" type="button" title="Restar 30s">-30s</button>
+            <button class="secondary-button timer-adjust-btn" data-delta="-60" type="button" title="Restar 60s">-60s</button>
+          </div>
+
           <details class="timer-config-details">
             <summary class="timer-config-summary">Configuraci&oacute;n</summary>
             <div class="timer-controls">
@@ -185,7 +196,11 @@
                   <h3 class="timer-config-title">Tiempos por evento</h3>
                   <label class="timer-field">
                     <span>Tiempo inicial (s)</span>
-                    <input class="timer-input" id="timer-initial-time" type="number" step="0.0001" min="0" value="300">
+                    <input class="timer-input" id="timer-initial-time" type="number" step="0.0001" min="1" max="86400" value="300">
+                  </label>
+                  <label class="timer-field">
+                    <span>Tiempo m&aacute;ximo (s)</span>
+                    <input class="timer-input" id="timer-max-time" type="number" step="1" min="0" max="86400" value="0" title="0 = sin l&iacute;mite">
                   </label>
                   <label class="timer-field">
                     <span>Por like (s)</span>
@@ -218,6 +233,68 @@
                   <label class="timer-field">
                     <span>Subt&iacute;tulo</span>
                     <input class="timer-input" id="timer-subtitle-text" type="text" value="📌 Cada coin suma {time_per_gift_coin}s">
+                  </label>
+                  <label class="timer-field">
+                    <span>Color de fondo</span>
+                    <input class="timer-input" id="timer-bg-color" type="text" value="#000000" placeholder="#000000">
+                  </label>
+                </div>
+
+                <div class="timer-config-section">
+                  <h3 class="timer-config-title">Estilo visual</h3>
+                  <label class="timer-field">
+                    <span>T&iacute;tulo: tama&ntilde;o</span>
+                    <input class="timer-input" id="timer-title-font-size" type="number" min="8" max="200" value="48">
+                  </label>
+                  <label class="timer-field">
+                    <span>T&iacute;tulo: color</span>
+                    <input class="timer-input" id="timer-title-font-color" type="text" value="#FFFFFF">
+                  </label>
+                  <label class="timer-field">
+                    <span>T&iacute;tulo: fuente</span>
+                    <input class="timer-input" id="timer-title-font-family" type="text" value="Segoe UI, sans-serif">
+                  </label>
+                  <label class="timer-field">
+                    <span class="option-chip">
+                      <input id="timer-title-bold" type="checkbox" checked>
+                      <span>T&iacute;tulo: negrita</span>
+                    </span>
+                  </label>
+                  <label class="timer-field">
+                    <span>Contador: tama&ntilde;o</span>
+                    <input class="timer-input" id="timer-counter-font-size" type="number" min="8" max="400" value="120">
+                  </label>
+                  <label class="timer-field">
+                    <span>Contador: color</span>
+                    <input class="timer-input" id="timer-counter-font-color" type="text" value="#00FF88">
+                  </label>
+                  <label class="timer-field">
+                    <span>Contador: fuente</span>
+                    <input class="timer-input" id="timer-counter-font-family" type="text" value="Segoe UI, monospace">
+                  </label>
+                  <label class="timer-field">
+                    <span class="option-chip">
+                      <input id="timer-counter-bold" type="checkbox" checked>
+                      <span>Contador: negrita</span>
+                    </span>
+                  </label>
+                  <label class="timer-field">
+                    <span>Subt&iacute;tulo: tama&ntilde;o</span>
+                    <input class="timer-input" id="timer-subtitle-font-size" type="number" min="8" max="200" value="32">
+                  </label>
+                  <label class="timer-field">
+                    <span>Subt&iacute;tulo: color</span>
+                    <input class="timer-input" id="timer-subtitle-font-color" type="text" value="#AAAAAA">
+                  </label>
+                  <label class="timer-field">
+                    <span>Subt&iacute;tulo: fuente</span>
+                    <input class="timer-input" id="timer-subtitle-font-family" type="text" value="Segoe UI, sans-serif">
+                  </label>
+                  <label class="timer-field">
+                    <span class="option-chip">
+                      <input id="timer-subtitle-bold" type="checkbox">
+                      <span>Subt&iacute;tulo: negrita</span>
+                    </span>
                   </label>
                 </div>
 

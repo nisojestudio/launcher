@@ -64,30 +64,7 @@ std::string build_live_timer_state_json(const games::LiveTimerGame* game) {
     };
 
     auto substitute_placeholders = [&](std::string_view tmpl) -> std::string {
-        std::string r(tmpl);
-        auto rep_num = [&](std::string_view ph, double val) {
-            std::string vs = std::to_string(val);
-            auto p = r.find(ph);
-            while (p != std::string::npos) {
-                r.replace(p, ph.size(), vs);
-                p = r.find(ph, p + vs.size());
-            }
-        };
-        auto rep_str = [&](std::string_view ph, const std::string& val) {
-            auto p = r.find(ph);
-            while (p != std::string::npos) {
-                r.replace(p, ph.size(), val);
-                p = r.find(ph, p + val.size());
-            }
-        };
-        rep_num("{time_per_like}", s.time_per_like);
-        rep_num("{time_per_share}", s.time_per_share);
-        rep_num("{time_per_follow}", s.time_per_follow);
-        rep_num("{time_per_gift_coin}", s.time_per_gift_coin);
-        rep_num("{time_per_chat}", s.time_per_chat);
-        rep_num("{initial_time}", s.initial_seconds);
-        rep_str("{title}", s.title_text);
-        return r;
+        return nlp3::games::substitute_timer_placeholders(tmpl, s);
     };
 
     std::ostringstream events_json;
@@ -97,6 +74,7 @@ std::string build_live_timer_state_json(const games::LiveTimerGame* game) {
         if (!first) events_json << ",";
         first = false;
         events_json << "{"
+            << "\"id\":" << ev.id << ","
             << "\"icon\":" << json_quote(ev.icon) << ","
             << "\"label\":" << json_quote(ev.label) << ","
             << "\"delta\":" << ev.delta_seconds << ","

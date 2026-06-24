@@ -386,6 +386,86 @@ void test_factory_creates() {
     std::cout << "PASS: factory creates\n";
 }
 
+void test_stop() {
+    LiveTimerGame game;
+    game.on_activated();
+    assert(game.is_running());
+
+    game.stop();
+    assert(!game.is_running());
+    assert(!game.state().paused);
+    assert(game.state().completed);
+    assert(game.remaining_seconds() == 0.0);
+
+    std::cout << "PASS: stop\n";
+}
+
+void test_max_time_s_limits_addition() {
+    LiveTimerGame game;
+    auto config = game.default_config();
+    config.set("initial_time_s", 10.0);
+    config.set("max_time_s", 15.0);
+    game.apply_config(config);
+    game.on_activated();
+
+    game.on_game_input_event(make_test_event(GameInputEventKind::like), kEmptySnapshot);
+    game.on_game_input_event(make_test_event(GameInputEventKind::follow), kEmptySnapshot);
+
+    auto rem = game.remaining_seconds();
+    assert(rem <= 15.1);
+
+    std::cout << "PASS: max_time_s limits addition\n";
+}
+
+void test_substitute_placeholders_shared() {
+    nlp3::games::LiveTimerGameState state;
+    state.time_per_like = 2.5;
+    state.time_per_share = 5.0;
+    state.time_per_gift_coin = 0.5;
+    state.initial_seconds = 300.0;
+    state.title_text = "Test Title";
+
+    auto result = nlp3::games::substitute_timer_placeholders(
+        "{title}: {time_per_like}s per like", state);
+    assert(result == "Test Title: 2.500000s per like");
+
+    result = nlp3::games::substitute_timer_placeholders(
+        "{initial_time}s initial", state);
+    assert(result == "300.000000s initial");
+
+    std::cout << "PASS: substitute_placeholders_shared\n";
+}
+
+void test_reset_config_to_defaults() {
+    LiveTimerGame game;
+    auto config = game.default_config();
+    config.set("initial_time_s", 999.0);
+    game.apply_config(config);
+    assert(game.config().get_double("initial_time_s", 0) == 999.0);
+
+    game.reset_config_to_defaults();
+    assert(game.config().get_double("initial_time_s", 0) == 300.0);
+
+    std::cout << "PASS: reset_config_to_defaults\n";
+}
+
+void test_remaining_seconds_auto_completed() {
+    LiveTimerGame game;
+    auto config = game.default_config();
+    config.set("initial_time_s", 0.01);
+    game.apply_config(config);
+    game.on_activated();
+
+    std::this_thread::sleep_for(std::chrono::milliseconds(50));
+
+    auto rem = game.remaining_seconds();
+    assert(rem == 0.0);
+    assert(game.state().completed);
+    assert(!game.state().running);
+
+    std::cout << "PASS: remaining_seconds_auto_completed\n";
+}
+
 } // namespace
 
 int main() {
@@ -409,6 +489,11 @@ int main() {
     test_reset_restarts_timer();
     test_default_config_background_color();
     test_factory_creates();
+    test_stop();
+    test_max_time_s_limits_addition();
+    test_substitute_placeholders_shared();
+    test_reset_config_to_defaults();
+    test_remaining_seconds_auto_completed();
 
     std::cout << "\nAll tests passed!\n";
     return 0;

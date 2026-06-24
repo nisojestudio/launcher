@@ -949,7 +949,7 @@ PanelSnapshot PanelApp::snapshot() const {
     if (live_timer_game_ != nullptr) {
         const auto& s = live_timer_game_->state();
         snapshot.timer.has_timer = true;
-        snapshot.timer.timer_id = "live-timer";
+        snapshot.timer.timer_id = std::string(games::kLiveTimerGameId);
         snapshot.timer.remaining_seconds = live_timer_game_->remaining_seconds();
         snapshot.timer.remaining_formatted = live_timer_game_->format_time();
         snapshot.timer.running = live_timer_game_->is_running();
@@ -958,7 +958,11 @@ PanelSnapshot PanelApp::snapshot() const {
         snapshot.timer.completed = s.completed;
         snapshot.timer.title = s.title_text;
         snapshot.timer.subtitle = s.subtitle_text;
-        snapshot.timer.overlay_url = "http://" + config_.overlay_host + ":" + std::to_string(http_ui_server_ != nullptr ? http_ui_server_->status().port : 18913) + "/overlay/live-timer";
+        {
+            auto host = config_.overlay_host.empty() ? "localhost" : config_.overlay_host;
+            auto port = http_ui_server_ != nullptr ? http_ui_server_->status().port : 18913;
+            snapshot.timer.overlay_url = "http://" + host + ":" + std::to_string(port) + "/overlay/live-timer";
+        }
     }
 
     return snapshot;

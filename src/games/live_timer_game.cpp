@@ -53,6 +53,7 @@ constexpr std::string_view kSoundRepeat = "on_complete_repeat";
 constexpr std::string_view kSoundVolume = "on_complete_volume";
 constexpr std::string_view kVideoUrl = "on_complete_video_url";
 constexpr std::string_view kBackgroundColor = "background_color";
+constexpr std::string_view kMaxTimeS = "max_time_s";
 
 constexpr double kMaxRecentEventsAgeS = 4.0;
 constexpr std::size_t kMaxRecentEvents = 6;
@@ -69,7 +70,11 @@ std::string resolve_actor_name(const gamesdk::GameInputActor& actor) {
     return "unknown";
 }
 
-std::string substitute_placeholders(std::string_view template_str, const LiveTimerGameState& state) {
+} // namespace
+
+std::string substitute_timer_placeholders(
+    std::string_view template_str,
+    const LiveTimerGameState& state) {
     std::string result(template_str);
 
     auto replace_num = [&](std::string_view placeholder, double value) {
@@ -98,6 +103,8 @@ std::string substitute_placeholders(std::string_view template_str, const LiveTim
 
     return result;
 }
+
+namespace {
 
 void apply_visual_style(const gamesdk::GameConfig& config, LiveTimerVisualStyle& style,
                          std::string_view size_key, std::string_view color_key,
@@ -129,12 +136,12 @@ LiveTimerGame::LiveTimerGame() {
 }
 
 std::string_view LiveTimerGame::game_id() const noexcept {
-    return "live-timer";
+    return kLiveTimerGameId;
 }
 
 gamesdk::GameManifest LiveTimerGame::manifest() const {
     return gamesdk::GameManifest{
-        "live-timer",
+        std::string(kLiveTimerGameId),
         "Live Timer",
         "0.1.0",
         {},
@@ -176,6 +183,7 @@ gamesdk::GameConfig LiveTimerGame::default_config() const {
     config.set(std::string(kSoundVolume), 1.0);
     config.set(std::string(kVideoUrl), std::string(""));
     config.set(std::string(kBackgroundColor), std::string("#000000"));
+    config.set(std::string(kMaxTimeS), 0.0);
 
     return config;
 }
@@ -212,6 +220,7 @@ void LiveTimerGame::apply_config(const gamesdk::GameConfig& config) {
     apply_double(kTimePerFollowS);
     apply_double(kTimePerGiftCoinS);
     apply_double(kTimePerChatS);
+    apply_double(kMaxTimeS);
 
     apply_string(kTitleText);
     apply_string(kSubtitleText);
@@ -244,6 +253,7 @@ void LiveTimerGame::apply_config(const gamesdk::GameConfig& config) {
     state_.time_per_follow = config_.get_double(kTimePerFollowS, 10.0);
     state_.time_per_gift_coin = config_.get_double(kTimePerGiftCoinS, 0.5);
     state_.time_per_chat = config_.get_double(kTimePerChatS, 0.0);
+    state_.max_time_s = config_.get_double(kMaxTimeS, 0.0);
 
     double new_initial = config_.get_double(kInitialTimeS, 300.0);
     double diff = new_initial - old_initial;
@@ -286,20 +296,25 @@ void LiveTimerGame::on_host_event(
 }
 
 double LiveTimerGame::remaining_seconds() const noexcept {
-    if (!state_.running) {
+    if (!state_.running || state_.paused) {
         return state_.remaining_seconds;
     }
 
     auto elapsed = std::chrono::steady_clock::now() - start_time_;
     auto elapsed_s = std::chrono::duration<double>(elapsed).count();
     double current = state_.remaining_seconds - elapsed_s;
-    if (current < 0.0) current = 0.0;
+    if (current <= 0.0) {
+        current = 0.0;
+        const_cast<LiveTimerGame*>(this)->state_.running = false;
+        const_cast<LiveTimerGame*>(this)->state_.completed = true;
+        const_cast<LiveTimerGame*>(this)->state_.remaining_seconds = 0.0;
+    }
     return current;
 }
 
 std::string LiveTimerGame::format_time() const {
     auto rem = remaining_seconds();
-    auto total_seconds = static_cast<std::int64_t>(std::ceil(rem));
+    auto total_seconds = static_cast<std::int64_t>(std::floor(rem));
 
     if (total_seconds < 0) total_seconds = 0;
 
@@ -380,6 +395,8 @@ void LiveTimerGame::on_game_input_event(
         state_.remaining_seconds = 0.0;
         state_.running = false;
         state_.completed = true;
+    } else if (state_.max_time_s > 0.0 && state_.remaining_seconds > state_.max_time_s) {
+        state_.remaining_seconds = state_.max_time_s;
     }
 
     add_event_popup(icon, label, delta);
@@ -387,7 +404,9 @@ void LiveTimerGame::on_game_input_event(
 
 void LiveTimerGame::add_event_popup(std::string_view icon, std::string_view label, double delta) {
     prune_old_events();
+    auto id = ++event_id_counter_;
     state_.recent_events.push_back({
+        id,
         std::string(icon),
         std::string(label),
         delta,
@@ -412,15 +431,9 @@ void LiveTimerGame::prune_old_events() {
 }
 
 bool LiveTimerGame::poll_completion_sound() noexcept {
-    if (!enabled_ || !state_.running || state_.paused) return false;
-    if (completion_sound_triggered_) return false;
-    if (!state_.completed) {
-        auto rem = remaining_seconds();
-        if (rem <= 0.0) {
-            state_.running = false;
-            state_.completed = true;
-            state_.remaining_seconds = 0.0;
-        }
+    if (!enabled_ || completion_sound_triggered_) return false;
+    if (!state_.paused) {
+        remaining_seconds();
     }
     if (state_.completed && !completion_sound_triggered_) {
         completion_sound_triggered_ = true;
@@ -465,7 +478,6 @@ const gamesdk::GameConfig& LiveTimerGame::config() const noexcept {
 
 std::vector<gamesdk::GameTelemetryItem> LiveTimerGame::telemetry() const {
     auto rem = remaining_seconds();
-    auto total_s = static_cast<std::int64_t>(std::ceil(rem));
 
     return {
         {"remaining_seconds", "Tiempo restante", std::to_string(rem), "neutral"},
@@ -478,15 +490,15 @@ std::vector<gamesdk::GameTelemetryItem> LiveTimerGame::telemetry() const {
         {"total_time_added", "Tiempo agregado", std::to_string(total_time_added_), "neutral"},
         {"total_actions", "Eventos procesados", std::to_string(state_.recent_events.size()), "neutral"},
         {"title_text", "Titulo", state_.title_text, "neutral"},
-        {"subtitle_text", "Subtitulo", substitute_placeholders(state_.subtitle_text, state_), "neutral"},
+        {"subtitle_text", "Subtitulo", substitute_timer_placeholders(state_.subtitle_text, state_), "neutral"},
     };
 }
 
 void LiveTimerGame::pause() noexcept {
     if (!state_.running || state_.paused) return;
+    paused_remaining_seconds_ = remaining_seconds();
     state_.paused = true;
     state_.running = false;
-    paused_remaining_seconds_ = remaining_seconds();
 }
 
 void LiveTimerGame::resume() noexcept {
@@ -512,6 +524,25 @@ void LiveTimerGame::stop() noexcept {
     completion_sound_triggered_ = false;
 }
 
+void LiveTimerGame::adjust_time(double delta) noexcept {
+    if (!enabled_) return;
+    if (state_.completed) return;
+
+    state_.remaining_seconds += delta;
+    total_time_added_ += delta;
+    if (state_.remaining_seconds < 0.0) {
+        state_.remaining_seconds = 0.0;
+        if (state_.running) {
+            state_.running = false;
+            state_.completed = true;
+        }
+    } else if (state_.max_time_s > 0.0 && state_.remaining_seconds > state_.max_time_s) {
+        state_.remaining_seconds = state_.max_time_s;
+    }
+
+    add_event_popup("\xf0\x9f\x93\x9d", "manual", delta);
+}
+
 void LiveTimerGame::set_enabled(bool enabled) noexcept {
     enabled_ = enabled;
     if (!enabled) {
@@ -519,6 +550,10 @@ void LiveTimerGame::set_enabled(bool enabled) noexcept {
         state_.running = false;
         state_.completed = false;
         state_.paused = false;
+        state_.remaining_seconds = 0.0;
+        state_.recent_events.clear();
+        total_time_added_ = 0.0;
+        event_id_counter_ = 0;
     }
 }
 
@@ -528,6 +563,11 @@ bool LiveTimerGame::is_enabled() const noexcept {
 
 bool LiveTimerGame::is_running() const noexcept {
     return state_.running;
+}
+
+void LiveTimerGame::reset_config_to_defaults() noexcept {
+    config_ = default_config();
+    apply_config(config_);
 }
 
 const gamesdk::GameManifest& LiveTimerGameFactory::manifest() const noexcept {

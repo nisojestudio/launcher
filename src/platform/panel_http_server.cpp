@@ -11,6 +11,8 @@
 #include <utility>
 #include <vector>
 
+
+
 #ifdef _WIN32
 #ifndef NOMINMAX
 #define NOMINMAX
@@ -839,6 +841,7 @@ std::string build_live_timer_config_json(const nlp3::games::LiveTimerGame* game)
         }
     };
     add("initial_time_s"); out << ",";
+    add("max_time_s"); out << ",";
     add("time_per_like_s"); out << ",";
     add("time_per_share_s"); out << ",";
     add("time_per_follow_s"); out << ",";
@@ -895,19 +898,21 @@ std::string handle_timer_configure(PanelApp* app, std::string_view body) {
     if (maybe_bool.has_value()) config.set("on_complete_repeat", *maybe_bool);
 
     auto maybe_d = parse_json_double(body, "initial_time_s");
-    if (maybe_d.has_value()) config.set("initial_time_s", *maybe_d);
+    if (maybe_d.has_value()) config.set("initial_time_s", std::clamp(*maybe_d, 1.0, 86400.0));
+    maybe_d = parse_json_double(body, "max_time_s");
+    if (maybe_d.has_value()) config.set("max_time_s", std::clamp(*maybe_d, 0.0, 86400.0));
     maybe_d = parse_json_double(body, "time_per_like_s");
-    if (maybe_d.has_value()) config.set("time_per_like_s", *maybe_d);
+    if (maybe_d.has_value()) config.set("time_per_like_s", std::clamp(*maybe_d, -3600.0, 3600.0));
     maybe_d = parse_json_double(body, "time_per_share_s");
-    if (maybe_d.has_value()) config.set("time_per_share_s", *maybe_d);
+    if (maybe_d.has_value()) config.set("time_per_share_s", std::clamp(*maybe_d, -3600.0, 3600.0));
     maybe_d = parse_json_double(body, "time_per_follow_s");
-    if (maybe_d.has_value()) config.set("time_per_follow_s", *maybe_d);
+    if (maybe_d.has_value()) config.set("time_per_follow_s", std::clamp(*maybe_d, -3600.0, 3600.0));
     maybe_d = parse_json_double(body, "time_per_gift_coin_s");
-    if (maybe_d.has_value()) config.set("time_per_gift_coin_s", *maybe_d);
+    if (maybe_d.has_value()) config.set("time_per_gift_coin_s", std::clamp(*maybe_d, -3600.0, 3600.0));
     maybe_d = parse_json_double(body, "time_per_chat_s");
-    if (maybe_d.has_value()) config.set("time_per_chat_s", *maybe_d);
+    if (maybe_d.has_value()) config.set("time_per_chat_s", std::clamp(*maybe_d, -3600.0, 3600.0));
     maybe_d = parse_json_double(body, "on_complete_volume");
-    if (maybe_d.has_value()) config.set("on_complete_volume", *maybe_d);
+    if (maybe_d.has_value()) config.set("on_complete_volume", std::clamp(*maybe_d, 0.0, 2.0));
 
     auto maybe_str = parse_json_string(body, "title_text");
     if (maybe_str.has_value()) config.set("title_text", *maybe_str);
@@ -933,11 +938,11 @@ std::string handle_timer_configure(PanelApp* app, std::string_view body) {
     if (maybe_str.has_value()) config.set("subtitle_font_family", *maybe_str);
 
     auto maybe_i64 = parse_json_uint64(body, "title_font_size");
-    if (maybe_i64.has_value()) config.set("title_font_size", static_cast<std::int64_t>(*maybe_i64));
+    if (maybe_i64.has_value()) config.set("title_font_size", static_cast<std::int64_t>(std::clamp<uint64_t>(*maybe_i64, 8, 200)));
     maybe_i64 = parse_json_uint64(body, "counter_font_size");
-    if (maybe_i64.has_value()) config.set("counter_font_size", static_cast<std::int64_t>(*maybe_i64));
+    if (maybe_i64.has_value()) config.set("counter_font_size", static_cast<std::int64_t>(std::clamp<uint64_t>(*maybe_i64, 8, 400)));
     maybe_i64 = parse_json_uint64(body, "subtitle_font_size");
-    if (maybe_i64.has_value()) config.set("subtitle_font_size", static_cast<std::int64_t>(*maybe_i64));
+    if (maybe_i64.has_value()) config.set("subtitle_font_size", static_cast<std::int64_t>(std::clamp<uint64_t>(*maybe_i64, 8, 200)));
 
     maybe_bool = parse_json_bool(body, "title_bold");
     if (maybe_bool.has_value()) config.set("title_bold", *maybe_bool);
@@ -1309,6 +1314,23 @@ std::string build_route_response(
         auto* timer = app->live_timer();
         if (timer != nullptr) { timer->stop(); }
         return make_http_response("200 OK", "application/json; charset=utf-8", make_simple_result(timer != nullptr, timer ? "stopped" : "unavailable"));
+    }
+    if (request.method == "POST" && request.path == "/api/timer/adjust") {
+        auto* timer = app->live_timer();
+        if (timer == nullptr) {
+            return make_http_response("200 OK", "application/json; charset=utf-8", make_simple_result(false, "unavailable"));
+        }
+        auto delta = parse_json_double(request.body, "delta").value_or(0.0);
+        if (delta == 0.0) {
+            return make_http_response("200 OK", "application/json; charset=utf-8", make_simple_result(false, "delta_zero"));
+        }
+        timer->adjust_time(delta);
+        return make_http_response("200 OK", "application/json; charset=utf-8", make_simple_result(true, "adjusted"));
+    }
+    if (request.method == "POST" && request.path == "/api/timer/reset-config") {
+        auto* timer = app->live_timer();
+        if (timer != nullptr) { timer->reset_config_to_defaults(); }
+        return make_http_response("200 OK", "application/json; charset=utf-8", make_simple_result(timer != nullptr, timer ? "config_reset" : "unavailable"));
     }
     if (request.method == "POST" && request.path == "/api/timer/toggle") {
         auto* timer = app->live_timer();

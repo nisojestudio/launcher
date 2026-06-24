@@ -11,6 +11,12 @@
 
 namespace nlp3::games {
 
+constexpr std::string_view kLiveTimerGameId = "live-timer";
+
+std::string substitute_timer_placeholders(
+    std::string_view template_str,
+    const struct LiveTimerGameState& state);
+
 struct LiveTimerVisualStyle {
     int font_size_px = 120;
     std::string font_color = "#00FF88";
@@ -19,6 +25,7 @@ struct LiveTimerVisualStyle {
 };
 
 struct LiveTimerRecentEvent {
+    int64_t id = 0;
     std::string icon;
     std::string label;
     double delta_seconds = 0.0;
@@ -32,6 +39,8 @@ struct LiveTimerGameState {
     bool running = false;
     bool completed = false;
     bool paused = false;
+
+    double max_time_s = 0.0;
 
     double time_per_like = 2.0;
     double time_per_share = 5.0;
@@ -85,9 +94,11 @@ public:
     void reset() noexcept;
     void stop() noexcept;
 
+    void adjust_time(double delta) noexcept;
     void set_enabled(bool enabled) noexcept;
     bool is_enabled() const noexcept;
     bool is_running() const noexcept;
+    void reset_config_to_defaults() noexcept;
 
 private:
     void add_event_popup(std::string_view icon, std::string_view label, double delta);
@@ -100,6 +111,7 @@ private:
     std::chrono::steady_clock::time_point start_time_;
     double paused_remaining_seconds_ = 0.0;
     double total_time_added_ = 0.0;
+    int64_t event_id_counter_ = 0;
     bool completion_sound_triggered_ = false;
     bool enabled_ = true;
 };
@@ -111,7 +123,7 @@ public:
 
 private:
     gamesdk::GameManifest manifest_{
-        "live-timer",
+        std::string(nlp3::games::kLiveTimerGameId),
         "Live Timer",
         "0.1.0",
         {},

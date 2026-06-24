@@ -4,6 +4,62 @@ All notable Panel Live changes should be recorded here.
 
 Format follows a lightweight Keep a Changelog style. Versions use SemVer.
 
+## 0.2.0 - 2026-06-23
+
+### Added
+
+- **Live Timer: max_time_s**: New config field caps the total accumulated time.
+  When set > 0, any addition that would exceed the cap is clamped.
+- **Live Timer: manual time adjust**: `POST /api/timer/adjust` endpoint with
+  delta support. UI includes quick buttons (+30s/+60s/+5min/-30s/-60s) and
+  a custom input field. Negative deltas supported.
+- **Live Timer: reset config to defaults**: `POST /api/timer/reset-config`
+  restores all timer settings to factory defaults.
+- **Live Timer: visual style fields in UI**: Font size, color, family, and
+  bold for title, counter, and subtitle are now editable in the config form
+  and sent to `POST /api/timer/configure`.
+- **Live Timer: background color**: `background_color` now configurable via
+  UI and accepted by the configure endpoint.
+- **Live Timer: overlay connection error banner**: Red banner appears when
+  the overlay loses connection to the panel.
+- **Live Timer: event dedup in overlay**: Events carry a monotonic `id`;
+  overlay skips already-shown popups on reconnect.
+- **Live Timer: confirm on restart**: If the timer is running and the user
+  clicks Start, a confirmation dialog prevents accidental reset.
+- **AGENTS.md Section 5.5**: Build without re-installation rule — agent must
+  check existing build before re-running cmake/vcpkg.
+
+### Changed
+
+- **Live Timer: overlay_host default**: Changed from `"127.0.0.1"` to
+  `"localhost"` in `PanelConfig`, matching the documented behavior and
+  fixing overlay URL generation in the snapshot.
+- **Live Timer: substitute_placeholders extracted**: Now a shared non-anonymous
+  function `substitute_timer_placeholders()` in the `nlp3::games` namespace,
+  used by both the game code and overlay_assets.cpp (was duplicated).
+- **Live Timer: kLiveTimerGameId constant**: All hardcoded `"live-timer"`
+  strings replaced with the named constant.
+
+### Fixed
+
+- **Live Timer: remaining_seconds() now triggers completion**: When the
+  countdown reaches 0, `remaining_seconds()` automatically sets
+  `running=false, completed=true`. Previously `poll_completion_sound()` was
+  the only path to detect expiry, causing the overlay to show stale values.
+- **Live Timer: format_time() uses floor(), not ceil()**: Display was
+  rounding up (e.g. 1.1s → 2s shown). Now truncates correctly.
+- **Live Timer: pause() captures remaining before pausing**: The paused
+  snapshot was stale because `remaining_seconds()` was called after setting
+  `paused=true` (which stopped the clock). Now called before the state change.
+- **Live Timer: set_enabled() resets full state**: Previously only toggled
+  flags; now also resets `remaining_seconds`, clears `recent_events`, and
+  zeroes `total_time_added`.
+- **Live Timer: clamp all numeric config values**: timeouts, volumes, and
+  font sizes are now clamped to sane ranges on the server side.
+- **Live Timer: overlay style comparison**: Fixed object reference comparison
+  that never detected style changes after the first render. Now uses
+  `styleEqual()` deep comparison function.
+
 ## 0.1.10 - 2026-06-13
 
 ### Fixed

@@ -260,6 +260,8 @@
     timerValue: $("#timer-value"),
     timerState: $("#timer-state"),
     timerInitialTime: $("#timer-initial-time"),
+    timerMaxTime: $("#timer-max-time"),
+    timerBgColor: $("#timer-bg-color"),
     timerPerLike: $("#timer-per-like"),
     timerPerShare: $("#timer-per-share"),
     timerPerFollow: $("#timer-per-follow"),
@@ -280,6 +282,8 @@
     timerReset: $("#timer-reset"),
     timerStop: $("#timer-stop"),
     timerEnabled: $("#timer-enabled"),
+    timerAdjustCustom: $("#timer-adjust-custom"),
+    timerAdjustApply: $("#timer-adjust-apply"),
   };
 
   const SAMPLE_AVATAR_DATA_URL =
@@ -2061,6 +2065,7 @@
 
     if (!els.timerPanel) return;
 
+    timerWasRunning = !!(timer.running && !timer.paused && !timer.completed);
     setText(els.timerValue, timer.remainingFormatted || "00:00:00");
     if (!timer.enabled) {
       setText(els.timerState, "Desactivado");
@@ -2068,7 +2073,7 @@
     } else if (timer.running && timer.paused) {
       setText(els.timerState, "Pausado");
       els.timerValue.style.color = "var(--warn)";
-    } else if (timer.running) {
+    } else if (timer.running && !timer.completed) {
       setText(els.timerState, "En curso");
       els.timerValue.style.color = "";
     } else if (timer.completed) {
@@ -3053,6 +3058,8 @@
     els.timerApplyConfig?.addEventListener("click", async () => {
       const config = {
         initial_time_s: parseFloat(els.timerInitialTime?.value) || 300,
+        max_time_s: parseFloat(els.timerMaxTime?.value) || 0,
+        background_color: els.timerBgColor?.value || "#000000",
         time_per_like_s: parseFloat(els.timerPerLike?.value) || 2.0,
         time_per_share_s: parseFloat(els.timerPerShare?.value) || 5.0,
         time_per_follow_s: parseFloat(els.timerPerFollow?.value) || 10.0,
@@ -3063,6 +3070,18 @@
         on_complete_sound_path: els.timerSoundPath?.value || "",
         on_complete_repeat: !!els.timerSoundRepeat?.checked,
         on_complete_volume: parseFloat(els.timerSoundVolume?.value) || 1.0,
+        title_font_size: parseInt(els.timerTitleFontSize?.value, 10) || 48,
+        title_font_color: els.timerTitleFontColor?.value || "#FFFFFF",
+        title_font_family: els.timerTitleFontFamily?.value || "Segoe UI, sans-serif",
+        title_bold: !!els.timerTitleBold?.checked,
+        counter_font_size: parseInt(els.timerCounterFontSize?.value, 10) || 120,
+        counter_font_color: els.timerCounterFontColor?.value || "#00FF88",
+        counter_font_family: els.timerCounterFontFamily?.value || "Segoe UI, monospace",
+        counter_bold: !!els.timerCounterBold?.checked,
+        subtitle_font_size: parseInt(els.timerSubtitleFontSize?.value, 10) || 32,
+        subtitle_font_color: els.timerSubtitleFontColor?.value || "#AAAAAA",
+        subtitle_font_family: els.timerSubtitleFontFamily?.value || "Segoe UI, sans-serif",
+        subtitle_bold: !!els.timerSubtitleBold?.checked,
       };
       try {
         const result = await apiPostJson("/api/timer/configure", config);
@@ -3091,12 +3110,37 @@
     const timerAction = (path) => {
       apiPostJson(path, {}).catch(() => {});
     };
-    els.timerStart?.addEventListener("click", () => timerAction("/api/timer/start"));
+    let timerWasRunning = false;
+    els.timerStart?.addEventListener("click", () => {
+      if (timerWasRunning && !confirm("\u00bfReiniciar el timer? Se perder\u00e1 el progreso actual.")) return;
+      timerAction("/api/timer/start");
+    });
     els.timerPause?.addEventListener("click", () => timerAction("/api/timer/pause"));
     els.timerResume?.addEventListener("click", () => timerAction("/api/timer/resume"));
     els.timerReset?.addEventListener("click", () => timerAction("/api/timer/reset"));
     els.timerStop?.addEventListener("click", () => timerAction("/api/timer/stop"));
     els.timerEnabled?.addEventListener("change", () => timerAction("/api/timer/toggle"));
+
+    // --- Timer manual adjust ---
+    document.querySelectorAll(".timer-adjust-btn").forEach(btn => {
+      btn.addEventListener("click", () => {
+        const delta = parseFloat(btn.dataset.delta) || 0;
+        if (delta !== 0) {
+          apiPostJson("/api/timer/adjust", { delta }).catch(() => {});
+        }
+      });
+    });
+    els.timerAdjustApply?.addEventListener("click", () => {
+      const delta = parseFloat(els.timerAdjustCustom?.value) || 0;
+      if (delta !== 0) {
+        apiPostJson("/api/timer/adjust", { delta }).catch(() => {});
+      }
+    });
+    els.timerAdjustCustom?.addEventListener("keydown", (e) => {
+      if (e.key === "Enter") {
+        els.timerAdjustApply?.click();
+      }
+    });
 
     // --- Timer sound file picker ---
     els.timerSoundBrowse?.addEventListener("click", () => {

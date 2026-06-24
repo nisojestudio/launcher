@@ -86,12 +86,14 @@ body {
 <div id="counter">00:00:00</div>
 <div id="subtitle"></div>
 <div id="completed-banner">TIEMPO CUMPLIDO</div>
+<div id="connection-error" style="display:none;position:fixed;top:10px;left:50%;transform:translateX(-50%);background:rgba(255,0,0,0.7);color:#fff;padding:6px 16px;border-radius:8px;font-size:16px;font-weight:bold;z-index:999;">Desconectado del panel</div>
 <div id="event-container"></div>
 
 <script>
 const API_STATE = '/api/overlay/live-timer/state';
 
 let styles = {};
+let lastShownEventId = 0;
 
 function applyStyles(el, styleObj) {
   el.style.fontSize = (styleObj.font_size_px || 48) + 'px';
@@ -101,7 +103,7 @@ function applyStyles(el, styleObj) {
 }
 
 function formatTime(seconds) {
-  const total = Math.max(0, Math.ceil(seconds));
+  const total = Math.max(0, Math.floor(seconds));
   const DAY = 86400, HOUR = 3600, MIN = 60;
   const days = Math.floor(total / DAY);
   const rem = total % DAY;
@@ -116,10 +118,19 @@ function showPopup(icon, label, delta) {
   const container = document.getElementById('event-container');
   const el = document.createElement('div');
   el.className = 'event-popup ' + (delta >= 0 ? 'add' : 'subtract');
-  el.textContent = icon + ' ' + (delta >= 0 ? '+' : '') + delta.toFixed(4) + 's';
+  el.textContent = icon + ' ' + (delta >= 0 ? '+' : '') + delta.toFixed(1) + 's';
   container.appendChild(el);
   requestAnimationFrame(() => { el.classList.add('fade'); });
   setTimeout(() => { if (el.parentNode) el.parentNode.removeChild(el); }, 3000);
+}
+
+function styleEqual(a, b) {
+  if (a === b) return true;
+  if (!a || !b) return false;
+  return a.font_size_px === b.font_size_px
+    && a.font_color === b.font_color
+    && a.font_family === b.font_family
+    && a.bold === b.bold;
 }
 
 function updateOverlay() {
@@ -130,6 +141,8 @@ function updateOverlay() {
       const counterEl = document.getElementById('counter');
       const subtitleEl = document.getElementById('subtitle');
       const bannerEl = document.getElementById('completed-banner');
+      const errorEl = document.getElementById('connection-error');
+      if (errorEl) errorEl.style.display = 'none';
 
       if (data.title !== undefined && titleEl.textContent !== data.title) {
         titleEl.textContent = data.title;
@@ -138,15 +151,15 @@ function updateOverlay() {
         subtitleEl.textContent = data.subtitle;
       }
 
-      if (styles.title !== data.titleStyle) {
+      if (!styleEqual(styles.title, data.titleStyle)) {
         applyStyles(titleEl, data.titleStyle || {font_size_px: 48, font_color: '#FFFFFF', font_family: 'Segoe UI, sans-serif', bold: true});
         styles.title = data.titleStyle;
       }
-      if (styles.counter !== data.counterStyle) {
+      if (!styleEqual(styles.counter, data.counterStyle)) {
         applyStyles(counterEl, data.counterStyle || {font_size_px: 120, font_color: '#00FF88', font_family: 'Segoe UI, monospace', bold: true});
         styles.counter = data.counterStyle;
       }
-      if (styles.subtitle !== data.subtitleStyle) {
+      if (!styleEqual(styles.subtitle, data.subtitleStyle)) {
         applyStyles(subtitleEl, data.subtitleStyle || {font_size_px: 32, font_color: '#AAAAAA', font_family: 'Segoe UI, sans-serif', bold: false});
         styles.subtitle = data.subtitleStyle;
       }
@@ -181,11 +194,17 @@ function updateOverlay() {
 
       if (data.recentEvents) {
         data.recentEvents.forEach(ev => {
-          showPopup(ev.icon, ev.label, ev.delta);
+          if (!ev.id || ev.id > lastShownEventId) {
+            showPopup(ev.icon, ev.label, ev.delta);
+            if (ev.id) lastShownEventId = ev.id;
+          }
         });
       }
     })
-    .catch(() => {});
+    .catch(() => {
+      const errorEl = document.getElementById('connection-error');
+      if (errorEl) errorEl.style.display = 'block';
+    });
 }
 
 updateOverlay();
