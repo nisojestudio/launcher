@@ -50,10 +50,9 @@ body {
 }
 .event-popup {
   position: fixed;
-  left: 0;
-  right: 0;
-  text-align: center;
-  font-size: 36px;
+  bottom: 80px;
+  right: 30px;
+  font-size: 28px;
   font-weight: bold;
   text-shadow: 0 0 15px rgba(0,0,0,0.9);
   opacity: 1;
@@ -119,12 +118,7 @@ function showPopup(icon, label, delta) {
   const container = document.getElementById('event-container');
   const el = document.createElement('div');
   el.className = 'event-popup ' + (delta >= 0 ? 'add' : 'subtract');
-  const deltaText = (delta >= 0 ? '+' : '') + delta.toFixed(1) + 's';
-  const labelText = Math.abs(delta) === 1 ? icon + ' ' + label + ' ' + deltaText : icon + ' ' + deltaText;
-  el.textContent = labelText;
-  const existing = container.querySelectorAll('.event-popup');
-  const offset = existing.length * 50;
-  el.style.bottom = 'calc(50% - 100px + ' + offset + 'px)';
+  el.textContent = icon + ' ' + (delta >= 0 ? '+' : '') + delta.toFixed(1) + 's';
   container.appendChild(el);
   requestAnimationFrame(() => { el.classList.add('fade'); });
   setTimeout(() => { if (el.parentNode) el.parentNode.removeChild(el); }, 3000);

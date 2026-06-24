@@ -910,18 +910,6 @@ try {
     Copy-IfExists (Join-Path $projectRoot "README_tts.md") (Join-Path $packageRoot "README_tts.md")
     Copy-IfExists (Join-Path $projectRoot "tools\install_tts_voices.ps1") (Join-Path $toolsRoot "install_tts_voices.ps1")
 
-    $cloudflaredCache = Join-Path $projectRoot "build\installer_cache\cloudflared.exe"
-    if (-not (Test-Path $cloudflaredCache)) {
-        $cloudflaredUrl = "https://github.com/cloudflare/cloudflared/releases/latest/download/cloudflared-windows-amd64.exe"
-        Write-Host "[package] downloading cloudflared tunnel client..."
-        [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
-        New-Item -ItemType Directory -Path (Split-Path $cloudflaredCache -Parent) -Force | Out-Null
-        Invoke-WebRequest -Uri $cloudflaredUrl -OutFile $cloudflaredCache
-    }
-    $cloudflaredDir = Join-Path $toolsRoot "cloudflared"
-    New-Item -ItemType Directory -Path $cloudflaredDir -Force | Out-Null
-    Copy-Item $cloudflaredCache (Join-Path $cloudflaredDir "cloudflared.exe") -Force
-
     Copy-DirectoryFiltered `
         -SourceDir (Join-Path $projectRoot "tools\bridge_py") `
         -DestinationDir $bridgeRoot `

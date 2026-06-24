@@ -27,7 +27,6 @@
 #include "platform/panel_snapshot.hpp"
 #include "platform/panel_tick_result.hpp"
 #include "games/live_timer_game.hpp"
-#include "platform/cloudflare_tunnel_service.hpp"
 #include "platform/panel_updater_service.hpp"
 
 namespace nlp3 {
@@ -159,7 +158,6 @@ private:
 
     PanelConfig config_{};
 
-    std::unique_ptr<CloudflareTunnelService> tunnel_service_{};
     std::unique_ptr<PanelConfigStorage> config_storage_{};
     std::unique_ptr<PanelActivityLog> activity_log_{};
     std::unique_ptr<IGameCatalogSource> game_catalog_source_{};

@@ -13,7 +13,6 @@
   ];
   const AUTH_PERSISTENT_KEY = "nlp3-auth-persistent-v1";
   const VOICE_NOTICES_STORAGE_KEY = "nlp3-custom-voice-notices-v1";
-  let _timerOverlayUrl = "";
   const AUDIO_NOTICE_MAX_BYTES = 1572864;
   const MAX_RECENT_ITEMS = 20;
   const FREQUENCY_INTERVAL_MAP = {
@@ -286,18 +285,6 @@
     timerAdjustApply: $("#timer-adjust-apply"),
     timerAdjustNeg: $("#timer-adjust-neg"),
     timerAdjustPos: $("#timer-adjust-pos"),
-    timerTitleFontSize: $("#timer-title-font-size"),
-    timerTitleFontColor: $("#timer-title-font-color"),
-    timerTitleFontFamily: $("#timer-title-font-family"),
-    timerTitleBold: $("#timer-title-bold"),
-    timerCounterFontSize: $("#timer-counter-font-size"),
-    timerCounterFontColor: $("#timer-counter-font-color"),
-    timerCounterFontFamily: $("#timer-counter-font-family"),
-    timerCounterBold: $("#timer-counter-bold"),
-    timerSubtitleFontSize: $("#timer-subtitle-font-size"),
-    timerSubtitleFontColor: $("#timer-subtitle-font-color"),
-    timerSubtitleFontFamily: $("#timer-subtitle-font-family"),
-    timerSubtitleBold: $("#timer-subtitle-bold"),
   };
 
   const SAMPLE_AVATAR_DATA_URL =
@@ -2100,7 +2087,6 @@
     if (els.timerEnabled) {
       els.timerEnabled.checked = timer.enabled;
     }
-    _timerOverlayUrl = timer.overlayTunnelUrl || "";
   }
 
   function renderSystemStatus(payload, metricsPayload) {
@@ -3110,7 +3096,7 @@
     });
 
     els.timerOverlayCopy?.addEventListener("click", async () => {
-      const url = _timerOverlayUrl || `${window.location.origin}/overlay/live-timer`;
+      const url = `${window.location.origin}/overlay/live-timer`;
       try {
         await navigator.clipboard.writeText(url);
         setText(els.timerOverlayCopy, "Copiado!", { animate: true });

@@ -369,8 +369,7 @@ std::string timer_json(const PanelTimerStatus& timer) {
         "\"completed\":" + bool_json(timer.completed) + ","
         "\"title\":" + quote(timer.title) + ","
         "\"subtitle\":" + quote(timer.subtitle) + ","
-        "\"overlayUrl\":" + quote(timer.overlay_url) + ","
-        "\"overlayTunnelUrl\":" + quote(timer.overlay_tunnel_url)
+        "\"overlayUrl\":" + quote(timer.overlay_url)
         + "}";
 }
 
