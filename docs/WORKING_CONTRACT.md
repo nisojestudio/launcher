@@ -38,6 +38,15 @@ Preparar y luego construir Panel Live 3.0 como plataforma nueva, tomando el proy
 - acoplar el nuevo sistema a la estructura vieja sin necesidad
 - presentar opiniones como hechos verificados
 - meter dependencias pesadas sin justificar costo/beneficio
+- inspeccionar prerequisitos manualmente cuando hay un script que los resuelve
+- ejecutar ninja o cmake sin cargar el entorno MSVC (vcvars64.bat) primero
+- marcar una puerta (gate) como "skipped" sin haber ejecutado el script correspondiente
+
+## Reglas obligatorias al ejecutar releases
+
+Antes de tocar cualquier script de release, leer la sección **Hard Rules for Agent Operators**
+en `docs/releases/RELEASE_PROTOCOL.md`. Esas reglas tienen prioridad sobre cualquier
+intuición operativa del agente.
 
 ## Modo de entrega esperado
 Cada respuesta técnica relevante debe incluir:

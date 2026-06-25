@@ -300,6 +300,55 @@ Document what a rollback would require:
 | 14 | Worker deployed | `wrangler deploy` | Auto (Phase 4) |
 | 15 | Verification | `curl ... /api/version/latest` | Auto (Phase 4) |
 
+## Hard Rules for Agent Operators
+
+These rules exist because past agent sessions committed the same mistakes repeatedly.
+Follow them strictly — no exceptions.
+
+### Rule 1 — Run the script, do not inspect prerequisites manually
+
+If a gate says `build_windows_installer.ps1 -Version X.Y.Z`, **run that script**.
+Do NOT check whether Inno Setup is installed first. Do NOT search for ISCC.exe.
+Do NOT try to predict whether it will work. The script resolves its own
+dependencies (it installs Inno Setup via winget if missing). Running the script
+is the only valid way to determine if a gate passes or fails.
+
+**Wrong:** `if (Test-Path "ISCC.exe") { ... } else { skip }`
+**Correct:** `powershell -File .\scripts\build_windows_installer.ps1 -Version X.Y.Z`
+
+### Rule 2 — Build within the MSVC environment
+
+The C++ toolchain requires the MSVC environment variables (`vcvars64.bat` or
+`VsDevCmd.bat`). Running `ninja` or `cmake --build` without this environment
+will fail with `fatal error C1083: cannot open include file: 'string_view'`
+even though the file exists. This is NOT a project bug.
+
+The package scripts (`package_windows.ps1`, `build_windows_installer.ps1`,
+`prepare_release.ps1`) all call `Ensure-MsvcBuildEnvironment` internally.
+When running build commands manually:
+
+```powershell
+# Correct — load environment first
+cmd.exe /c "`"C:\Program Files (x86)\Microsoft Visual Studio\2022\BuildTools\VC\Auxiliary\Build\vcvars64.bat`" >nul && ninja -C build\release -j4"
+```
+
+Or use `prepare_release.ps1` / `deploy_launcher.ps1` which handle this automatically.
+
+### Rule 3 — Never mark a gate "skipped" without running the script
+
+If the protocol lists a script for a gate, execute that script first. Only if the
+script itself fails with a clear error should you consider skipping, and then
+follow the Emergency Override procedure below.
+
+### Rule 4 — Read the script before assuming what it does
+
+Before declaring a tool or dependency missing, read the relevant script.
+Many scripts in this project install their own dependencies (winget, curl, etc.)
+or search multiple locations. A `Test-Path` in the shell is NOT the same as
+the script's own resolution logic.
+
+---
+
 ## Emergency Override
 
 If a gate must be skipped, record:

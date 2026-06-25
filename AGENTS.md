@@ -68,6 +68,20 @@ c) Si no existe build o hay error de compilación, consultar primero `README.md`
 d) Esta regla tiene prioridad sobre cualquier impulso de "fresh config" o
    "preset por defecto".
 
+### 5.6 Releases — Hard Rules
+Cuando la tarea involucre preparar, empaquetar, versionar o publicar un release,
+el agente debe leer y cumplir estrictamente la sección **Hard Rules for Agent Operators**
+en `docs/releases/RELEASE_PROTOCOL.md`. Esas reglas están diseñadas para corregir
+errores operativos documentados de sesiones anteriores y tienen prioridad sobre
+cualquier otra política operativa.
+
+Resumen de las reglas:
+- **Ejecutar scripts, no inspeccionar prerequisitos** — si un gate dice
+  `build_windows_installer.ps1`, se ejecuta, no se busca `ISCC.exe` manualmente.
+- **Build siempre dentro del MSVC environment** — `vcvars64.bat` primero.
+- **No marcar gates "skipped" sin ejecutar el script.**
+- **Leer el script antes de asumir qué hace.**
+
 ## 6. Organización técnica deseada
 - `src/core` → reglas y simulación
 - `src/render` → renderizado
