@@ -203,7 +203,7 @@
               <summary class="timer-config-summary">Vista previa del overlay</summary>
               <div class="timer-preview-container">
                 <iframe id="timer-preview-iframe" src="" title="Vista previa del overlay"
-                  style="width:100%;height:200px;border:1px solid var(--border);border-radius:4px;background:#000"
+                  style="width:100%;height:240px;border:1px solid var(--border);border-radius:4px;background:#1a1a2e"
                   sandbox="allow-scripts allow-same-origin"></iframe>
               </div>
             </details>
@@ -212,295 +212,249 @@
           <details class="timer-config-details">
             <summary class="timer-config-summary">Configuraci&oacute;n</summary>
             <div class="timer-controls">
-              <div class="timer-grid">
-                <div class="timer-config-section">
-                  <h3 class="timer-config-title">Tiempos por evento</h3>
-                  <div class="timer-presets">
+              <!-- ===== Section 1: Tiempos ===== -->
+              <details class="tv-section" open>
+                <summary class="tv-summary">⏱ Tiempos</summary>
+                <div class="tv-body">
+                  <div class="tv-presets-row">
                     <button class="secondary-button preset-btn" type="button" data-preset="rapido">R&aacute;pido (60s)</button>
                     <button class="secondary-button preset-btn" type="button" data-preset="maraton">Marat&oacute;n (1h)</button>
                     <button class="secondary-button preset-btn" type="button" data-preset="punitivo">Punitivo</button>
                     <button class="secondary-button preset-btn" type="button" data-preset="solo-regalo">Solo regalo</button>
                   </div>
-                  <label class="timer-field">
-                    <span>Tiempo inicial (s)</span>
-                    <input class="timer-input" id="timer-initial-time" type="text" value="05:00" placeholder="mm:ss o segundos">
-                  </label>
-                  <label class="timer-field">
-                    <span class="option-chip">
+                  <div class="tv-row">
+                    <div class="tv-group">
+                      <span class="tv-label">Inicial</span>
+                      <input class="timer-input tv-num" id="timer-initial-time" type="text" value="05:00" placeholder="mm:ss">
+                    </div>
+                    <div class="tv-group">
+                      <span class="tv-label">M&aacute;x</span>
+                      <input class="timer-input tv-num" id="timer-max-time" type="number" step="1" min="0" max="31536000" value="0" title="0 = sin l&iacute;mite">
+                    </div>
+                    <label class="tv-chip">
                       <input id="timer-allow-negatives" type="checkbox">
-                      <span>Permitir valores negativos</span>
-                    </span>
-                  </label>
-                  <label class="timer-field">
-                    <span>Tiempo m&aacute;ximo (s)</span>
-                    <input class="timer-input" id="timer-max-time" type="number" step="1" min="0" max="31536000" value="0" title="0 = sin l&iacute;mite">
-                  </label>
-                  <label class="timer-field">
-                    <span>Por like (s)</span>
-                    <input class="timer-input" id="timer-per-like" type="number" step="0.0001" min="-10" max="10" value="2.0">
-                  </label>
-                  <label class="timer-field">
-                    <span>Por share (s)</span>
-                    <input class="timer-input" id="timer-per-share" type="number" step="0.0001" min="-10" max="10" value="5.0">
-                  </label>
-                  <label class="timer-field">
-                    <span>Por follow (s)</span>
-                    <input class="timer-input" id="timer-per-follow" type="number" step="0.0001" min="-10" max="10" value="10.0">
-                  </label>
-                  <label class="timer-field">
-                    <span>Por coin de gift (s)</span>
-                    <input class="timer-input" id="timer-per-gift-coin" type="number" step="0.0001" min="-10" max="10" value="0.5">
-                  </label>
-                  <label class="timer-field">
-                    <span>Por chat (s)</span>
-                    <input class="timer-input" id="timer-per-chat" type="number" step="0.0001" min="-10" max="10" value="0.0">
-                  </label>
-                </div>
-
-                <div class="timer-config-section">
-                  <h3 class="timer-config-title">Visual</h3>
-                  <label class="timer-field">
-                    <span>T&iacute;tulo</span>
-                    <input class="timer-input" id="timer-title-text" type="text" value="🎯 Extiende el Live">
-                  </label>
-                  <label class="timer-field">
-                    <span>Subt&iacute;tulo</span>
-                    <input class="timer-input" id="timer-subtitle-text" type="text" value="📌 Cada coin suma {time_per_gift_coin}s">
-                    <span class="timer-field-hint" id="timer-subtitle-preview"></span>
-                  </label>
-                </div>
-
-                <div class="timer-config-section">
-                  <h3 class="timer-config-title">Estilo visual</h3>
-                  <label class="timer-field">
-                    <span>T&iacute;tulo: tama&ntilde;o</span>
-                    <input class="timer-input" id="timer-title-font-size" type="number" min="8" max="200" value="48">
-                  </label>
-                  <label class="timer-field">
-                    <span>T&iacute;tulo: color</span>
-                    <input class="timer-input timer-color-picker" id="timer-title-font-color" type="color" value="#FFFFFF">
-                  </label>
-                  <label class="timer-field">
-                    <span>T&iacute;tulo: fuente</span>
-                    <select class="timer-input timer-select" id="timer-title-font-family">
-                      <option value="Segoe UI, sans-serif">Segoe UI</option>
-                      <option value="Arial, sans-serif">Arial</option>
-                      <option value="Helvetica, sans-serif">Helvetica</option>
-                      <option value="Verdana, sans-serif">Verdana</option>
-                      <option value="&quot;Trebuchet MS&quot;, sans-serif">Trebuchet MS</option>
-                      <option value="&quot;Courier New&quot;, monospace">Courier New</option>
-                      <option value="Consolas, monospace">Consolas</option>
-                      <option value="Georgia, serif">Georgia</option>
-                      <option value="Impact, sans-serif">Impact</option>
-                      <option value="&quot;Times New Roman&quot;, serif">Times New Roman</option>
-                    </select>
-                  </label>
-                  <label class="timer-field">
-                    <span class="option-chip">
-                      <input id="timer-title-bold" type="checkbox" checked>
-                      <span>T&iacute;tulo: negrita</span>
-                    </span>
-                  </label>
-                  <label class="timer-field">
-                    <span>Contador: tama&ntilde;o</span>
-                    <input class="timer-input" id="timer-counter-font-size" type="number" min="8" max="400" value="120">
-                  </label>
-                  <label class="timer-field">
-                    <span>Contador: color</span>
-                    <input class="timer-input timer-color-picker" id="timer-counter-font-color" type="color" value="#00FF88">
-                  </label>
-                  <label class="timer-field">
-                    <span>Contador: fuente</span>
-                    <select class="timer-input timer-select" id="timer-counter-font-family">
-                      <option value="Segoe UI, sans-serif">Segoe UI</option>
-                      <option value="Arial, sans-serif">Arial</option>
-                      <option value="Helvetica, sans-serif">Helvetica</option>
-                      <option value="Verdana, sans-serif">Verdana</option>
-                      <option value="&quot;Trebuchet MS&quot;, sans-serif">Trebuchet MS</option>
-                      <option value="&quot;Courier New&quot;, monospace">Courier New</option>
-                      <option value="Consolas, monospace">Consolas</option>
-                      <option value="Georgia, serif">Georgia</option>
-                      <option value="Impact, sans-serif">Impact</option>
-                      <option value="&quot;Times New Roman&quot;, serif">Times New Roman</option>
-                    </select>
-                  </label>
-                  <label class="timer-field">
-                    <span class="option-chip">
-                      <input id="timer-counter-bold" type="checkbox" checked>
-                      <span>Contador: negrita</span>
-                    </span>
-                  </label>
-                  <label class="timer-field">
-                    <span>Subt&iacute;tulo: tama&ntilde;o</span>
-                    <input class="timer-input" id="timer-subtitle-font-size" type="number" min="8" max="200" value="32">
-                  </label>
-                  <label class="timer-field">
-                    <span>Subt&iacute;tulo: color</span>
-                    <input class="timer-input timer-color-picker" id="timer-subtitle-font-color" type="color" value="#AAAAAA">
-                  </label>
-                  <label class="timer-field">
-                    <span>Subt&iacute;tulo: fuente</span>
-                    <select class="timer-input timer-select" id="timer-subtitle-font-family">
-                      <option value="Segoe UI, sans-serif" selected>Segoe UI</option>
-                      <option value="Arial, sans-serif">Arial</option>
-                      <option value="Helvetica, sans-serif">Helvetica</option>
-                      <option value="Verdana, sans-serif">Verdana</option>
-                      <option value="&quot;Trebuchet MS&quot;, sans-serif">Trebuchet MS</option>
-                      <option value="&quot;Courier New&quot;, monospace">Courier New</option>
-                      <option value="Consolas, monospace">Consolas</option>
-                      <option value="Georgia, serif">Georgia</option>
-                      <option value="Impact, sans-serif">Impact</option>
-                      <option value="&quot;Times New Roman&quot;, serif">Times New Roman</option>
-                    </select>
-                  </label>
-                  <label class="timer-field">
-                    <span class="option-chip">
-                      <input id="timer-subtitle-bold" type="checkbox">
-                      <span>Subt&iacute;tulo: negrita</span>
-                    </span>
-                  </label>
-                </div>
-
-                <div class="timer-config-section">
-                  <h3 class="timer-config-title">Avisos (popups)</h3>
-                  <label class="timer-field">
-                    <span>Color cuando suma</span>
-                    <input class="timer-input timer-color-picker" id="timer-popup-add-color" type="color" value="#00AAFF">
-                  </label>
-                  <label class="timer-field">
-                    <span>Color cuando resta</span>
-                    <input class="timer-input timer-color-picker" id="timer-popup-subtract-color" type="color" value="#FF4444">
-                  </label>
-                </div>
-
-                <div class="timer-config-section">
-                  <h3 class="timer-config-title">Al completar</h3>
-                  <label class="timer-field">
-                    <span>Texto del banner</span>
-                    <input class="timer-input" id="timer-complete-text" type="text" value="TIEMPO CUMPLIDO">
-                  </label>
-                  <label class="timer-field">
-                    <span>Color del banner</span>
-                    <input class="timer-input timer-color-picker" id="timer-complete-text-color" type="color" value="#FFD700">
-                  </label>
-                  <label class="timer-field">
-                    <span>Tama&ntilde;o del banner</span>
-                    <input class="timer-input" id="timer-complete-text-size" type="number" min="12" max="200" value="48">
-                  </label>
-                  <label class="timer-field">
-                    <span>Archivo .wav</span>
-                    <input class="timer-input" id="timer-sound-path" type="text" value="" placeholder="Ruta o vac&iacute;o para beep">
-                    <button class="secondary-button" id="timer-sound-browse" type="button" style="margin-top:4px">Examinar...</button>
-                  </label>
-                  <label class="timer-field">
-                    <span class="option-chip">
-                      <input id="timer-sound-repeat" type="checkbox">
-                      <span>Repetir</span>
-                    </span>
-                  </label>
-                  <label class="timer-field">
-                    <span>Volumen</span>
-                    <input class="timer-input" id="timer-sound-volume" type="number" step="0.1" min="0" max="1" value="1.0">
-                  </label>
-                </div>
-
-                <div class="timer-config-section">
-                  <h3 class="timer-config-title">Sonidos</h3>
-                  <label class="timer-field">
-                    <span>Sonido de inicio/tick (.wav)</span>
-                    <input class="timer-input" id="timer-tick-sound-path" type="text" value="" placeholder="Vac&iacute;o = beep">
-                  </label>
-                  <label class="timer-field">
-                    <span>Volumen tick</span>
-                    <input class="timer-input" id="timer-tick-sound-volume" type="number" step="0.1" min="0" max="2" value="1.0">
-                  </label>
-                  <label class="timer-field">
-                    <span>Sonido al sumar tiempo (.wav)</span>
-                    <input class="timer-input" id="timer-add-sound-path" type="text" value="" placeholder="Vac&iacute;o = beep">
-                  </label>
-                  <label class="timer-field">
-                    <span>Volumen al sumar</span>
-                    <input class="timer-input" id="timer-add-sound-volume" type="number" step="0.1" min="0" max="2" value="1.0">
-                  </label>
-                </div>
-              </div>
-
-              <!-- Visual effects section -->
-              <div class="timer-config-section" style="grid-column:1/-1">
-                <h3 class="timer-config-title">Efectos visuales</h3>
-
-                <div class="timer-effect-row" title="Efecto visual principal del t&iacute;tulo">
-                  <span class="timer-effect-label">T&iacute;tulo</span>
-                  <select class="timer-input timer-select timer-effect-select" id="timer-title-effect">
-                    <option value="none">Ninguno</option>
-                    <option value="glow">Brillo ne&oacute;n</option>
-                    <option value="pulse">Latido</option>
-                    <option value="shake">Temblor</option>
-                    <option value="wave">Ola de color</option>
-                  </select>
-                  <label class="option-chip timer-glow-toggle" style="margin-left:4px" title="A&ntilde;ade brillo extra al texto">
-                    <input id="timer-title-glow" type="checkbox">
-                    <span>+Resplandor</span>
-                  </label>
-                </div>
-
-                <div class="timer-effect-row" title="Efecto visual principal del contador">
-                  <span class="timer-effect-label">Contador</span>
-                  <select class="timer-input timer-select timer-effect-select" id="timer-counter-effect">
-                    <option value="none">Ninguno</option>
-                    <option value="glow">Brillo ne&oacute;n</option>
-                    <option value="pulse">Latido</option>
-                    <option value="shake">Temblor</option>
-                    <option value="wave">Ola de color</option>
-                  </select>
-                  <label class="option-chip timer-glow-toggle" style="margin-left:4px" title="A&ntilde;ade brillo extra al texto">
-                    <input id="timer-counter-glow" type="checkbox">
-                    <span>+Resplandor</span>
-                  </label>
-                </div>
-
-                <div class="timer-effect-row" title="Efecto visual principal del subt&iacute;tulo">
-                  <span class="timer-effect-label">Subt&iacute;tulo</span>
-                  <select class="timer-input timer-select timer-effect-select" id="timer-subtitle-effect">
-                    <option value="none">Ninguno</option>
-                    <option value="glow">Brillo ne&oacute;n</option>
-                    <option value="pulse">Latido</option>
-                    <option value="shake">Temblor</option>
-                    <option value="wave">Ola de color</option>
-                  </select>
-                  <label class="option-chip timer-glow-toggle" style="margin-left:4px" title="A&ntilde;ade brillo extra al texto">
-                    <input id="timer-subtitle-glow" type="checkbox">
-                    <span>+Resplandor</span>
-                  </label>
-                </div>
-
-                <div class="timer-effect-presets" style="display:flex;gap:6px;flex-wrap:wrap;margin:6px 0 10px">
-                  <span style="font-size:12px;color:var(--text-dim);align-self:center;margin-right:4px">Temas r&aacute;pidos:</span>
-                  <button class="secondary-button" style="font-size:11px;padding:2px 8px" type="button" data-preset="elegant">Elegante</button>
-                  <button class="secondary-button" style="font-size:11px;padding:2px 8px" type="button" data-preset="energy">Energ&iacute;a</button>
-                  <button class="secondary-button" style="font-size:11px;padding:2px 8px" type="button" data-preset="rainbow">Arco&iacute;ris</button>
-                  <button class="secondary-button" style="font-size:11px;padding:2px 8px" type="button" data-preset="minimal">Minimal</button>
-                </div>
-
-                <details class="timer-effect-params">
-                  <summary class="timer-effect-params-summary">Par&aacute;metros de efectos</summary>
-                  <div class="timer-effect-params-body">
-                    <label class="timer-field" title="Brillo alrededor del texto">
-                      <span>Color del resplandor</span>
-                      <input class="timer-input timer-color-picker" id="timer-glow-color" type="color" value="#FFD700">
+                      <span>Permitir negativos</span>
                     </label>
-                    <label class="timer-field" title="Qu&eacute; tan intenso es el brillo">
-                      <span>Intensidad del resplandor</span>
-                      <select class="timer-input timer-select" id="timer-glow-intensity">
+                  </div>
+                  <div class="tv-row">
+                    <div class="tv-group">
+                      <span class="tv-label">Like</span>
+                      <input class="timer-input tv-num" id="timer-per-like" type="number" step="0.0001" min="-10" max="10" value="2.0">
+                    </div>
+                    <div class="tv-group">
+                      <span class="tv-label">Share</span>
+                      <input class="timer-input tv-num" id="timer-per-share" type="number" step="0.0001" min="-10" max="10" value="5.0">
+                    </div>
+                    <div class="tv-group">
+                      <span class="tv-label">Follow</span>
+                      <input class="timer-input tv-num" id="timer-per-follow" type="number" step="0.0001" min="-10" max="10" value="10.0">
+                    </div>
+                    <div class="tv-group">
+                      <span class="tv-label">Gift coin</span>
+                      <input class="timer-input tv-num" id="timer-per-gift-coin" type="number" step="0.0001" min="-10" max="10" value="0.5">
+                    </div>
+                    <div class="tv-group">
+                      <span class="tv-label">Chat</span>
+                      <input class="timer-input tv-num" id="timer-per-chat" type="number" step="0.0001" min="-10" max="10" value="0.0">
+                    </div>
+                  </div>
+                </div>
+              </details>
+
+              <!-- ===== Section 2: Visual ===== -->
+              <details class="tv-section" open>
+                <summary class="tv-summary">🎨 Visual</summary>
+                <div class="tv-body">
+
+                  <!-- Card: Título -->
+                  <div class="tv-card">
+                    <div class="tv-card-head">T&iacute;tulo</div>
+                    <input class="tv-text-input" id="timer-title-text" type="text" value="🎯 Extiende el Live">
+                    <div class="tv-row">
+                      <div class="tv-group">
+                        <span class="tv-label">Tama&ntilde;o</span>
+                        <input class="timer-input tv-num" id="timer-title-font-size" type="number" min="8" max="200" value="48">
+                      </div>
+                      <div class="tv-group">
+                        <span class="tv-label">Color</span>
+                        <input class="timer-input tv-color" id="timer-title-font-color" type="color" value="#FFFFFF">
+                      </div>
+                      <div class="tv-group tv-group-grow">
+                        <span class="tv-label">Fuente</span>
+                        <select class="timer-input tv-select" id="timer-title-font-family">
+                          <option value="Segoe UI, sans-serif">Segoe UI</option>
+                          <option value="Arial, sans-serif">Arial</option>
+                          <option value="Helvetica, sans-serif">Helvetica</option>
+                          <option value="Verdana, sans-serif">Verdana</option>
+                          <option value="&quot;Trebuchet MS&quot;, sans-serif">Trebuchet MS</option>
+                          <option value="&quot;Courier New&quot;, monospace">Courier New</option>
+                          <option value="Consolas, monospace">Consolas</option>
+                          <option value="Georgia, serif">Georgia</option>
+                          <option value="Impact, sans-serif">Impact</option>
+                          <option value="&quot;Times New Roman&quot;, serif">Times New Roman</option>
+                        </select>
+                      </div>
+                      <label class="tv-chip">
+                        <input id="timer-title-bold" type="checkbox" checked>
+                        <span>Neg</span>
+                      </label>
+                    </div>
+                    <div class="tv-row">
+                      <div class="tv-group">
+                        <span class="tv-label">Efecto</span>
+                        <select class="timer-input tv-select" id="timer-title-effect">
+                          <option value="none">Ninguno</option>
+                          <option value="glow">Brillo ne&oacute;n</option>
+                          <option value="pulse">Latido</option>
+                          <option value="shake">Temblor</option>
+                          <option value="wave">Ola de color</option>
+                        </select>
+                      </div>
+                      <label class="tv-chip">
+                        <input id="timer-title-glow" type="checkbox">
+                        <span>+Resplandor</span>
+                      </label>
+                    </div>
+                  </div>
+
+                  <!-- Card: Contador -->
+                  <div class="tv-card">
+                    <div class="tv-card-head">Contador</div>
+                    <div class="tv-row">
+                      <div class="tv-group">
+                        <span class="tv-label">Tama&ntilde;o</span>
+                        <input class="timer-input tv-num" id="timer-counter-font-size" type="number" min="8" max="400" value="120">
+                      </div>
+                      <div class="tv-group">
+                        <span class="tv-label">Color</span>
+                        <input class="timer-input tv-color" id="timer-counter-font-color" type="color" value="#00FF88">
+                      </div>
+                      <div class="tv-group tv-group-grow">
+                        <span class="tv-label">Fuente</span>
+                        <select class="timer-input tv-select" id="timer-counter-font-family">
+                          <option value="Segoe UI, sans-serif">Segoe UI</option>
+                          <option value="Arial, sans-serif">Arial</option>
+                          <option value="Helvetica, sans-serif">Helvetica</option>
+                          <option value="Verdana, sans-serif">Verdana</option>
+                          <option value="&quot;Trebuchet MS&quot;, sans-serif">Trebuchet MS</option>
+                          <option value="&quot;Courier New&quot;, monospace">Courier New</option>
+                          <option value="Consolas, monospace">Consolas</option>
+                          <option value="Georgia, serif">Georgia</option>
+                          <option value="Impact, sans-serif">Impact</option>
+                          <option value="&quot;Times New Roman&quot;, serif">Times New Roman</option>
+                        </select>
+                      </div>
+                      <label class="tv-chip">
+                        <input id="timer-counter-bold" type="checkbox" checked>
+                        <span>Neg</span>
+                      </label>
+                    </div>
+                    <div class="tv-row">
+                      <div class="tv-group">
+                        <span class="tv-label">Efecto</span>
+                        <select class="timer-input tv-select" id="timer-counter-effect">
+                          <option value="none">Ninguno</option>
+                          <option value="glow">Brillo ne&oacute;n</option>
+                          <option value="pulse">Latido</option>
+                          <option value="shake">Temblor</option>
+                          <option value="wave">Ola de color</option>
+                        </select>
+                      </div>
+                      <label class="tv-chip">
+                        <input id="timer-counter-glow" type="checkbox">
+                        <span>+Resplandor</span>
+                      </label>
+                    </div>
+                  </div>
+
+                  <!-- Card: Subtítulo -->
+                  <div class="tv-card">
+                    <div class="tv-card-head">Subt&iacute;tulo</div>
+                    <input class="tv-text-input" id="timer-subtitle-text" type="text" value="📌 Cada coin suma {time_per_gift_coin}s">
+                    <span class="tv-hint" id="timer-subtitle-preview"></span>
+                    <div class="tv-row">
+                      <div class="tv-group">
+                        <span class="tv-label">Tama&ntilde;o</span>
+                        <input class="timer-input tv-num" id="timer-subtitle-font-size" type="number" min="8" max="200" value="32">
+                      </div>
+                      <div class="tv-group">
+                        <span class="tv-label">Color</span>
+                        <input class="timer-input tv-color" id="timer-subtitle-font-color" type="color" value="#AAAAAA">
+                      </div>
+                      <div class="tv-group tv-group-grow">
+                        <span class="tv-label">Fuente</span>
+                        <select class="timer-input tv-select" id="timer-subtitle-font-family">
+                          <option value="Segoe UI, sans-serif" selected>Segoe UI</option>
+                          <option value="Arial, sans-serif">Arial</option>
+                          <option value="Helvetica, sans-serif">Helvetica</option>
+                          <option value="Verdana, sans-serif">Verdana</option>
+                          <option value="&quot;Trebuchet MS&quot;, sans-serif">Trebuchet MS</option>
+                          <option value="&quot;Courier New&quot;, monospace">Courier New</option>
+                          <option value="Consolas, monospace">Consolas</option>
+                          <option value="Georgia, serif">Georgia</option>
+                          <option value="Impact, sans-serif">Impact</option>
+                          <option value="&quot;Times New Roman&quot;, serif">Times New Roman</option>
+                        </select>
+                      </div>
+                      <label class="tv-chip">
+                        <input id="timer-subtitle-bold" type="checkbox">
+                        <span>Neg</span>
+                      </label>
+                    </div>
+                    <div class="tv-row">
+                      <div class="tv-group">
+                        <span class="tv-label">Efecto</span>
+                        <select class="timer-input tv-select" id="timer-subtitle-effect">
+                          <option value="none">Ninguno</option>
+                          <option value="glow">Brillo ne&oacute;n</option>
+                          <option value="pulse">Latido</option>
+                          <option value="shake">Temblor</option>
+                          <option value="wave">Ola de color</option>
+                        </select>
+                      </div>
+                      <label class="tv-chip">
+                        <input id="timer-subtitle-glow" type="checkbox">
+                        <span>+Resplandor</span>
+                      </label>
+                    </div>
+                  </div>
+
+                </div>
+              </details>
+
+              <!-- ===== Section 3: Efectos ===== -->
+              <details class="tv-section">
+                <summary class="tv-summary">✨ Efectos</summary>
+                <div class="tv-body">
+
+                  <div class="tv-presets-row">
+                    <span class="tv-label" style="align-self:center">Temas r&aacute;pidos:</span>
+                    <button class="secondary-button" style="font-size:11px;padding:2px 8px" type="button" data-preset="elegant">Elegante</button>
+                    <button class="secondary-button" style="font-size:11px;padding:2px 8px" type="button" data-preset="energy">Energ&iacute;a</button>
+                    <button class="secondary-button" style="font-size:11px;padding:2px 8px" type="button" data-preset="rainbow">Arco&iacute;ris</button>
+                    <button class="secondary-button" style="font-size:11px;padding:2px 8px" type="button" data-preset="minimal">Minimal</button>
+                  </div>
+
+                  <div class="tv-row">
+                    <div class="tv-group">
+                      <span class="tv-label">Color glow</span>
+                      <input class="timer-input tv-color" id="timer-glow-color" type="color" value="#FFD700">
+                    </div>
+                    <div class="tv-group">
+                      <span class="tv-label">Intensidad</span>
+                      <select class="timer-input tv-select" id="timer-glow-intensity">
                         <option value="4">Sutil</option>
                         <option value="8" selected>Medio</option>
                         <option value="16">Fuerte</option>
                         <option value="30">Intenso</option>
                       </select>
-                    </label>
-                    <label class="timer-field" title="Combinaci&oacute;n de colores para el efecto Ola">
-                      <span>Paleta del wave</span>
-                      <select class="timer-input timer-select" id="timer-wave-colors">
+                    </div>
+                  </div>
+
+                  <div class="tv-row">
+                    <div class="tv-group">
+                      <span class="tv-label">Wave</span>
+                      <select class="timer-input tv-select" id="timer-wave-colors">
                         <option value="#FF6B6B,#4ECDC4,#FFE66D">Arco&iacute;ris</option>
                         <option value="#FF4500,#FF8C00,#FFD700">Puesta de sol</option>
                         <option value="#00FF88,#00DDFF,#8844FF">Ne&oacute;n</option>
@@ -508,45 +462,125 @@
                         <option value="#FF0000,#FF4400,#FF8800">Fuego</option>
                         <option value="#FF69B4,#FF1493,#8B008B">Rosa</option>
                       </select>
-                    </label>
-                    <label class="timer-field" title="Velocidad del latido del texto">
-                      <span>Velocidad del latido</span>
-                      <select class="timer-input timer-select" id="timer-pulse-speed">
+                    </div>
+                    <div class="tv-group">
+                      <span class="tv-label">Pulse</span>
+                      <select class="timer-input tv-select" id="timer-pulse-speed">
                         <option value="3">Lento</option>
                         <option value="1.5" selected>Normal</option>
                         <option value="0.5">R&aacute;pido</option>
                       </select>
-                    </label>
-                    <label class="timer-field" title="Qu&eacute; tan fuerte se mueve el texto">
-                      <span>Intensidad del temblor</span>
-                      <select class="timer-input timer-select" id="timer-shake-intensity">
+                    </div>
+                    <div class="tv-group">
+                      <span class="tv-label">Shake</span>
+                      <select class="timer-input tv-select" id="timer-shake-intensity">
                         <option value="light">Suave</option>
                         <option value="normal" selected>Normal</option>
                         <option value="heavy">Fuerte</option>
                       </select>
+                    </div>
+                  </div>
+
+                  <div class="tv-row">
+                    <label class="tv-chip">
+                      <input id="timer-particles-enabled" type="checkbox">
+                      <span>Part&iacute;culas</span>
                     </label>
-                    <label class="timer-field" style="border-top:1px solid var(--border);padding-top:8px;margin-top:4px">
-                      <span class="option-chip">
-                        <input id="timer-particles-enabled" type="checkbox">
-                        <span>Part&iacute;culas flotantes</span>
-                      </span>
-                    </label>
-                    <label class="timer-field" title="Cu&aacute;ntas part&iacute;culas aparecen">
-                      <span>Cantidad de part&iacute;culas</span>
-                      <select class="timer-input timer-select" id="timer-particle-count">
+                    <div class="tv-group">
+                      <span class="tv-label">Cantidad</span>
+                      <select class="timer-input tv-select" id="timer-particle-count">
                         <option value="5">Pocas (5)</option>
                         <option value="15" selected>Normales (15)</option>
                         <option value="30">Muchas (30)</option>
                         <option value="50">Lluvia (50)</option>
                       </select>
-                    </label>
-                    <label class="timer-field">
-                      <span>Color de part&iacute;culas</span>
-                      <input class="timer-input timer-color-picker" id="timer-particle-color" type="color" value="#FFD700">
-                    </label>
+                    </div>
+                    <div class="tv-group">
+                      <span class="tv-label">Color</span>
+                      <input class="timer-input tv-color" id="timer-particle-color" type="color" value="#FFD700">
+                    </div>
                   </div>
-                </details>
-              </div>
+
+                </div>
+              </details>
+
+              <!-- ===== Section 4: Sonidos y Completado ===== -->
+              <details class="tv-section">
+                <summary class="tv-summary">🔔 Sonidos y Completado</summary>
+                <div class="tv-body">
+
+                  <div class="tv-subsection">Al completar</div>
+                  <div class="tv-row">
+                    <div class="tv-group tv-group-grow">
+                      <span class="tv-label">Texto</span>
+                      <input class="timer-input" id="timer-complete-text" type="text" value="TIEMPO CUMPLIDO">
+                    </div>
+                    <div class="tv-group">
+                      <span class="tv-label">Color</span>
+                      <input class="timer-input tv-color" id="timer-complete-text-color" type="color" value="#FFD700">
+                    </div>
+                    <div class="tv-group" style="flex-shrink:0">
+                      <span class="tv-label">Tama&ntilde;o</span>
+                      <input class="timer-input tv-num" id="timer-complete-text-size" type="number" min="12" max="200" value="48">
+                    </div>
+                  </div>
+                  <div class="tv-row">
+                    <div class="tv-group tv-group-grow">
+                      <span class="tv-label">Sonido</span>
+                      <input class="timer-input" id="timer-sound-path" type="text" value="" placeholder="Ruta o vac&iacute;o = beep">
+                    </div>
+                    <button class="secondary-button" id="timer-sound-browse" type="button" style="padding:2px 8px;font-size:11px">Examinar</button>
+                    <label class="tv-chip">
+                      <input id="timer-sound-repeat" type="checkbox">
+                      <span>Repetir</span>
+                    </label>
+                    <div class="tv-group" style="flex-shrink:0">
+                      <span class="tv-label">Vol</span>
+                      <input class="timer-input tv-num" id="timer-sound-volume" type="number" step="0.1" min="0" max="1" value="1.0" style="width:50px">
+                    </div>
+                  </div>
+
+                  <div class="tv-subsection">Sonidos de eventos</div>
+                  <div class="tv-row">
+                    <div class="tv-group tv-group-grow">
+                      <span class="tv-label">Tick</span>
+                      <input class="timer-input" id="timer-tick-sound-path" type="text" value="" placeholder="Vac&iacute;o = beep">
+                    </div>
+                    <div class="tv-group" style="flex-shrink:0">
+                      <span class="tv-label">Vol</span>
+                      <input class="timer-input tv-num" id="timer-tick-sound-volume" type="number" step="0.1" min="0" max="2" value="1.0" style="width:50px">
+                    </div>
+                  </div>
+                  <div class="tv-row">
+                    <div class="tv-group tv-group-grow">
+                      <span class="tv-label">Sumar</span>
+                      <input class="timer-input" id="timer-add-sound-path" type="text" value="" placeholder="Vac&iacute;o = beep">
+                    </div>
+                    <div class="tv-group" style="flex-shrink:0">
+                      <span class="tv-label">Vol</span>
+                      <input class="timer-input tv-num" id="timer-add-sound-volume" type="number" step="0.1" min="0" max="2" value="1.0" style="width:50px">
+                    </div>
+                  </div>
+
+                </div>
+              </details>
+
+              <!-- ===== Section 5: Avisos ===== -->
+              <details class="tv-section">
+                <summary class="tv-summary">💬 Avisos</summary>
+                <div class="tv-body">
+                  <div class="tv-row">
+                    <div class="tv-group">
+                      <span class="tv-label">Color suma</span>
+                      <input class="timer-input tv-color" id="timer-popup-add-color" type="color" value="#00AAFF">
+                    </div>
+                    <div class="tv-group">
+                      <span class="tv-label">Color resta</span>
+                      <input class="timer-input tv-color" id="timer-popup-subtract-color" type="color" value="#FF4444">
+                    </div>
+                  </div>
+                </div>
+              </details>
 
               <div class="timer-events-feed" id="timer-events-feed">
                 <h4 class="timer-events-title">Eventos recientes</h4>

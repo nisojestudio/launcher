@@ -4,6 +4,19 @@ All notable Panel Live changes should be recorded here.
 
 Format follows a lightweight Keep a Changelog style. Versions use SemVer.
 
+## 0.2.8 - 2026-07-04
+
+### Added
+
+- **Config layout redesigned**: 5 collapsible sections (Tiempos, Visual, Efectos, Sonidos, Avisos) with clean card-per-element layout. Each card groups Tamaño/Color/Fuente/Negrita + Efecto/+Resplandor in compact inline rows.
+- **Preview background**: Changed from pure black to dark navy (`#1a1a2e`) for a more pleasant preview look.
+- **Preview scales down**: When `?preview=1` is detected, overlay uses smaller fonts (counter 52px, title 22px) to fit the 240px panel iframe.
+
+### Fixed
+
+- **Overlay preview showing black screen**: Query string (`?preview=1&t=...`) was not stripped from the HTTP request path, causing all overlay routes to return 404. The C++ HTTP parser now correctly strips query params before route matching.
+- **Timer preview iframe height**: Increased from 200px to 240px (180px on small screens) for better preview visibility.
+
 ## 0.2.7 - 2026-07-04
 
 ### Added

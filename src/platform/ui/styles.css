@@ -2900,16 +2900,169 @@ select.timer-input,
 .timer-preview-container iframe {
   display: block;
   width: 100%;
-  height: 200px;
-  background: #000;
+  height: 240px;
+  background: #1a1a2e;
   border: 1px solid var(--border);
   border-radius: 4px;
 }
 @media (max-height: 800px) {
   .timer-preview-container iframe {
-    height: 140px;
+    height: 180px;
   }
 }
 .timer-keyboard-hints kbd {
   font-family: inherit;
+}
+
+/* ===== Timer Visual: new card layout ===== */
+.tv-section {
+  margin-bottom: 6px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--panel);
+}
+.tv-section[open] {
+  padding-bottom: 4px;
+}
+.tv-summary {
+  cursor: pointer;
+  padding: 8px 10px;
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text);
+  border-radius: 6px;
+  user-select: none;
+}
+.tv-summary:hover {
+  background: var(--panel-soft);
+}
+.tv-summary::-webkit-details-marker {
+  color: var(--text-dim);
+}
+.tv-body {
+  padding: 4px 10px 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+/* Card for each visual element */
+.tv-card {
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 8px 10px;
+  background: var(--panel-soft);
+}
+.tv-card-head {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-dim);
+  margin-bottom: 6px;
+  letter-spacing: 0.3px;
+  text-transform: uppercase;
+}
+
+/* Text input inside card (full width) */
+.tv-text-input {
+  width: 100%;
+  margin-bottom: 6px;
+}
+.tv-hint {
+  display: block;
+  font-size: 11px;
+  color: var(--text-dim);
+  margin: -4px 0 4px;
+  min-height: 14px;
+}
+
+/* Presets row */
+.tv-presets-row {
+  display: flex;
+  gap: 4px;
+  flex-wrap: wrap;
+  align-items: center;
+  margin-bottom: 2px;
+}
+
+/* Row: horizontal line of controls */
+.tv-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  align-items: center;
+}
+
+/* Single control group: label + input inline */
+.tv-group {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  flex-shrink: 0;
+}
+.tv-group-grow {
+  flex: 1;
+  min-width: 80px;
+}
+
+/* Compact label */
+.tv-label {
+  font-size: 11px;
+  color: var(--text-dim);
+  white-space: nowrap;
+}
+
+/* Numeric input: narrow */
+.tv-num {
+  width: 58px !important;
+  text-align: center;
+}
+
+/* Color input: small swatch */
+.tv-color {
+  width: 36px !important;
+  height: 28px !important;
+  padding: 2px !important;
+  cursor: pointer;
+}
+
+/* Select: compact */
+.tv-select {
+  min-width: 80px;
+  font-size: 12px !important;
+  padding: 2px 4px !important;
+}
+
+/* Chip: checkbox with inline label */
+.tv-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  font-size: 11px;
+  color: var(--text-dim);
+  white-space: nowrap;
+  cursor: pointer;
+  padding: 2px 6px;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  background: var(--panel);
+  user-select: none;
+  flex-shrink: 0;
+}
+.tv-chip:hover {
+  background: var(--panel-soft);
+}
+.tv-chip input {
+  margin: 0;
+  width: 13px;
+  height: 13px;
+}
+
+/* Subsection header */
+.tv-subsection {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text-dim);
+  padding: 2px 0;
+  margin-top: 2px;
+  border-bottom: 1px solid var(--border);
 }

@@ -119,6 +119,11 @@ ParsedRequest parse_request_buffer(std::string_view request_buffer) {
     if (parsed.method.empty() || parsed.path.empty()) {
         return parsed;
     }
+    // Strip query string from path so route exact-matches work
+    const auto qmark = parsed.path.find('?');
+    if (qmark != std::string::npos) {
+        parsed.path = parsed.path.substr(0, qmark);
+    }
 
     std::size_t cursor = request_line_end == std::string_view::npos ? header_block.size() : request_line_end + 2;
     while (cursor < header_block.size()) {

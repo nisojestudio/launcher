@@ -17,7 +17,13 @@ body {
   font-family: 'Segoe UI', sans-serif;
   color: white;
   text-shadow: 0 0 20px rgba(0,0,0,0.8), 0 0 40px rgba(0,0,0,0.6);
+  text-align: center;
 }
+/* Preview mode: smaller fonts to fit in 200px iframe */
+body.preview-mode #title     { font-size: 22px !important; margin-bottom: 2px !important; }
+body.preview-mode #counter   { font-size: 52px !important; }
+body.preview-mode #subtitle  { font-size: 14px !important; margin-top: 2px !important; }
+body.preview-mode #completed-banner { font-size: 20px !important; margin-top: 4px !important; }
 
 /* ---- Particle container ---- */
 #particle-container {
@@ -236,6 +242,13 @@ body {
 <div id="event-container"></div>
 
 <script>
+// Detect preview mode (shown in panel iframe)
+(function() {
+  if (window.location.search.includes('preview=1')) {
+    document.body.classList.add('preview-mode');
+  }
+})();
+
 const API_STATE = '/api/overlay/live-timer/state';
 
 let styles = {};
