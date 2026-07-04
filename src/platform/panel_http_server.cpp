@@ -906,9 +906,9 @@ std::string handle_timer_configure(PanelApp* app, std::string_view body) {
     if (maybe_bool.has_value()) config.set("on_complete_repeat", *maybe_bool);
 
     auto maybe_d = parse_json_double(body, "initial_time_s");
-    if (maybe_d.has_value()) config.set("initial_time_s", std::clamp(*maybe_d, 1.0, 86400.0));
+    if (maybe_d.has_value()) config.set("initial_time_s", std::clamp(*maybe_d, 1.0, 31536000.0));
     maybe_d = parse_json_double(body, "max_time_s");
-    if (maybe_d.has_value()) config.set("max_time_s", std::clamp(*maybe_d, 0.0, 86400.0));
+    if (maybe_d.has_value()) config.set("max_time_s", std::clamp(*maybe_d, 0.0, 31536000.0));
     maybe_d = parse_json_double(body, "time_per_like_s");
     if (maybe_d.has_value()) config.set("time_per_like_s", std::clamp(*maybe_d, -3600.0, 3600.0));
     maybe_d = parse_json_double(body, "time_per_share_s");
