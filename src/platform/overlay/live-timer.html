@@ -18,10 +18,132 @@ body {
   color: white;
   text-shadow: 0 0 20px rgba(0,0,0,0.8), 0 0 40px rgba(0,0,0,0.6);
 }
+
+/* ---- Particle container ---- */
+#particle-container {
+  position: fixed;
+  top: 0; left: 0;
+  width: 100vw; height: 100vh;
+  pointer-events: none;
+  z-index: 1;
+  overflow: hidden;
+}
+.particle {
+  position: absolute;
+  border-radius: 50%;
+  opacity: 0;
+  pointer-events: none;
+}
+
+/* ---- Effect: Glow (dynamic text-shadow set via JS) ---- */
+
+/* ---- Effect: Wave Gradient ---- */
+.effect-wave {
+  background-clip: text !important;
+  -webkit-background-clip: text !important;
+  -webkit-text-fill-color: transparent;
+  background-size: 300% 300%;
+  animation: waveAnim 3s ease-in-out infinite;
+}
+/* Wave yields to danger/warning/completed states */
+#counter.effect-wave.danger {
+  -webkit-text-fill-color: #ff4444 !important;
+  background-clip: unset !important;
+  -webkit-background-clip: unset !important;
+  background: none !important;
+  animation: pulse 0.5s ease-in-out infinite !important;
+}
+#counter.effect-wave.warning {
+  -webkit-text-fill-color: #ff8c00 !important;
+  background-clip: unset !important;
+  -webkit-background-clip: unset !important;
+  background: none !important;
+}
+#counter.effect-wave.completed {
+  -webkit-text-fill-color: #ff4444 !important;
+  background-clip: unset !important;
+  -webkit-background-clip: unset !important;
+  background: none !important;
+  animation: pulse 0.3s ease-in-out infinite !important;
+}
+@keyframes waveAnim {
+  0%   { background-position: 0% 50%; }
+  50%  { background-position: 100% 50%; }
+  100% { background-position: 0% 50%; }
+}
+
+/* ---- Effect: Pulse ---- */
+.effect-pulse {
+  animation: pulseEffect var(--pulse-speed, 1.5s) ease-in-out infinite;
+}
+@keyframes pulseEffect {
+  0%, 100% { transform: scale(1); }
+  50%      { transform: scale(1.06); }
+}
+
+/* ---- Effect: Shake ---- */
+.effect-shake-light {
+  animation: shakeLight var(--shake-speed, 0.3s) ease-in-out infinite;
+}
+.effect-shake-normal {
+  animation: shakeNormal var(--shake-speed, 0.2s) ease-in-out infinite;
+}
+.effect-shake-heavy {
+  animation: shakeHeavy var(--shake-speed, 0.12s) ease-in-out infinite;
+}
+@keyframes shakeLight {
+  0%, 100% { transform: translateX(0); }
+  25%      { transform: translateX(-3px); }
+  75%      { transform: translateX(3px); }
+}
+@keyframes shakeNormal {
+  0%, 100% { transform: translateX(0); }
+  20%      { transform: translateX(-5px) rotate(-0.5deg); }
+  40%      { transform: translateX(5px) rotate(0.5deg); }
+  60%      { transform: translateX(-4px); }
+  80%      { transform: translateX(4px); }
+}
+@keyframes shakeHeavy {
+  0%, 100% { transform: translateX(0); }
+  15%      { transform: translateX(-8px) rotate(-1deg); }
+  30%      { transform: translateX(8px) rotate(1deg); }
+  45%      { transform: translateX(-6px) rotate(-0.5deg); }
+  60%      { transform: translateX(6px) rotate(0.5deg); }
+  75%      { transform: translateX(-4px); }
+  90%      { transform: translateX(4px); }
+}
+
+/* ---- Confetti ---- */
+#confetti-container {
+  position: fixed;
+  top: 0; left: 0;
+  width: 100vw; height: 100vh;
+  pointer-events: none;
+  z-index: 5;
+  overflow: hidden;
+}
+.confetti-piece {
+  position: absolute;
+  top: -10px;
+  width: 8px;
+  height: 8px;
+  border-radius: 2px;
+  opacity: 0;
+  animation: confettiFall var(--fall-dur, 3s) ease-in forwards;
+}
+@keyframes confettiFall {
+  0%   { transform: translateY(0) rotate(0deg); opacity: 1; }
+  80%  { opacity: 0.8; }
+  100% { transform: translateY(100vh) rotate(720deg); opacity: 0; }
+}
+
+/* ---- Base elements ---- */
 #title {
   font-size: 48px;
   margin-bottom: 8px;
   text-align: center;
+  position: relative;
+  z-index: 10;
 }
 #counter {
   font-size: 120px;
@@ -30,6 +152,8 @@ body {
   text-align: center;
   line-height: 1.1;
   transition: color 0.3s ease;
+  position: relative;
+  z-index: 10;
 }
 #counter.warning { color: #ff8c00 !important; }
 #counter.danger {
@@ -44,6 +168,8 @@ body {
   font-size: 32px;
   margin-top: 8px;
   text-align: center;
+  position: relative;
+  z-index: 10;
 }
 @keyframes pulse {
   50% { transform: scale(1.05); }
@@ -99,6 +225,8 @@ body {
 </style>
 </head>
 <body>
+<div id="particle-container"></div>
+<div id="confetti-container"></div>
 <div id="title"></div>
 <div id="counter">00:00:00</div>
 <div id="subtitle"></div>
@@ -114,6 +242,214 @@ let styles = {};
 let popupColors = { add: '#00AAFF', subtract: '#FF4444' };
 let completedStyle = { text: 'TIEMPO CUMPLIDO', color: '#FFD700', size: 48 };
 let lastShownEventId = 0;
+let effectState = null;      // { effects, glow, wave, pulse, shake, particles }
+let particleContainer = null;
+let particleColor_ = '#FFD700';
+let particleCount_ = 15;
+
+/* ---- Compare two effect config objects ---- */
+function effectConfigChanged(data) {
+  const cur = {
+    te: data.title_effect, ce: data.counter_effect, se: data.subtitle_effect,
+    tg: !!data.title_glow_enabled, cg: !!data.counter_glow_enabled, sg: !!data.subtitle_glow_enabled,
+    gc: data.glow_color, gi: data.glow_intensity_px,
+    wc: data.wave_colors, ps: data.pulse_speed_s, si: data.shake_intensity,
+    pe: !!data.particles_enabled, pc: data.particle_count, pcol: data.particle_color
+  };
+  if (effectState === null) { effectState = cur; return true; }
+  for (const k in cur) {
+    if (effectState[k] !== cur[k]) { effectState = cur; return true; }
+  }
+  return false;
+}
+
+/* ---- Effect: Clear effect classes from an element (keep base classes) ---- */
+function clearEffectClasses(el) {
+  el.classList.remove('effect-wave', 'effect-pulse',
+    'effect-shake-light', 'effect-shake-normal', 'effect-shake-heavy');
+  el.style.removeProperty('--pulse-speed');
+  el.style.removeProperty('--shake-speed');
+  el.style.textShadow = '';
+  el.style.background = '';
+  el.style.webkitBackgroundClip = '';
+  el.style.backgroundClip = '';
+  el.style.webkitTextFillColor = '';
+}
+
+/* ---- Effect: Apply visual effects to an element ---- */
+function applyEffects(el, effectName, glowEnabled, glowColor, glowIntensity,
+                       waveColors, pulseSpeed, shakeIntensity) {
+  clearEffectClasses(el);
+
+  // Glow (text-shadow) — compatible with everything
+  if (glowEnabled && glowColor) {
+    el.style.textShadow =
+      '0 0 ' + glowIntensity + 'px ' + glowColor + ',' +
+      '0 0 ' + (glowIntensity * 2) + 'px ' + glowColor + ',' +
+      '0 0 20px rgba(0,0,0,0.8), 0 0 40px rgba(0,0,0,0.6)';
+  } else {
+    el.style.textShadow = '0 0 20px rgba(0,0,0,0.8), 0 0 40px rgba(0,0,0,0.6)';
+  }
+
+  // Main effect
+  switch (effectName) {
+    case 'wave':
+      el.classList.add('effect-wave');
+      if (waveColors) {
+        el.style.background = 'linear-gradient(135deg, ' + waveColors.split(',').join(', ') + ')';
+      }
+      el.style.backgroundClip = 'text';
+      el.style.webkitBackgroundClip = 'text';
+      el.style.webkitTextFillColor = 'transparent';
+      break;
+
+    case 'pulse':
+      el.classList.add('effect-pulse');
+      el.style.setProperty('--pulse-speed', (pulseSpeed || 1.5) + 's');
+      break;
+
+    case 'shake':
+      if (shakeIntensity === 'light') el.classList.add('effect-shake-light');
+      else if (shakeIntensity === 'heavy') el.classList.add('effect-shake-heavy');
+      else el.classList.add('effect-shake-normal');
+      break;
+
+    case 'glow':
+      // Glow-only: just the text-shadow set above
+      break;
+
+    default:
+      break;
+  }
+}
+
+/* ---- Particle system (continuous, no reset) ---- */
+(function injectParticleKeyframes() {
+  const s = document.createElement('style');
+  s.textContent =
+    '@keyframes particleRise {\n' +
+    '  0%   { transform: translateY(100vh) translateX(0); opacity: 0; }\n' +
+    '  10%  { opacity: 0.7; }\n' +
+    '  90%  { opacity: 0.2; }\n' +
+    '  100% { transform: translateY(-10vh) translateX(var(--drift, 0px)); opacity: 0; }\n' +
+    '}\n';
+  document.head.appendChild(s);
+})();
+
+function spawnParticle(container, color) {
+  const p = document.createElement('div');
+  p.className = 'particle';
+  const size = 2 + Math.random() * 5;
+  p.style.width = size + 'px';
+  p.style.height = size + 'px';
+  p.style.background = color || '#FFD700';
+  p.style.left = Math.random() * 100 + '%';
+  p.style.bottom = '-5%';
+  p.style.boxShadow = '0 0 ' + (size * 2) + 'px ' + (color || '#FFD700');
+  const duration = 6 + Math.random() * 8;
+  const delay = Math.random() * 4;
+  const drift = (Math.random() - 0.5) * 60;
+  p.style.animation = 'particleRise ' + duration + 's ease-in ' + delay + 's forwards';
+  p.style.setProperty('--drift', drift + 'px');
+  container.appendChild(p);
+  // Remove after animation completes to avoid DOM bloat
+  setTimeout(function() {
+    if (p.parentNode) p.parentNode.removeChild(p);
+  }, (duration + delay) * 1000 + 100);
+}
+
+/* ---- Confetti celebration ---- */
+var _confettiTimeout = null;
+function spawnConfetti() {
+  var container = document.getElementById('confetti-container');
+  if (!container) return;
+  // Clear previous confetti
+  container.innerHTML = '';
+  if (_confettiTimeout) { clearTimeout(_confettiTimeout); _confettiTimeout = null; }
+  var colors = ['#FF6B6B','#4ECDC4','#FFE66D','#FF4444','#00FF88','#FFD700','#FF69B4','#66CCFF','#AA66FF'];
+  for (var i = 0; i < 60; i++) {
+    var piece = document.createElement('div');
+    piece.className = 'confetti-piece';
+    var size = 4 + Math.random() * 8;
+    piece.style.width = size + 'px';
+    piece.style.height = (size * (0.4 + Math.random() * 0.8)) + 'px';
+    piece.style.background = colors[Math.floor(Math.random() * colors.length)];
+    piece.style.left = (Math.random() * 100) + '%';
+    piece.style.setProperty('--fall-dur', (2 + Math.random() * 3) + 's');
+    piece.style.animationDelay = (Math.random() * 2) + 's';
+    piece.style.borderRadius = Math.random() > 0.5 ? '50%' : '2px';
+    container.appendChild(piece);
+  }
+  // Auto-cleanup after animation
+  _confettiTimeout = setTimeout(function() {
+    if (container) container.innerHTML = '';
+    _confettiTimeout = null;
+  }, 6000);
+}
+
+function updateParticles(enabled, count, color) {
+  particleColor_ = color || '#FFD700';
+  particleCount_ = (count > 0 ? count : 15);
+  if (!particleContainer) particleContainer = document.getElementById('particle-container');
+  if (!particleContainer) return;
+
+  // Clear existing interval if any
+  if (particleContainer._timer) {
+    clearInterval(particleContainer._timer);
+    particleContainer._timer = null;
+  }
+  // Remove existing particles
+  particleContainer.innerHTML = '';
+
+  if (enabled && particleCount_ > 0) {
+    // Initial burst
+    for (let i = 0; i < Math.min(particleCount_, 10); i++) {
+      setTimeout(function() { spawnParticle(particleContainer, particleColor_); }, i * 200);
+    }
+    // Continuous spawn
+    particleContainer._timer = setInterval(function() {
+      spawnParticle(particleContainer, particleColor_);
+    }, Math.max(600, 3000 / particleCount_));
+  }
+}
+
+function updateEffects(data) {
+  if (!effectConfigChanged(data)) return; // skip if same config
+
+  const titleEl = document.getElementById('title');
+  const counterEl = document.getElementById('counter');
+  const subtitleEl = document.getElementById('subtitle');
+
+  applyEffects(titleEl,
+    data.title_effect || 'none',
+    data.title_glow_enabled,
+    data.glow_color,
+    data.glow_intensity_px || 8,
+    data.wave_colors,
+    data.pulse_speed_s,
+    data.shake_intensity);
+
+  applyEffects(counterEl,
+    data.counter_effect || 'none',
+    data.counter_glow_enabled,
+    data.glow_color,
+    data.glow_intensity_px || 8,
+    data.wave_colors,
+    data.pulse_speed_s,
+    data.shake_intensity);
+
+  applyEffects(subtitleEl,
+    data.subtitle_effect || 'none',
+    data.subtitle_glow_enabled,
+    data.glow_color,
+    data.glow_intensity_px || 8,
+    data.wave_colors,
+    data.pulse_speed_s,
+    data.shake_intensity);
+
+  // Particles (global)
+  updateParticles(data.particles_enabled, data.particle_count || 15, data.particle_color);
+}
 
 function applyStyles(el, styleObj) {
   el.style.fontSize = (styleObj.font_size_px || 48) + 'px';
@@ -215,29 +551,41 @@ function updateOverlay() {
       if (data.completedTextColor !== undefined) completedStyle.color = data.completedTextColor;
       if (data.completedTextSize !== undefined) completedStyle.size = data.completedTextSize;
 
+      // Apply visual effects (sets effect classes only)
+      updateEffects(data);
+
+      // Set counter state class (preserves effect classes)
+      function setCounterState(state) {
+        counterEl.classList.remove('danger', 'warning', 'completed', 'paused-state');
+        if (state) counterEl.classList.add(state);
+      }
+
       if (data.enabled === false) {
         counterEl.textContent = '--:--:--';
-        counterEl.className = '';
+        setCounterState(null);
         bannerEl.classList.remove('visible');
       } else if (data.paused) {
-        counterEl.className = 'warning';
+        counterEl.textContent = formatTime(data.remainingSeconds);
+        setCounterState('warning');
         bannerEl.classList.remove('visible');
       } else if (data.completed) {
         counterEl.textContent = '00:00:00';
-        counterEl.className = 'completed';
+        setCounterState('completed');
         bannerEl.textContent = completedStyle.text;
         bannerEl.style.color = completedStyle.color;
         bannerEl.style.fontSize = completedStyle.size + 'px';
         bannerEl.classList.add('visible');
+        // Confetti celebration (only once per completion)
+        spawnConfetti();
       } else {
         const formatted = data.format || formatTime(data.remainingSeconds);
         counterEl.textContent = formatted;
         if (data.remainingSeconds <= 10) {
-          counterEl.className = 'danger';
+          setCounterState('danger');
         } else if (data.remainingSeconds <= 60) {
-          counterEl.className = 'warning';
+          setCounterState('warning');
         } else {
-          counterEl.className = '';
+          setCounterState(null);
         }
         bannerEl.classList.remove('visible');
       }

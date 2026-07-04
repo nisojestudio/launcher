@@ -41,4 +41,8 @@ std::string GameConfig::get_string(std::string_view key, std::string fallback) c
         : fallback;
 }
 
+const std::unordered_map<std::string, GameConfigValue>& GameConfig::values() const noexcept {
+    return values_;
+}
+
 } // namespace nlp3::gamesdk

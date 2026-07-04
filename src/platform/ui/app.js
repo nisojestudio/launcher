@@ -339,6 +339,22 @@
     timerTickSoundVolume: $("#timer-tick-sound-volume"),
     timerAddSoundPath: $("#timer-add-sound-path"),
     timerAddSoundVolume: $("#timer-add-sound-volume"),
+    // Effects
+    timerTitleEffect: $("#timer-title-effect"),
+    timerCounterEffect: $("#timer-counter-effect"),
+    timerSubtitleEffect: $("#timer-subtitle-effect"),
+    timerTitleGlow: $("#timer-title-glow"),
+    timerCounterGlow: $("#timer-counter-glow"),
+    timerSubtitleGlow: $("#timer-subtitle-glow"),
+    timerGlowColor: $("#timer-glow-color"),
+    timerGlowIntensity: $("#timer-glow-intensity"),
+
+    timerWaveColors: $("#timer-wave-colors"),
+    timerPulseSpeed: $("#timer-pulse-speed"),
+    timerShakeIntensity: $("#timer-shake-intensity"),
+    timerParticlesEnabled: $("#timer-particles-enabled"),
+    timerParticleCount: $("#timer-particle-count"),
+    timerParticleColor: $("#timer-particle-color"),
   };
 
   const SAMPLE_AVATAR_DATA_URL =
@@ -3271,6 +3287,21 @@
         tick_sound_volume: parseFloat(els.timerTickSoundVolume?.value) || 1.0,
         add_sound_path: els.timerAddSoundPath?.value || "",
         add_sound_volume: parseFloat(els.timerAddSoundVolume?.value) || 1.0,
+        // Effects
+        title_effect: els.timerTitleEffect?.value || "none",
+        counter_effect: els.timerCounterEffect?.value || "none",
+        subtitle_effect: els.timerSubtitleEffect?.value || "none",
+        title_glow_enabled: !!els.timerTitleGlow?.checked,
+        counter_glow_enabled: !!els.timerCounterGlow?.checked,
+        subtitle_glow_enabled: !!els.timerSubtitleGlow?.checked,
+        glow_color: els.timerGlowColor?.value || "#FFD700",
+        glow_intensity_px: parseInt(els.timerGlowIntensity?.value, 10) || 8,
+        wave_colors: els.timerWaveColors?.value || "#FF6B6B,#4ECDC4,#FFE66D",
+        pulse_speed_s: parseFloat(els.timerPulseSpeed?.value) || 1.5,
+        shake_intensity: els.timerShakeIntensity?.value || "normal",
+        particles_enabled: !!els.timerParticlesEnabled?.checked,
+        particle_count: parseInt(els.timerParticleCount?.value, 10) || 15,
+        particle_color: els.timerParticleColor?.value || "#FFD700",
       };
       try {
         const result = await apiPostJson("/api/timer/configure", config);
@@ -3294,6 +3325,107 @@
         setText(els.timerOverlayCopy, "Error", { animate: true });
       }
     });
+
+    // --- Timer preview iframe ---
+    const previewWrapper = document.getElementById('timer-preview-wrapper');
+    const previewIframe = document.getElementById('timer-preview-iframe');
+    const previewDetails = document.getElementById('timer-preview-details');
+    let previewVisible = false;
+
+    function updatePreviewUrl() {
+      if (previewIframe) {
+        const url = _timerOverlayUrl || `${window.location.origin}/overlay/live-timer`;
+        previewIframe.src = url + (url.includes('?') ? '&' : '?') + 'preview=1&t=' + Date.now();
+      }
+    }
+
+    // Show preview and refresh it when opening the details
+    if (previewDetails) {
+      previewDetails.addEventListener('toggle', function() {
+        if (previewDetails.open) {
+          previewVisible = true;
+          if (previewWrapper) previewWrapper.hidden = false;
+          updatePreviewUrl();
+        } else {
+          previewVisible = false;
+        }
+      });
+    }
+
+    // Refresh preview when config is applied
+    const origApplyTimerConfig = els.timerApplyConfig?.click;
+    if (els.timerApplyConfig) {
+      els.timerApplyConfig.addEventListener('click', function() {
+        // Refresh preview after a short delay (config needs time to propagate)
+        if (previewVisible) setTimeout(updatePreviewUrl, 500);
+      });
+    }
+
+    // --- Timer keyboard shortcuts (safe: only when no input/textarea/select focused) ---
+    function isEditableFocused() {
+      const el = document.activeElement;
+      if (!el) return false;
+      const tag = el.tagName.toLowerCase();
+      if (tag === 'input' || tag === 'textarea' || tag === 'select') return true;
+      if (el.isContentEditable) return true;
+      return false;
+    }
+
+    document.addEventListener('keydown', function(e) {
+      // Only act on timer panel shortcuts
+      const timerPanel = document.querySelector('.timer-panel');
+      if (!timerPanel || !timerPanel.contains(e.target) && !timerPanel.contains(document.activeElement)) {
+        // Allow global shortcut for V (preview toggle) even outside
+        if (e.key !== 'v' && e.key !== 'V') return;
+      }
+
+      // Ignore if typing in a field
+      if (isEditableFocused()) return;
+
+      switch (e.key) {
+        case ' ': // Space = pause/resume
+        case 'Space':
+          e.preventDefault();
+          if (els.timerPause && els.timerPause.style.display !== 'none') {
+            els.timerPause.click();
+          } else if (els.timerResume && els.timerResume.style.display !== 'none') {
+            els.timerResume.click();
+          } else if (els.timerStart && els.timerStart.style.display !== 'none') {
+            els.timerStart.click();
+          }
+          break;
+        case 'r':
+        case 'R':
+          e.preventDefault();
+          if (els.timerReset) els.timerReset.click();
+          break;
+        case '+':
+          e.preventDefault();
+          if (els.timerAdjustPos) els.timerAdjustPos.click();
+          break;
+        case '-':
+        case '_':
+          e.preventDefault();
+          if (els.timerAdjustNeg) els.timerAdjustNeg.click();
+          break;
+        case 'v':
+        case 'V':
+          e.preventDefault();
+          if (previewDetails) {
+            previewDetails.open = !previewDetails.open;
+          }
+          break;
+      }
+    });
+
+    // Update preview URL when overlay URL changes
+    const origTimerUpdate = state.onPayloadUpdate;
+    state.onPayloadUpdate = function(payload) {
+      if (origTimerUpdate) origTimerUpdate(payload);
+      if (payload && payload.timer && payload.timer.overlayTunnelUrl) {
+        _timerOverlayUrl = payload.timer.overlayTunnelUrl;
+      }
+    };
 
     // --- Timer config export/import ---
     els.timerExportConfig?.addEventListener("click", async () => {
@@ -3349,6 +3481,56 @@
         if (config.tick_sound_volume !== undefined) els.timerTickSoundVolume.value = config.tick_sound_volume;
         if (config.add_sound_path !== undefined) els.timerAddSoundPath.value = config.add_sound_path;
         if (config.add_sound_volume !== undefined) els.timerAddSoundVolume.value = config.add_sound_volume;
+        // Effects
+        if (config.title_effect !== undefined) els.timerTitleEffect.value = config.title_effect;
+        if (config.counter_effect !== undefined) els.timerCounterEffect.value = config.counter_effect;
+        if (config.subtitle_effect !== undefined) els.timerSubtitleEffect.value = config.subtitle_effect;
+        if (config.title_glow_enabled !== undefined) els.timerTitleGlow.checked = !!config.title_glow_enabled;
+        if (config.counter_glow_enabled !== undefined) els.timerCounterGlow.checked = !!config.counter_glow_enabled;
+        if (config.subtitle_glow_enabled !== undefined) els.timerSubtitleGlow.checked = !!config.subtitle_glow_enabled;
+        if (config.glow_color !== undefined) els.timerGlowColor.value = config.glow_color;
+        if (config.glow_intensity_px !== undefined) {
+          // Select may not have this exact value; set or add custom
+          const gi = els.timerGlowIntensity;
+          if (gi) {
+            const opt = gi.querySelector('option[value="' + config.glow_intensity_px + '"]');
+            if (opt) gi.value = config.glow_intensity_px;
+          }
+        }
+        if (config.wave_colors !== undefined) {
+          const wc = els.timerWaveColors;
+          if (wc) {
+            const opt = Array.from(wc.options).find(function(o) { return o.value === config.wave_colors; });
+            if (opt) wc.value = config.wave_colors;
+            else {
+              // Add custom option for saved palette not in presets
+              const custom = document.createElement('option');
+              custom.value = config.wave_colors;
+              custom.textContent = 'Personalizado';
+              custom.selected = true;
+              wc.prepend(custom);
+            }
+          }
+        }
+        if (config.pulse_speed_s !== undefined) {
+          const ps = els.timerPulseSpeed;
+          if (ps) {
+            const opt = ps.querySelector('option[value="' + config.pulse_speed_s + '"]');
+            if (opt) ps.value = config.pulse_speed_s;
+          }
+        }
+        if (config.shake_intensity !== undefined) els.timerShakeIntensity.value = config.shake_intensity;
+        if (config.particles_enabled !== undefined) els.timerParticlesEnabled.checked = !!config.particles_enabled;
+        if (config.particle_count !== undefined) {
+          const pc = els.timerParticleCount;
+          if (pc) {
+            const opt = pc.querySelector('option[value="' + config.particle_count + '"]');
+            if (opt) pc.value = config.particle_count;
+          }
+        }
+        if (config.particle_color !== undefined) els.timerParticleColor.value = config.particle_color;
+        // Sync +Resplandor toggles
+        if (typeof updateGlowToggles === 'function') updateGlowToggles();
         // Trigger preview update
         updateSubtitlePreview();
         setText(els.timerConfigStatus, "Campos rellenados. Aplicar para enviar.", { animate: true });
@@ -3407,6 +3589,58 @@
         }
       });
       input.click();
+    });
+
+    // Disable "+Resplandor" checkbox when effect is "Brillo neón" (redundant)
+    function updateGlowToggles() {
+      const selectors = [
+        { select: els.timerTitleEffect, toggle: els.timerTitleGlow },
+        { select: els.timerCounterEffect, toggle: els.timerCounterGlow },
+        { select: els.timerSubtitleEffect, toggle: els.timerSubtitleGlow }
+      ];
+      for (const { select, toggle } of selectors) {
+        if (!select || !toggle) continue;
+        const isGlow = select.value === 'glow';
+        toggle.disabled = isGlow;
+        toggle.closest('.timer-glow-toggle')?.classList.toggle('disabled', isGlow);
+        if (isGlow) toggle.checked = false;
+      }
+    }
+    els.timerTitleEffect?.addEventListener("change", updateGlowToggles);
+    els.timerCounterEffect?.addEventListener("change", updateGlowToggles);
+    els.timerSubtitleEffect?.addEventListener("change", updateGlowToggles);
+    updateGlowToggles(); // initial state
+
+    // "Temas rápidos" preset buttons
+    function applyEffectPreset(preset) {
+      const presets = {
+        elegant:   { title:'pulse', counter:'pulse', subtitle:'none', titleGlow:true, counterGlow:true,
+                     glowIntensity:'8', particles:true, particleCount:'15', particleColor:'#FFD700' },
+        energy:    { title:'shake', counter:'shake', subtitle:'none', titleGlow:true, counterGlow:true,
+                     shakeIntensity:'heavy', glowIntensity:'16', particles:true, particleCount:'30', particleColor:'#FF4444' },
+        rainbow:   { title:'wave', counter:'wave', subtitle:'none', titleGlow:false, counterGlow:false,
+                     waveColors:'#FF6B6B,#4ECDC4,#FFE66D', particles:false },
+        minimal:   { title:'none', counter:'none', subtitle:'none', titleGlow:false, counterGlow:false,
+                     particles:false }
+      };
+      const p = presets[preset];
+      if (!p) return;
+      if (els.timerTitleEffect) els.timerTitleEffect.value = p.title;
+      if (els.timerCounterEffect) els.timerCounterEffect.value = p.counter;
+      if (els.timerSubtitleEffect) els.timerSubtitleEffect.value = p.subtitle;
+      if (els.timerTitleGlow) els.timerTitleGlow.checked = !!p.titleGlow;
+      if (els.timerCounterGlow) els.timerCounterGlow.checked = !!p.counterGlow;
+      if (els.timerSubtitleGlow) els.timerSubtitleGlow.checked = false;
+      if (p.glowIntensity && els.timerGlowIntensity) els.timerGlowIntensity.value = p.glowIntensity;
+      if (p.shakeIntensity && els.timerShakeIntensity) els.timerShakeIntensity.value = p.shakeIntensity;
+      if (p.waveColors && els.timerWaveColors) els.timerWaveColors.value = p.waveColors;
+      if (p.particles !== undefined && els.timerParticlesEnabled) els.timerParticlesEnabled.checked = p.particles;
+      if (p.particleCount && els.timerParticleCount) els.timerParticleCount.value = p.particleCount;
+      if (p.particleColor && els.timerParticleColor) els.timerParticleColor.value = p.particleColor;
+      updateGlowToggles();
+    }
+    document.querySelectorAll('[data-preset]').forEach(btn => {
+      btn.addEventListener('click', () => applyEffectPreset(btn.dataset.preset));
     });
   }
 

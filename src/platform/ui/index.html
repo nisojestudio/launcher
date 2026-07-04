@@ -185,6 +185,30 @@
             <button class="primary-button timer-adjust-apply" id="timer-adjust-apply" type="button" title="Aplicar ajuste">Aplicar</button>
           </div>
 
+          <div class="timer-keyboard-hints" style="font-size:11px;color:var(--text-dim);margin:4px 0 6px;text-align:center;user-select:none">
+            <kbd style="background:var(--bg-surface);padding:1px 5px;border-radius:3px;border:1px solid var(--border);font-size:10px">Espacio</kbd> Pausa
+            <span style="margin:0 6px;opacity:0.3">|</span>
+            <kbd style="background:var(--bg-surface);padding:1px 5px;border-radius:3px;border:1px solid var(--border);font-size:10px">R</kbd> Reiniciar
+            <span style="margin:0 6px;opacity:0.3">|</span>
+            <kbd style="background:var(--bg-surface);padding:1px 5px;border-radius:3px;border:1px solid var(--border);font-size:10px">+</kbd> Sumar
+            <span style="margin:0 6px;opacity:0.3">|</span>
+            <kbd style="background:var(--bg-surface);padding:1px 5px;border-radius:3px;border:1px solid var(--border);font-size:10px">&minus;</kbd> Restar
+            <span style="margin:0 6px;opacity:0.3">|</span>
+            <kbd style="background:var(--bg-surface);padding:1px 5px;border-radius:3px;border:1px solid var(--border);font-size:10px">V</kbd> Preview
+            <span class="timer-kbd-note" style="margin-left:6px;opacity:0.5">(solo fuera de inputs)</span>
+          </div>
+
+          <div class="timer-preview-wrapper" id="timer-preview-wrapper" hidden>
+            <details class="timer-config-details" id="timer-preview-details">
+              <summary class="timer-config-summary">Vista previa del overlay</summary>
+              <div class="timer-preview-container">
+                <iframe id="timer-preview-iframe" src="" title="Vista previa del overlay"
+                  style="width:100%;height:200px;border:1px solid var(--border);border-radius:4px;background:#000"
+                  sandbox="allow-scripts allow-same-origin"></iframe>
+              </div>
+            </details>
+          </div>
+
           <details class="timer-config-details">
             <summary class="timer-config-summary">Configuraci&oacute;n</summary>
             <div class="timer-controls">
@@ -399,6 +423,129 @@
                     <input class="timer-input" id="timer-add-sound-volume" type="number" step="0.1" min="0" max="2" value="1.0">
                   </label>
                 </div>
+              </div>
+
+              <!-- Visual effects section -->
+              <div class="timer-config-section" style="grid-column:1/-1">
+                <h3 class="timer-config-title">Efectos visuales</h3>
+
+                <div class="timer-effect-row" title="Efecto visual principal del t&iacute;tulo">
+                  <span class="timer-effect-label">T&iacute;tulo</span>
+                  <select class="timer-input timer-select timer-effect-select" id="timer-title-effect">
+                    <option value="none">Ninguno</option>
+                    <option value="glow">Brillo ne&oacute;n</option>
+                    <option value="pulse">Latido</option>
+                    <option value="shake">Temblor</option>
+                    <option value="wave">Ola de color</option>
+                  </select>
+                  <label class="option-chip timer-glow-toggle" style="margin-left:4px" title="A&ntilde;ade brillo extra al texto">
+                    <input id="timer-title-glow" type="checkbox">
+                    <span>+Resplandor</span>
+                  </label>
+                </div>
+
+                <div class="timer-effect-row" title="Efecto visual principal del contador">
+                  <span class="timer-effect-label">Contador</span>
+                  <select class="timer-input timer-select timer-effect-select" id="timer-counter-effect">
+                    <option value="none">Ninguno</option>
+                    <option value="glow">Brillo ne&oacute;n</option>
+                    <option value="pulse">Latido</option>
+                    <option value="shake">Temblor</option>
+                    <option value="wave">Ola de color</option>
+                  </select>
+                  <label class="option-chip timer-glow-toggle" style="margin-left:4px" title="A&ntilde;ade brillo extra al texto">
+                    <input id="timer-counter-glow" type="checkbox">
+                    <span>+Resplandor</span>
+                  </label>
+                </div>
+
+                <div class="timer-effect-row" title="Efecto visual principal del subt&iacute;tulo">
+                  <span class="timer-effect-label">Subt&iacute;tulo</span>
+                  <select class="timer-input timer-select timer-effect-select" id="timer-subtitle-effect">
+                    <option value="none">Ninguno</option>
+                    <option value="glow">Brillo ne&oacute;n</option>
+                    <option value="pulse">Latido</option>
+                    <option value="shake">Temblor</option>
+                    <option value="wave">Ola de color</option>
+                  </select>
+                  <label class="option-chip timer-glow-toggle" style="margin-left:4px" title="A&ntilde;ade brillo extra al texto">
+                    <input id="timer-subtitle-glow" type="checkbox">
+                    <span>+Resplandor</span>
+                  </label>
+                </div>
+
+                <div class="timer-effect-presets" style="display:flex;gap:6px;flex-wrap:wrap;margin:6px 0 10px">
+                  <span style="font-size:12px;color:var(--text-dim);align-self:center;margin-right:4px">Temas r&aacute;pidos:</span>
+                  <button class="secondary-button" style="font-size:11px;padding:2px 8px" type="button" data-preset="elegant">Elegante</button>
+                  <button class="secondary-button" style="font-size:11px;padding:2px 8px" type="button" data-preset="energy">Energ&iacute;a</button>
+                  <button class="secondary-button" style="font-size:11px;padding:2px 8px" type="button" data-preset="rainbow">Arco&iacute;ris</button>
+                  <button class="secondary-button" style="font-size:11px;padding:2px 8px" type="button" data-preset="minimal">Minimal</button>
+                </div>
+
+                <details class="timer-effect-params">
+                  <summary class="timer-effect-params-summary">Par&aacute;metros de efectos</summary>
+                  <div class="timer-effect-params-body">
+                    <label class="timer-field" title="Brillo alrededor del texto">
+                      <span>Color del resplandor</span>
+                      <input class="timer-input timer-color-picker" id="timer-glow-color" type="color" value="#FFD700">
+                    </label>
+                    <label class="timer-field" title="Qu&eacute; tan intenso es el brillo">
+                      <span>Intensidad del resplandor</span>
+                      <select class="timer-input timer-select" id="timer-glow-intensity">
+                        <option value="4">Sutil</option>
+                        <option value="8" selected>Medio</option>
+                        <option value="16">Fuerte</option>
+                        <option value="30">Intenso</option>
+                      </select>
+                    </label>
+                    <label class="timer-field" title="Combinaci&oacute;n de colores para el efecto Ola">
+                      <span>Paleta del wave</span>
+                      <select class="timer-input timer-select" id="timer-wave-colors">
+                        <option value="#FF6B6B,#4ECDC4,#FFE66D">Arco&iacute;ris</option>
+                        <option value="#FF4500,#FF8C00,#FFD700">Puesta de sol</option>
+                        <option value="#00FF88,#00DDFF,#8844FF">Ne&oacute;n</option>
+                        <option value="#66CCFF,#99EEFF,#FFFFFF">Hielo</option>
+                        <option value="#FF0000,#FF4400,#FF8800">Fuego</option>
+                        <option value="#FF69B4,#FF1493,#8B008B">Rosa</option>
+                      </select>
+                    </label>
+                    <label class="timer-field" title="Velocidad del latido del texto">
+                      <span>Velocidad del latido</span>
+                      <select class="timer-input timer-select" id="timer-pulse-speed">
+                        <option value="3">Lento</option>
+                        <option value="1.5" selected>Normal</option>
+                        <option value="0.5">R&aacute;pido</option>
+                      </select>
+                    </label>
+                    <label class="timer-field" title="Qu&eacute; tan fuerte se mueve el texto">
+                      <span>Intensidad del temblor</span>
+                      <select class="timer-input timer-select" id="timer-shake-intensity">
+                        <option value="light">Suave</option>
+                        <option value="normal" selected>Normal</option>
+                        <option value="heavy">Fuerte</option>
+                      </select>
+                    </label>
+                    <label class="timer-field" style="border-top:1px solid var(--border);padding-top:8px;margin-top:4px">
+                      <span class="option-chip">
+                        <input id="timer-particles-enabled" type="checkbox">
+                        <span>Part&iacute;culas flotantes</span>
+                      </span>
+                    </label>
+                    <label class="timer-field" title="Cu&aacute;ntas part&iacute;culas aparecen">
+                      <span>Cantidad de part&iacute;culas</span>
+                      <select class="timer-input timer-select" id="timer-particle-count">
+                        <option value="5">Pocas (5)</option>
+                        <option value="15" selected>Normales (15)</option>
+                        <option value="30">Muchas (30)</option>
+                        <option value="50">Lluvia (50)</option>
+                      </select>
+                    </label>
+                    <label class="timer-field">
+                      <span>Color de part&iacute;culas</span>
+                      <input class="timer-input timer-color-picker" id="timer-particle-color" type="color" value="#FFD700">
+                    </label>
+                  </div>
+                </details>
               </div>
 
               <div class="timer-events-feed" id="timer-events-feed">

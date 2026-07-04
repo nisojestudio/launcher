@@ -745,7 +745,17 @@ bool PanelApp::initialize(const std::string& config_path) {
 
         live_timer_game_ = std::make_unique<games::LiveTimerGame>();
         live_timer_game_->apply_config(live_timer_game_->default_config());
-        live_timer_game_->arm();
+
+        // Derive timer save path alongside panel config
+        {
+            const std::filesystem::path cfg_path(config_path_);
+            timer_save_path_ = (cfg_path.parent_path() / "live_timer_save.json").string();
+        }
+
+        // Restore saved timer config + state if available
+        if (!load_timer_state()) {
+            live_timer_game_->arm();
+        }
 
         refresh_external_game_manifests();
 
@@ -806,6 +816,116 @@ bool PanelApp::save_config(const std::string& config_path) const {
 
     PanelConfigStorage storage;
     return storage.save_to_file(config_, resolved_config_path);
+}
+
+bool PanelApp::save_timer_state() {
+    if (live_timer_game_ == nullptr || timer_save_path_.empty()) {
+        return false;
+    }
+    try {
+        using nlohmann::ordered_json;
+        ordered_json root;
+        root["version"] = 1;
+
+        // Serialize GameConfig
+        ordered_json config_json = ordered_json::object();
+        for (const auto& [key, value] : live_timer_game_->config().values()) {
+            if (std::holds_alternative<bool>(value)) {
+                config_json[key] = std::get<bool>(value);
+            } else if (std::holds_alternative<std::int64_t>(value)) {
+                config_json[key] = std::get<std::int64_t>(value);
+            } else if (std::holds_alternative<double>(value)) {
+                config_json[key] = std::get<double>(value);
+            } else if (std::holds_alternative<std::string>(value)) {
+                config_json[key] = std::get<std::string>(value);
+            }
+        }
+        root["config"] = std::move(config_json);
+
+        // Serialize runtime state
+        const auto& st = live_timer_game_->state();
+        const auto now_ms = now_wall_clock_ms();
+        // Use remaining_seconds() to get current remaining (accounts for elapsed time when running)
+        const double current_remaining = live_timer_game_->remaining_seconds();
+
+        ordered_json state_json = ordered_json::object();
+        state_json["remaining_seconds"] = current_remaining;
+        state_json["running"] = live_timer_game_->is_running();
+        state_json["paused"] = st.paused;
+        state_json["completed"] = st.completed;
+        state_json["enabled"] = live_timer_game_->is_enabled();
+        state_json["saved_at_ms"] = now_ms;
+        root["state"] = std::move(state_json);
+
+        // Ensure directory exists
+        const std::filesystem::path path(timer_save_path_);
+        if (path.has_parent_path()) {
+            std::error_code ec;
+            std::filesystem::create_directories(path.parent_path(), ec);
+        }
+
+        std::ofstream output(timer_save_path_, std::ios::binary | std::ios::trunc);
+        if (!output) return false;
+        output << root.dump(2) << "\n";
+        return output.good();
+    } catch (...) {
+        return false;
+    }
+}
+
+bool PanelApp::load_timer_state() {
+    if (live_timer_game_ == nullptr || timer_save_path_.empty()) {
+        return false;
+    }
+    try {
+        if (!std::filesystem::exists(timer_save_path_)) {
+            return false;
+        }
+        std::ifstream input(timer_save_path_, std::ios::binary);
+        if (!input) return false;
+
+        std::ostringstream buffer;
+        buffer << input.rdbuf();
+        if (!input.good() && !input.eof()) return false;
+
+        const auto root = nlohmann::json::parse(buffer.str(), nullptr, false);
+        if (root.is_discarded() || !root.is_object()) return false;
+
+        // 1. Restore config
+        gamesdk::GameConfig saved_config = live_timer_game_->default_config();
+        const auto it_cfg = root.find("config");
+        if (it_cfg != root.end() && it_cfg->is_object()) {
+            for (const auto& [key, val] : it_cfg->items()) {
+                if (val.is_boolean()) {
+                    saved_config.set(key, val.get<bool>());
+                } else if (val.is_number_integer()) {
+                    saved_config.set(key, val.get<std::int64_t>());
+                } else if (val.is_number_float()) {
+                    saved_config.set(key, val.get<double>());
+                } else if (val.is_string()) {
+                    saved_config.set(key, val.get<std::string>());
+                }
+            }
+        }
+        live_timer_game_->apply_config(saved_config);
+
+        // 2. Restore saved runtime state
+        const auto it_st = root.find("state");
+        if (it_st != root.end() && it_st->is_object()) {
+            const auto& s = *it_st;
+            const double remaining = s.value("remaining_seconds", live_timer_game_->state().initial_seconds);
+            const bool running = s.value("running", false);
+            const bool paused = s.value("paused", false);
+            const bool completed = s.value("completed", false);
+            const bool enabled = s.value("enabled", true);
+
+            live_timer_game_->restore_state(remaining, running, paused, completed, enabled);
+        }
+
+        return true;
+    } catch (...) {
+        return false;
+    }
 }
 
 bool PanelApp::apply_live_config() {
@@ -1040,6 +1160,12 @@ PanelTickResult PanelApp::tick(std::uint64_t now_ms) {
     if (live_timer_game_ != nullptr) {
         live_timer_game_->poll_completion_sound();
         live_timer_game_->poll_tick_sound();
+
+        // Auto-save timer state every 30s to preserve config + runtime on restart
+        if (now_ms > 0 && (now_ms - last_timer_save_ms_ >= 30000)) {
+            save_timer_state();
+            last_timer_save_ms_ = now_ms;
+        }
     }
 
     return result;

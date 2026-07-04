@@ -66,6 +66,22 @@ constexpr std::string_view kTickSoundVolume = "tick_sound_volume";
 constexpr std::string_view kAddSoundPath = "add_sound_path";
 constexpr std::string_view kAddSoundVolume = "add_sound_volume";
 
+// Effect config keys
+constexpr std::string_view kTitleEffect = "title_effect";
+constexpr std::string_view kCounterEffect = "counter_effect";
+constexpr std::string_view kSubtitleEffect = "subtitle_effect";
+constexpr std::string_view kTitleGlow = "title_glow_enabled";
+constexpr std::string_view kCounterGlow = "counter_glow_enabled";
+constexpr std::string_view kSubtitleGlow = "subtitle_glow_enabled";
+constexpr std::string_view kGlowColor = "glow_color";
+constexpr std::string_view kGlowIntensity = "glow_intensity_px";
+constexpr std::string_view kWaveColors = "wave_colors";
+constexpr std::string_view kPulseSpeed = "pulse_speed_s";
+constexpr std::string_view kShakeIntensity = "shake_intensity";
+constexpr std::string_view kParticlesEnabled = "particles_enabled";
+constexpr std::string_view kParticleCount = "particle_count";
+constexpr std::string_view kParticleColor = "particle_color";
+
 constexpr double kMaxRecentEventsAgeS = 4.0;
 constexpr std::size_t kMaxRecentEvents = 6;
 
@@ -222,6 +238,22 @@ gamesdk::GameConfig LiveTimerGame::default_config() const {
     config.set(std::string(kAddSoundPath), std::string(""));
     config.set(std::string(kAddSoundVolume), 1.0);
 
+    // Visual effects defaults
+    config.set(std::string(kTitleEffect), std::string("none"));
+    config.set(std::string(kCounterEffect), std::string("none"));
+    config.set(std::string(kSubtitleEffect), std::string("none"));
+    config.set(std::string(kTitleGlow), false);
+    config.set(std::string(kCounterGlow), false);
+    config.set(std::string(kSubtitleGlow), false);
+    config.set(std::string(kGlowColor), std::string("#FFD700"));
+    config.set(std::string(kGlowIntensity), std::int64_t{8});
+    config.set(std::string(kWaveColors), std::string("#FF6B6B,#4ECDC4,#FFE66D"));
+    config.set(std::string(kPulseSpeed), 1.5);
+    config.set(std::string(kShakeIntensity), std::string("normal"));
+    config.set(std::string(kParticlesEnabled), false);
+    config.set(std::string(kParticleCount), std::int64_t{15});
+    config.set(std::string(kParticleColor), std::string("#FFD700"));
+
     return config;
 }
 
@@ -320,6 +352,54 @@ void LiveTimerGame::apply_config(const gamesdk::GameConfig& config) {
     state_.tick_sound_volume = config_.get_double(kTickSoundVolume, 1.0);
     state_.add_sound_path = config_.get_string(kAddSoundPath, "");
     state_.add_sound_volume = config_.get_double(kAddSoundVolume, 1.0);
+
+    // Apply visual effects from config
+    apply_string(kTitleEffect);
+    apply_string(kCounterEffect);
+    apply_string(kSubtitleEffect);
+    apply_bool(kTitleGlow);
+    apply_bool(kCounterGlow);
+    apply_bool(kSubtitleGlow);
+    apply_string(kGlowColor);
+    apply_int(kGlowIntensity);
+    apply_string(kWaveColors);
+    apply_double(kPulseSpeed);
+    apply_string(kShakeIntensity);
+    apply_bool(kParticlesEnabled);
+    apply_int(kParticleCount);
+    apply_string(kParticleColor);
+
+    // Validate effect names — fall back to "none" if invalid
+    auto validate_effect = [&](std::string_view key, std::string_view fallback) {
+        auto raw = config_.get_string(key, fallback);
+        if (raw != "none" && raw != "glow" && raw != "pulse" && raw != "shake" && raw != "wave") {
+            raw = fallback;
+            config_.set(std::string(key), std::string(raw));
+        }
+        return std::string(raw);
+    };
+    state_.title_effect = validate_effect(kTitleEffect, "none");
+    state_.counter_effect = validate_effect(kCounterEffect, "none");
+    state_.subtitle_effect = validate_effect(kSubtitleEffect, "none");
+    state_.title_glow_enabled = config_.get_bool(kTitleGlow, false);
+    state_.counter_glow_enabled = config_.get_bool(kCounterGlow, false);
+    state_.subtitle_glow_enabled = config_.get_bool(kSubtitleGlow, false);
+    state_.glow_color = config_.get_string(kGlowColor, "#FFD700");
+    state_.glow_intensity_px = static_cast<int>(config_.get_double(kGlowIntensity, 8.0));
+    state_.wave_colors = config_.get_string(kWaveColors, "#FF6B6B,#4ECDC4,#FFE66D");
+    state_.pulse_speed_s = config_.get_double(kPulseSpeed, 1.5);
+    // Validate shake_intensity
+    {
+        auto raw = config_.get_string(kShakeIntensity, "normal");
+        if (raw != "light" && raw != "normal" && raw != "heavy") {
+            raw = "normal";
+            config_.set(std::string(kShakeIntensity), std::string(raw));
+        }
+        state_.shake_intensity = raw;
+    }
+    state_.particles_enabled = config_.get_bool(kParticlesEnabled, false);
+    state_.particle_count = static_cast<int>(config_.get_double(kParticleCount, 15.0));
+    state_.particle_color = config_.get_string(kParticleColor, "#FFD700");
 
     apply_visual_style(config_, state_.title_style,
         kTitleFontSize, kTitleFontColor, kTitleFontFamily, kTitleBold,
@@ -674,6 +754,35 @@ bool LiveTimerGame::is_running() const noexcept {
 void LiveTimerGame::reset_config_to_defaults() noexcept {
     config_ = default_config();
     apply_config(config_);
+}
+
+void LiveTimerGame::restore_state(double remaining_seconds, bool running, bool paused,
+                                   bool completed, bool enabled) noexcept {
+    stop_sound();
+    completion_sound_triggered_ = false;
+    last_tick_second_ = -1;
+    state_.recent_events.clear();
+    event_id_counter_ = 0;
+    total_time_added_ = 0.0;
+    enabled_ = enabled;
+
+    state_.remaining_seconds = std::max(0.0, remaining_seconds);
+    state_.running = running && !completed && remaining_seconds > 0.0;
+    state_.paused = paused;
+    state_.completed = completed;
+
+    if (state_.running && !state_.paused) {
+        start_time_ = std::chrono::steady_clock::now();
+        paused_remaining_seconds_ = 0.0;
+    } else {
+        start_time_ = std::chrono::steady_clock::now();
+        paused_remaining_seconds_ = state_.remaining_seconds;
+        state_.running = false;
+    }
+
+    if (state_.completed) {
+        state_.remaining_seconds = 0.0;
+    }
 }
 
 const gamesdk::GameManifest& LiveTimerGameFactory::manifest() const noexcept {

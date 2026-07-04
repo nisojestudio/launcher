@@ -145,8 +145,10 @@ public:
     bool has_active_external_game() const noexcept;
 
     games::LiveTimerGame* live_timer() const noexcept;
+    bool save_timer_state();
 
 private:
+    bool load_timer_state();
     void forward_event_to_timer(const events::HostEvent& event);
     bool activate_external_game_by_id(const std::string& game_id);
     void stop_external_game();
@@ -186,6 +188,8 @@ private:
     std::unique_ptr<games::LiveTimerGame> live_timer_game_{};
 
     std::string config_path_ = "panel_config.json";
+    std::string timer_save_path_{};
+    std::uint64_t last_timer_save_ms_ = 0;
     std::vector<ExternalGameManifest> external_game_manifests_{};
     std::string active_external_game_id_{};
     PanelExternalGameStatus external_game_status_cache_{};

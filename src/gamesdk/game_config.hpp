@@ -25,6 +25,8 @@ public:
     double get_double(std::string_view key, double fallback = 0.0) const noexcept;
     std::string get_string(std::string_view key, std::string fallback = {}) const;
 
+    const std::unordered_map<std::string, GameConfigValue>& values() const noexcept;
+
 private:
     std::unordered_map<std::string, GameConfigValue> values_{};
 };

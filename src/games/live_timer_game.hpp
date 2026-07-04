@@ -75,6 +75,26 @@ struct LiveTimerGameState {
     std::string add_sound_path;
     double add_sound_volume = 1.0;
 
+    // Visual effects — per element
+    // Main effect: "none" | "glow" | "pulse" | "shake" | "wave"
+    std::string title_effect = "none";
+    std::string counter_effect = "none";
+    std::string subtitle_effect = "none";
+    // Glow can stack on top of any main effect
+    bool title_glow_enabled = false;
+    bool counter_glow_enabled = false;
+    bool subtitle_glow_enabled = false;
+
+    // Global effect parameters
+    std::string glow_color = "#FFD700";
+    int glow_intensity_px = 8;
+    std::string wave_colors = "#FF6B6B,#4ECDC4,#FFE66D";
+    double pulse_speed_s = 1.5;
+    std::string shake_intensity = "normal";   // "light" | "normal" | "heavy"
+    bool particles_enabled = false;
+    int particle_count = 15;
+    std::string particle_color = "#FFD700";
+
     std::vector<LiveTimerRecentEvent> recent_events;
 };
 
@@ -114,6 +134,8 @@ public:
     bool is_enabled() const noexcept;
     bool is_running() const noexcept;
     void reset_config_to_defaults() noexcept;
+    void restore_state(double remaining_seconds, bool running, bool paused,
+                       bool completed, bool enabled) noexcept;
 
 private:
     void add_event_popup(std::string_view icon, std::string_view label, double delta);

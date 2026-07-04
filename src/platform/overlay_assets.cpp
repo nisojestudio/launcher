@@ -105,6 +105,20 @@ std::string build_live_timer_state_json(const games::LiveTimerGame* game) {
         << "\"completedTextColor\":" << json_quote(s.on_complete_text_color) << ","
         << "\"completedTextSize\":" << s.on_complete_text_size << ","
         << "\"bgColor\":\"transparent\","
+        << "\"title_effect\":" << json_quote(s.title_effect) << ","
+        << "\"counter_effect\":" << json_quote(s.counter_effect) << ","
+        << "\"subtitle_effect\":" << json_quote(s.subtitle_effect) << ","
+        << "\"title_glow_enabled\":" << (s.title_glow_enabled ? "true" : "false") << ","
+        << "\"counter_glow_enabled\":" << (s.counter_glow_enabled ? "true" : "false") << ","
+        << "\"subtitle_glow_enabled\":" << (s.subtitle_glow_enabled ? "true" : "false") << ","
+        << "\"glow_color\":" << json_quote(s.glow_color) << ","
+        << "\"glow_intensity_px\":" << s.glow_intensity_px << ","
+        << "\"wave_colors\":" << json_quote(s.wave_colors) << ","
+        << "\"pulse_speed_s\":" << s.pulse_speed_s << ","
+        << "\"shake_intensity\":" << json_quote(s.shake_intensity) << ","
+        << "\"particles_enabled\":" << (s.particles_enabled ? "true" : "false") << ","
+        << "\"particle_count\":" << s.particle_count << ","
+        << "\"particle_color\":" << json_quote(s.particle_color) << ","
         << "\"recentEvents\":" << events_json.str()
         << "}";
     return oss.str();

@@ -873,7 +873,22 @@ std::string build_live_timer_config_json(const nlp3::games::LiveTimerGame* game)
     add("tick_sound_path"); out << ",";
     add("tick_sound_volume"); out << ",";
     add("add_sound_path"); out << ",";
-    add("add_sound_volume");
+    add("add_sound_volume"); out << ",";
+    // Visual effects
+    add("title_effect"); out << ",";
+    add("counter_effect"); out << ",";
+    add("subtitle_effect"); out << ",";
+    add("title_glow_enabled"); out << ",";
+    add("counter_glow_enabled"); out << ",";
+    add("subtitle_glow_enabled"); out << ",";
+    add("glow_color"); out << ",";
+    add("glow_intensity_px"); out << ",";
+    add("wave_colors"); out << ",";
+    add("pulse_speed_s"); out << ",";
+    add("shake_intensity"); out << ",";
+    add("particles_enabled"); out << ",";
+    add("particle_count"); out << ",";
+    add("particle_color");
     out << "}";
     return out.str();
 }
@@ -977,7 +992,40 @@ std::string handle_timer_configure(PanelApp* app, std::string_view body) {
     maybe_d = parse_json_double(body, "add_sound_volume");
     if (maybe_d.has_value()) config.set("add_sound_volume", std::clamp(*maybe_d, 0.0, 2.0));
 
+    // Visual effects
+    maybe_str = parse_json_string(body, "title_effect");
+    if (maybe_str.has_value()) config.set("title_effect", *maybe_str);
+    maybe_str = parse_json_string(body, "counter_effect");
+    if (maybe_str.has_value()) config.set("counter_effect", *maybe_str);
+    maybe_str = parse_json_string(body, "subtitle_effect");
+    if (maybe_str.has_value()) config.set("subtitle_effect", *maybe_str);
+
+    maybe_bool = parse_json_bool(body, "title_glow_enabled");
+    if (maybe_bool.has_value()) config.set("title_glow_enabled", *maybe_bool);
+    maybe_bool = parse_json_bool(body, "counter_glow_enabled");
+    if (maybe_bool.has_value()) config.set("counter_glow_enabled", *maybe_bool);
+    maybe_bool = parse_json_bool(body, "subtitle_glow_enabled");
+    if (maybe_bool.has_value()) config.set("subtitle_glow_enabled", *maybe_bool);
+
+    maybe_str = parse_json_string(body, "glow_color");
+    if (maybe_str.has_value()) config.set("glow_color", *maybe_str);
+    maybe_i64 = parse_json_uint64(body, "glow_intensity_px");
+    if (maybe_i64.has_value()) config.set("glow_intensity_px", static_cast<std::int64_t>(std::clamp<uint64_t>(*maybe_i64, 1, 60)));
+    maybe_str = parse_json_string(body, "wave_colors");
+    if (maybe_str.has_value()) config.set("wave_colors", *maybe_str);
+    maybe_d = parse_json_double(body, "pulse_speed_s");
+    if (maybe_d.has_value()) config.set("pulse_speed_s", std::clamp(*maybe_d, 0.3, 5.0));
+    maybe_str = parse_json_string(body, "shake_intensity");
+    if (maybe_str.has_value()) config.set("shake_intensity", *maybe_str);
+    maybe_bool = parse_json_bool(body, "particles_enabled");
+    if (maybe_bool.has_value()) config.set("particles_enabled", *maybe_bool);
+    maybe_i64 = parse_json_uint64(body, "particle_count");
+    if (maybe_i64.has_value()) config.set("particle_count", static_cast<std::int64_t>(std::clamp<uint64_t>(*maybe_i64, 0, 60)));
+    maybe_str = parse_json_string(body, "particle_color");
+    if (maybe_str.has_value()) config.set("particle_color", *maybe_str);
+
     timer->apply_config(config);
+    app->save_timer_state();
     return make_simple_result(true, "config_applied");
 }
 
@@ -1318,27 +1366,27 @@ std::string build_route_response(
     }
     if (request.method == "POST" && request.path == "/api/timer/start") {
         auto* timer = app->live_timer();
-        if (timer != nullptr) { timer->on_activated(); }
+        if (timer != nullptr) { timer->on_activated(); app->save_timer_state(); }
         return make_http_response("200 OK", "application/json; charset=utf-8", make_simple_result(timer != nullptr, timer ? "started" : "unavailable"));
     }
     if (request.method == "POST" && request.path == "/api/timer/pause") {
         auto* timer = app->live_timer();
-        if (timer != nullptr) { timer->pause(); }
+        if (timer != nullptr) { timer->pause(); app->save_timer_state(); }
         return make_http_response("200 OK", "application/json; charset=utf-8", make_simple_result(timer != nullptr, timer ? "paused" : "unavailable"));
     }
     if (request.method == "POST" && request.path == "/api/timer/resume") {
         auto* timer = app->live_timer();
-        if (timer != nullptr) { timer->resume(); }
+        if (timer != nullptr) { timer->resume(); app->save_timer_state(); }
         return make_http_response("200 OK", "application/json; charset=utf-8", make_simple_result(timer != nullptr, timer ? "resumed" : "unavailable"));
     }
     if (request.method == "POST" && request.path == "/api/timer/reset") {
         auto* timer = app->live_timer();
-        if (timer != nullptr) { timer->reset(); }
+        if (timer != nullptr) { timer->reset(); app->save_timer_state(); }
         return make_http_response("200 OK", "application/json; charset=utf-8", make_simple_result(timer != nullptr, timer ? "reset" : "unavailable"));
     }
     if (request.method == "POST" && request.path == "/api/timer/stop") {
         auto* timer = app->live_timer();
-        if (timer != nullptr) { timer->stop(); }
+        if (timer != nullptr) { timer->stop(); app->save_timer_state(); }
         return make_http_response("200 OK", "application/json; charset=utf-8", make_simple_result(timer != nullptr, timer ? "stopped" : "unavailable"));
     }
     if (request.method == "POST" && request.path == "/api/timer/adjust") {
@@ -1351,16 +1399,17 @@ std::string build_route_response(
             return make_http_response("200 OK", "application/json; charset=utf-8", make_simple_result(false, "delta_zero"));
         }
         timer->adjust_time(delta);
+        app->save_timer_state();
         return make_http_response("200 OK", "application/json; charset=utf-8", make_simple_result(true, "adjusted"));
     }
     if (request.method == "POST" && request.path == "/api/timer/reset-config") {
         auto* timer = app->live_timer();
-        if (timer != nullptr) { timer->reset_config_to_defaults(); }
+        if (timer != nullptr) { timer->reset_config_to_defaults(); app->save_timer_state(); }
         return make_http_response("200 OK", "application/json; charset=utf-8", make_simple_result(timer != nullptr, timer ? "config_reset" : "unavailable"));
     }
     if (request.method == "POST" && request.path == "/api/timer/toggle") {
         auto* timer = app->live_timer();
-        if (timer != nullptr) { timer->set_enabled(!timer->is_enabled()); }
+        if (timer != nullptr) { timer->set_enabled(!timer->is_enabled()); app->save_timer_state(); }
         return make_http_response("200 OK", "application/json; charset=utf-8", make_simple_result(timer != nullptr, timer ? (timer->is_enabled() ? "enabled" : "disabled") : "unavailable"));
     }
     if (request.method == "POST" && request.path == "/api/host/tts") {
