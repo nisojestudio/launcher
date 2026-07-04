@@ -4,6 +4,21 @@ All notable Panel Live changes should be recorded here.
 
 Format follows a lightweight Keep a Changelog style. Versions use SemVer.
 
+## 0.2.5 - 2026-07-04
+
+### Added
+
+- **Timer presets**: 4 quick-config buttons (Rápido 60s, Maratón 1h, Punitivo, Solo regalo) in timer config panel
+- **mm:ss input**: Timer initial time now accepts "mm:ss" or "hh:mm:ss" format beside plain seconds
+- **Subtitle preview**: Live preview of subtitle text with resolved placeholders in config panel
+- **Completion banner customization**: Text, color, and font size of the "TIEMPO CUMPLIDO" banner are now configurable
+- **Flexible time format**: Overlay shows "1 dia 01:30:00" (plural-aware) instead of hardcoded "Dia 1"
+- **Events feed**: Timer panel now shows a compact live feed of recent events with deltas
+
+### Fixed
+
+- **Timer auto-start**: Timer now starts armed (stopped) instead of auto-starting when panel opens
+
 ## 0.2.4 - 2026-06-24
 
 ### Fixed
