@@ -4,6 +4,24 @@ All notable Panel Live changes should be recorded here.
 
 Format follows a lightweight Keep a Changelog style. Versions use SemVer.
 
+## 0.2.7 - 2026-07-04
+
+### Added
+
+- **Overlay preview in panel**: New collapsible iframe showing the overlay live. Opens with `V` key or clicking "Vista previa del overlay". Auto-refreshes when config is applied.
+- **Confetti celebration**: When timer reaches 0, colorful confetti rains down. 60 particles in 9 colors, auto-cleanup after 6s.
+- **Keyboard shortcuts**: `Space` (pause/resume), `R` (reset), `+`/`-` (adjust time), `V` (preview toggle). Only work when no text field is focused — safe to type normally.
+- **Effect parameter presets**: Wave palette picker (Arcoíris, Neón, Fuego, etc.), pulse speed (Lento/Normal/Rápido), glow intensity (Sutil/Medio/Fuerte/Intenso), particle count (Pocas/Normales/Muchas/Lluvia). No more raw hex codes or technical units.
+- **"Temas rápidos" preset buttons**: Elegante (pulse+brillo), Energía (temblor+partículas), Arcoíris (wave), Minimal (sin efectos).
+- **Effect key validation in C++**: Invalid effect names fall back to "none" instead of being silently stored.
+
+### Fixed
+
+- **Wave animation flickering**: `updateEffects()` now compares effect state before re-applying. The CSS wave animation no longer restarts every 500ms.
+- **Particle system stutter**: Particles now spawn continuously from bottom and self-clean instead of mass-respawning every 8s with `innerHTML = ''`.
+- **Wave + Danger color conflict**: When timer enters danger/warning, wave gradient is suspended and the danger color is shown instead.
+- **Effect classes overwritten by state**: `className = 'danger'` no longer removes `effect-wave`/`effect-pulse` classes. Uses `classList.add/remove`.
+
 ## 0.2.6 - 2026-07-04
 
 ### Added
