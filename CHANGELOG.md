@@ -4,6 +4,19 @@ All notable Panel Live changes should be recorded here.
 
 Format follows a lightweight Keep a Changelog style. Versions use SemVer.
 
+## 0.2.9 - 2026-07-04
+
+### Added
+
+- **Efectos visuales en caliente**: Todos los cambios de efectos, colores y fuentes se envían automáticamente al servidor con debounce de 350ms, sin necesidad de presionar "Aplicar config". La preview del overlay se refresca automáticamente después de cada cambio.
+- **Presets "Temas rápidos" ahora aplican inmediatamente**: Al hacer clic en Elegante, Energía, Arcoíris o Minimal, los cambios se envían al servidor y se reflejan en la preview al instante.
+
+### Fixed
+
+- **Keyboard shortcuts no funcionaban con selects/campos numéricos enfocados**: `isEditableFocused()` ahora solo bloquea shortcuts cuando se está escribiendo texto real, no cuando el foco está en dropdowns de efectos, color pickers o inputs numéricos. Las teclas R, +, -, Space y V funcionan correctamente desde cualquier control del timer.
+- **Tecla + requiere Shift**: Se agregó `=` como alias de `+` para teclados donde `+` requiere Shift.
+- **Preview del overlay no se actualizaba al cambiar efectos**: Ahora la preview se refresca automáticamente 200ms después de cada cambio visual, sin necesidad de abrir/cerrar el panel de preview.
+
 ## 0.2.8 - 2026-07-04
 
 ### Added

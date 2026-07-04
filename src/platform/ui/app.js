@@ -3366,8 +3366,16 @@
       const el = document.activeElement;
       if (!el) return false;
       const tag = el.tagName.toLowerCase();
-      if (tag === 'input' || tag === 'textarea' || tag === 'select') return true;
+      // Only block shortcut when actually typing text (input/textarea with text)
+      if (tag === 'textarea') return true;
+      if (tag === 'input') {
+        // text, search, email, tel, url, password → typing, block shortcuts
+        if (['text','search','email','tel','url','password'].includes(el.type)) return true;
+        // number, color, checkbox, radio, range → not typing, allow shortcuts
+        return false;
+      }
       if (el.isContentEditable) return true;
+      // select, button, etc. → allow shortcuts to pass through
       return false;
     }
 
@@ -3400,6 +3408,7 @@
           if (els.timerReset) els.timerReset.click();
           break;
         case '+':
+        case '=':  // '+' without Shift on some keyboard layouts
           e.preventDefault();
           if (els.timerAdjustPos) els.timerAdjustPos.click();
           break;
@@ -3611,6 +3620,86 @@
     els.timerSubtitleEffect?.addEventListener("change", updateGlowToggles);
     updateGlowToggles(); // initial state
 
+    // --- Auto-send visual config on change (hot) with debounce ---
+    let hotConfigTimer = null;
+    function sendTimerConfigHot() {
+      if (hotConfigTimer) clearTimeout(hotConfigTimer);
+      hotConfigTimer = setTimeout(async () => {
+        hotConfigTimer = null;
+        const config = {
+          title_text: els.timerTitleText?.value || "🎯 Extiende el Live",
+          subtitle_text: els.timerSubtitleText?.value || "📌 Cada coin suma {time_per_gift_coin}s",
+          popup_add_color: els.timerPopupAddColor?.value || "#00AAFF",
+          popup_subtract_color: els.timerPopupSubtractColor?.value || "#FF4444",
+          on_complete_text: els.timerCompleteText?.value || "TIEMPO CUMPLIDO",
+          on_complete_text_color: els.timerCompleteTextColor?.value || "#FFD700",
+          on_complete_text_size: parseInt(els.timerCompleteTextSize?.value, 10) || 48,
+          title_font_size: parseInt(els.timerTitleFontSize?.value, 10) || 48,
+          title_font_color: els.timerTitleFontColor?.value || "#FFFFFF",
+          title_font_family: els.timerTitleFontFamily?.value || "Segoe UI, sans-serif",
+          title_bold: !!els.timerTitleBold?.checked,
+          counter_font_size: parseInt(els.timerCounterFontSize?.value, 10) || 120,
+          counter_font_color: els.timerCounterFontColor?.value || "#00FF88",
+          counter_font_family: els.timerCounterFontFamily?.value || "Segoe UI, monospace",
+          counter_bold: !!els.timerCounterBold?.checked,
+          subtitle_font_size: parseInt(els.timerSubtitleFontSize?.value, 10) || 32,
+          subtitle_font_color: els.timerSubtitleFontColor?.value || "#AAAAAA",
+          subtitle_font_family: els.timerSubtitleFontFamily?.value || "Segoe UI, sans-serif",
+          subtitle_bold: !!els.timerSubtitleBold?.checked,
+          title_effect: els.timerTitleEffect?.value || "none",
+          counter_effect: els.timerCounterEffect?.value || "none",
+          subtitle_effect: els.timerSubtitleEffect?.value || "none",
+          title_glow_enabled: !!els.timerTitleGlow?.checked,
+          counter_glow_enabled: !!els.timerCounterGlow?.checked,
+          subtitle_glow_enabled: !!els.timerSubtitleGlow?.checked,
+          glow_color: els.timerGlowColor?.value || "#FFD700",
+          glow_intensity_px: parseInt(els.timerGlowIntensity?.value, 10) || 8,
+          wave_colors: els.timerWaveColors?.value || "#FF6B6B,#4ECDC4,#FFE66D",
+          pulse_speed_s: parseFloat(els.timerPulseSpeed?.value) || 1.5,
+          shake_intensity: els.timerShakeIntensity?.value || "normal",
+          particles_enabled: !!els.timerParticlesEnabled?.checked,
+          particle_count: parseInt(els.timerParticleCount?.value, 10) || 15,
+          particle_color: els.timerParticleColor?.value || "#FFD700",
+        };
+        try {
+          await apiPostJson("/api/timer/configure", config);
+          // Refresh preview if visible
+          if (typeof previewVisible !== 'undefined' && previewVisible) {
+            setTimeout(updatePreviewUrl, 200);
+          }
+        } catch (_e) {
+          // silent — auto-send errors are non-critical
+        }
+      }, 350);
+    }
+
+    // Wire auto-send to all visual/styling controls
+    const hotControls = [
+      'timerTitleEffect', 'timerCounterEffect', 'timerSubtitleEffect',
+      'timerTitleGlow', 'timerCounterGlow', 'timerSubtitleGlow',
+      'timerGlowColor', 'timerGlowIntensity', 'timerWaveColors',
+      'timerPulseSpeed', 'timerShakeIntensity',
+      'timerParticlesEnabled', 'timerParticleCount', 'timerParticleColor',
+      'timerTitleFontSize', 'timerTitleFontColor', 'timerTitleFontFamily', 'timerTitleBold',
+      'timerCounterFontSize', 'timerCounterFontColor', 'timerCounterFontFamily', 'timerCounterBold',
+      'timerSubtitleFontSize', 'timerSubtitleFontColor', 'timerSubtitleFontFamily', 'timerSubtitleBold',
+      'timerCompleteText', 'timerCompleteTextColor', 'timerCompleteTextSize',
+      'timerPopupAddColor', 'timerPopupSubtractColor',
+      'timerTitleText', 'timerSubtitleText'
+    ];
+    hotControls.forEach(id => {
+      const el = els[id];
+      if (!el) return;
+      const tag = el.tagName.toLowerCase();
+      if (tag === 'select') {
+        el.addEventListener('change', sendTimerConfigHot);
+      } else if (el.type === 'checkbox') {
+        el.addEventListener('change', sendTimerConfigHot);
+      } else {
+        el.addEventListener('input', sendTimerConfigHot);
+      }
+    });
+
     // "Temas rápidos" preset buttons
     function applyEffectPreset(preset) {
       const presets = {
@@ -3638,6 +3727,7 @@
       if (p.particleCount && els.timerParticleCount) els.timerParticleCount.value = p.particleCount;
       if (p.particleColor && els.timerParticleColor) els.timerParticleColor.value = p.particleColor;
       updateGlowToggles();
+      sendTimerConfigHot();
     }
     document.querySelectorAll('[data-preset]').forEach(btn => {
       btn.addEventListener('click', () => applyEffectPreset(btn.dataset.preset));
