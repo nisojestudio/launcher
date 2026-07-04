@@ -323,6 +323,22 @@ void LiveTimerGame::apply_config(const gamesdk::GameConfig& config) {
     apply_string(kAddSoundPath);
     apply_double(kAddSoundVolume);
 
+    // Visual effects — apply BEFORE moving effective to config_
+    apply_string(kTitleEffect);
+    apply_string(kCounterEffect);
+    apply_string(kSubtitleEffect);
+    apply_bool(kTitleGlow);
+    apply_bool(kCounterGlow);
+    apply_bool(kSubtitleGlow);
+    apply_string(kGlowColor);
+    apply_int(kGlowIntensity);
+    apply_string(kWaveColors);
+    apply_double(kPulseSpeed);
+    apply_string(kShakeIntensity);
+    apply_bool(kParticlesEnabled);
+    apply_int(kParticleCount);
+    apply_string(kParticleColor);
+
     config_ = std::move(effective);
 
     state_.time_per_like = config_.get_double(kTimePerLikeS, 2.0);
@@ -352,22 +368,6 @@ void LiveTimerGame::apply_config(const gamesdk::GameConfig& config) {
     state_.tick_sound_volume = config_.get_double(kTickSoundVolume, 1.0);
     state_.add_sound_path = config_.get_string(kAddSoundPath, "");
     state_.add_sound_volume = config_.get_double(kAddSoundVolume, 1.0);
-
-    // Apply visual effects from config
-    apply_string(kTitleEffect);
-    apply_string(kCounterEffect);
-    apply_string(kSubtitleEffect);
-    apply_bool(kTitleGlow);
-    apply_bool(kCounterGlow);
-    apply_bool(kSubtitleGlow);
-    apply_string(kGlowColor);
-    apply_int(kGlowIntensity);
-    apply_string(kWaveColors);
-    apply_double(kPulseSpeed);
-    apply_string(kShakeIntensity);
-    apply_bool(kParticlesEnabled);
-    apply_int(kParticleCount);
-    apply_string(kParticleColor);
 
     // Validate effect names — fall back to "none" if invalid
     auto validate_effect = [&](std::string_view key, std::string fallback) {

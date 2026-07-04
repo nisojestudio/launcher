@@ -4,12 +4,18 @@ All notable Panel Live changes should be recorded here.
 
 Format follows a lightweight Keep a Changelog style. Versions use SemVer.
 
+## 0.2.10 - 2026-07-04
+
+### Fixed
+
+- **CRITICAL — Efectos visuales nunca se aplicaban**: Bug en `LiveTimerGame::apply_config()` donde las 14 propiedades de efectos visuales (`title_effect`, `counter_effect`, `subtitle_effect`, glow, wave, pulse, shake, partículas) se escribían en `effective` DESPUÉS de `config_ = std::move(effective)`, perdiendo todos los valores. Como resultado, `state_.*_effect` siempre quedaba en `"none"` y `state_.*_glow_enabled` / `particles_enabled` siempre en `false`. Ahora los efectos se aplican antes del move y el estado los recibe correctamente.
+
 ## 0.2.9 - 2026-07-04
 
 ### Added
 
-- **Efectos visuales en caliente**: Todos los cambios de efectos, colores y fuentes se envían automáticamente al servidor con debounce de 350ms, sin necesidad de presionar "Aplicar config". La preview del overlay se refresca automáticamente después de cada cambio.
-- **Presets "Temas rápidos" ahora aplican inmediatamente**: Al hacer clic en Elegante, Energía, Arcoíris o Minimal, los cambios se envían al servidor y se reflejan en la preview al instante.
+- **Efectos visuales en caliente**: Todos los cambios de efectos, colores y fuentes se envían automáticamente al servidor con debounce de 350ms, sin necesidad de presionar "Aplicar config". La preview del overlay se refresca automáticamente después de cada cambio. *(Nota: el frontend y el overlay estaban correctos, pero el backend C++ perdía los valores — corregido en 0.2.10)*
+- **Presets "Temas rápidos" ahora aplican inmediatamente**: Al hacer clic en Elegante, Energía, Arcoíris o Minimal, los cambios se envían al servidor y se reflejan en la preview al instante. *(Requiere fix de 0.2.10)*
 
 ### Fixed
 
