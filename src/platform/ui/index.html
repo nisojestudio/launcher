@@ -379,6 +379,26 @@
                     <input class="timer-input" id="timer-sound-volume" type="number" step="0.1" min="0" max="1" value="1.0">
                   </label>
                 </div>
+
+                <div class="timer-config-section">
+                  <h3 class="timer-config-title">Sonidos</h3>
+                  <label class="timer-field">
+                    <span>Sonido de inicio/tick (.wav)</span>
+                    <input class="timer-input" id="timer-tick-sound-path" type="text" value="" placeholder="Vac&iacute;o = beep">
+                  </label>
+                  <label class="timer-field">
+                    <span>Volumen tick</span>
+                    <input class="timer-input" id="timer-tick-sound-volume" type="number" step="0.1" min="0" max="2" value="1.0">
+                  </label>
+                  <label class="timer-field">
+                    <span>Sonido al sumar tiempo (.wav)</span>
+                    <input class="timer-input" id="timer-add-sound-path" type="text" value="" placeholder="Vac&iacute;o = beep">
+                  </label>
+                  <label class="timer-field">
+                    <span>Volumen al sumar</span>
+                    <input class="timer-input" id="timer-add-sound-volume" type="number" step="0.1" min="0" max="2" value="1.0">
+                  </label>
+                </div>
               </div>
 
               <div class="timer-events-feed" id="timer-events-feed">
@@ -390,6 +410,8 @@
 
               <div class="timer-action-row">
                 <button class="primary-button" id="timer-apply-config" type="button">Aplicar configuraci&oacute;n</button>
+                <button class="secondary-button" id="timer-export-config" type="button" title="Copiar configuraci&oacute;n al portapapeles">Exportar</button>
+                <button class="secondary-button" id="timer-import-config" type="button" title="Pegar configuraci&oacute;n desde el portapapeles">Importar</button>
                 <span class="summary-note" id="timer-config-status"></span>
               </div>
             </div>

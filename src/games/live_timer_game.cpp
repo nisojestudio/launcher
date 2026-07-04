@@ -61,6 +61,11 @@ constexpr std::string_view kOnCompleteText = "on_complete_text";
 constexpr std::string_view kOnCompleteTextColor = "on_complete_text_color";
 constexpr std::string_view kOnCompleteTextSize = "on_complete_text_size";
 
+constexpr std::string_view kTickSoundPath = "tick_sound_path";
+constexpr std::string_view kTickSoundVolume = "tick_sound_volume";
+constexpr std::string_view kAddSoundPath = "add_sound_path";
+constexpr std::string_view kAddSoundVolume = "add_sound_volume";
+
 constexpr double kMaxRecentEventsAgeS = 4.0;
 constexpr std::size_t kMaxRecentEvents = 6;
 
@@ -212,6 +217,11 @@ gamesdk::GameConfig LiveTimerGame::default_config() const {
     config.set(std::string(kOnCompleteTextColor), std::string("#FFD700"));
     config.set(std::string(kOnCompleteTextSize), std::int64_t{48});
 
+    config.set(std::string(kTickSoundPath), std::string(""));
+    config.set(std::string(kTickSoundVolume), 1.0);
+    config.set(std::string(kAddSoundPath), std::string(""));
+    config.set(std::string(kAddSoundVolume), 1.0);
+
     return config;
 }
 
@@ -276,6 +286,10 @@ void LiveTimerGame::apply_config(const gamesdk::GameConfig& config) {
     apply_string(kOnCompleteText);
     apply_string(kOnCompleteTextColor);
     apply_int(kOnCompleteTextSize);
+    apply_string(kTickSoundPath);
+    apply_double(kTickSoundVolume);
+    apply_string(kAddSoundPath);
+    apply_double(kAddSoundVolume);
 
     config_ = std::move(effective);
 
@@ -302,6 +316,10 @@ void LiveTimerGame::apply_config(const gamesdk::GameConfig& config) {
     state_.on_complete_text = config_.get_string(kOnCompleteText, "TIEMPO CUMPLIDO");
     state_.on_complete_text_color = config_.get_string(kOnCompleteTextColor, "#FFD700");
     state_.on_complete_text_size = static_cast<int>(config_.get_double(kOnCompleteTextSize, 48.0));
+    state_.tick_sound_path = config_.get_string(kTickSoundPath, "");
+    state_.tick_sound_volume = config_.get_double(kTickSoundVolume, 1.0);
+    state_.add_sound_path = config_.get_string(kAddSoundPath, "");
+    state_.add_sound_volume = config_.get_double(kAddSoundVolume, 1.0);
 
     apply_visual_style(config_, state_.title_style,
         kTitleFontSize, kTitleFontColor, kTitleFontFamily, kTitleBold,
@@ -323,11 +341,14 @@ void LiveTimerGame::on_activated() {
     state_.recent_events.clear();
     total_time_added_ = 0.0;
     start_time_ = std::chrono::steady_clock::now();
+    last_tick_second_ = -1;
+    play_event_sound(state_.tick_sound_path, state_.tick_sound_volume);
 }
 
 void LiveTimerGame::arm() noexcept {
     stop_sound();
     completion_sound_triggered_ = false;
+    last_tick_second_ = -1;
     state_.completed = false;
     state_.paused = false;
     state_.running = false;
@@ -516,6 +537,39 @@ void LiveTimerGame::stop_sound() const noexcept {
 #endif
 }
 
+void LiveTimerGame::play_event_sound(const std::string& path, double volume) const {
+#ifdef _WIN32
+    if (path.empty()) {
+        // No fallback beep (would be synchronous). User should configure a .wav.
+        return;
+    }
+    auto flags = SND_FILENAME | SND_ASYNC | SND_NOSTOP;
+    PlaySoundA(path.c_str(), nullptr, flags);
+#else
+    (void)path;
+    (void)volume;
+#endif
+}
+
+bool LiveTimerGame::poll_tick_sound() noexcept {
+    if (!enabled_ || !state_.running || state_.paused || state_.completed) {
+        last_tick_second_ = -1;
+        return false;
+    }
+    auto rem = remaining_seconds();
+    if (rem > 60.0) {
+        last_tick_second_ = -1;
+        return false;
+    }
+    int current_sec = static_cast<int>(std::floor(rem));
+    if (current_sec != last_tick_second_) {
+        last_tick_second_ = current_sec;
+        play_event_sound(state_.tick_sound_path, state_.tick_sound_volume);
+        return true;
+    }
+    return false;
+}
+
 const LiveTimerGameState& LiveTimerGame::state() const noexcept {
     return state_;
 }
@@ -586,6 +640,10 @@ void LiveTimerGame::adjust_time(double delta) noexcept {
         }
     } else if (state_.max_time_s > 0.0 && state_.remaining_seconds > state_.max_time_s) {
         state_.remaining_seconds = state_.max_time_s;
+    }
+
+    if (delta > 0.0) {
+        play_event_sound(state_.add_sound_path, state_.add_sound_volume);
     }
 
     add_event_popup("\xf0\x9f\x93\x9d", "manual", delta);

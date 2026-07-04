@@ -4,6 +4,18 @@ All notable Panel Live changes should be recorded here.
 
 Format follows a lightweight Keep a Changelog style. Versions use SemVer.
 
+## 0.2.6 - 2026-07-04
+
+### Added
+
+- **Config export/import (B7)**: New Export/Import buttons in timer config panel. Export copies JSON config to clipboard, Import pastes and fills all fields.
+- **Overlay subtitle preview (A9)**: Overlay now shows a "PREVIEW" badge and dimmed subtitle when timer is idle, so the operator can see how it looks in OBS while configuring.
+- **Event sounds (A4)**: New "Sonidos" section in timer config. Configure `.wav` for start/tick sounds (plays every second in last 60s) and add-time sounds (plays when timer receives extra time from events).
+
+### Fixed
+
+- **Config keys missing in server**: `popup_add_color`, `popup_subtract_color`, `on_complete_text/color/size` were not being parsed in POST `/api/timer/configure` nor returned in GET `/api/timer/config`. Now properly handled.
+
 ## 0.2.5 - 2026-07-04
 
 ### Added

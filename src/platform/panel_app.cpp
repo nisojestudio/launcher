@@ -1039,6 +1039,7 @@ PanelTickResult PanelApp::tick(std::uint64_t now_ms) {
 
     if (live_timer_game_ != nullptr) {
         live_timer_game_->poll_completion_sound();
+        live_timer_game_->poll_tick_sound();
     }
 
     return result;

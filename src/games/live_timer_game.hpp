@@ -70,6 +70,11 @@ struct LiveTimerGameState {
     std::string on_complete_text_color = "#FFD700";
     int on_complete_text_size = 48;
 
+    std::string tick_sound_path;
+    double tick_sound_volume = 1.0;
+    std::string add_sound_path;
+    double add_sound_volume = 1.0;
+
     std::vector<LiveTimerRecentEvent> recent_events;
 };
 
@@ -97,6 +102,7 @@ public:
     double remaining_seconds() const noexcept;
     std::string format_time() const;
     bool poll_completion_sound() noexcept;
+    bool poll_tick_sound() noexcept;
 
     void pause() noexcept;
     void resume() noexcept;
@@ -113,6 +119,7 @@ private:
     void add_event_popup(std::string_view icon, std::string_view label, double delta);
     void prune_old_events();
     void play_completion_sound() const;
+    void play_event_sound(const std::string& path, double volume) const;
     void stop_sound() const noexcept;
 
     LiveTimerGameState state_;
@@ -122,6 +129,7 @@ private:
     double total_time_added_ = 0.0;
     int64_t event_id_counter_ = 0;
     bool completion_sound_triggered_ = false;
+    int last_tick_second_ = -1;
     bool enabled_ = true;
 };
 

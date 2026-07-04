@@ -78,6 +78,24 @@ body {
   animation: pulse 0.6s ease-in-out infinite;
 }
 #completed-banner.visible { display: block; }
+#preview-badge {
+  display: none;
+  position: fixed;
+  top: 8px;
+  right: 12px;
+  background: rgba(255,255,255,0.15);
+  color: rgba(255,255,255,0.5);
+  font-size: 12px;
+  font-weight: bold;
+  padding: 3px 10px;
+  border-radius: 10px;
+  letter-spacing: 1px;
+  text-shadow: none;
+  pointer-events: none;
+  z-index: 999;
+}
+#preview-badge.visible { display: block; }
+#subtitle.preview { opacity: 0.5; }
 </style>
 </head>
 <body>
@@ -86,6 +104,7 @@ body {
 <div id="subtitle"></div>
 <div id="completed-banner"></div>
 <div id="connection-error" style="display:none;position:fixed;top:10px;left:50%;transform:translateX(-50%);background:rgba(255,0,0,0.7);color:#fff;padding:6px 16px;border-radius:8px;font-size:16px;font-weight:bold;z-index:999;">Desconectado del panel</div>
+<div id="preview-badge">PREVIEW</div>
 <div id="event-container"></div>
 
 <script>
@@ -157,8 +176,17 @@ function updateOverlay() {
       const counterEl = document.getElementById('counter');
       const subtitleEl = document.getElementById('subtitle');
       const bannerEl = document.getElementById('completed-banner');
+      const previewBadge = document.getElementById('preview-badge');
       const errorEl = document.getElementById('connection-error');
       if (errorEl) errorEl.style.display = 'none';
+
+      // Show preview badge when idle (not running, not completed, enabled)
+      const isLive = data.running && !data.paused && !data.completed;
+      const showPreview = !isLive && data.enabled !== false && !data.completed;
+      if (previewBadge) {
+        previewBadge.classList.toggle('visible', showPreview);
+      }
+      subtitleEl.classList.toggle('preview', showPreview);
 
       if (data.title !== undefined && titleEl.textContent !== data.title) {
         titleEl.textContent = data.title;

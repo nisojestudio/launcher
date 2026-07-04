@@ -309,6 +309,8 @@
     timerSoundVolume: $("#timer-sound-volume"),
     timerSoundBrowse: $("#timer-sound-browse"),
     timerApplyConfig: $("#timer-apply-config"),
+    timerExportConfig: $("#timer-export-config"),
+    timerImportConfig: $("#timer-import-config"),
     timerConfigStatus: $("#timer-config-status"),
     timerOverlayCopy: $("#timer-overlay-copy"),
     timerStart: $("#timer-start"),
@@ -333,6 +335,10 @@
     timerSubtitleFontColor: $("#timer-subtitle-font-color"),
     timerSubtitleFontFamily: $("#timer-subtitle-font-family"),
     timerSubtitleBold: $("#timer-subtitle-bold"),
+    timerTickSoundPath: $("#timer-tick-sound-path"),
+    timerTickSoundVolume: $("#timer-tick-sound-volume"),
+    timerAddSoundPath: $("#timer-add-sound-path"),
+    timerAddSoundVolume: $("#timer-add-sound-volume"),
   };
 
   const SAMPLE_AVATAR_DATA_URL =
@@ -3261,6 +3267,10 @@
         subtitle_font_color: els.timerSubtitleFontColor?.value || "#AAAAAA",
         subtitle_font_family: els.timerSubtitleFontFamily?.value || "Segoe UI, sans-serif",
         subtitle_bold: !!els.timerSubtitleBold?.checked,
+        tick_sound_path: els.timerTickSoundPath?.value || "",
+        tick_sound_volume: parseFloat(els.timerTickSoundVolume?.value) || 1.0,
+        add_sound_path: els.timerAddSoundPath?.value || "",
+        add_sound_volume: parseFloat(els.timerAddSoundVolume?.value) || 1.0,
       };
       try {
         const result = await apiPostJson("/api/timer/configure", config);
@@ -3282,6 +3292,68 @@
         setTimeout(() => setText(els.timerOverlayCopy, "Copiar URL"), 1500);
       } catch {
         setText(els.timerOverlayCopy, "Error", { animate: true });
+      }
+    });
+
+    // --- Timer config export/import ---
+    els.timerExportConfig?.addEventListener("click", async () => {
+      try {
+        const resp = await fetch("/api/timer/config");
+        if (!resp.ok) throw new Error("HTTP " + resp.status);
+        const data = await resp.json();
+        if (!data.ok || !data.config) throw new Error("Respuesta inv\u00e1lida");
+        await navigator.clipboard.writeText(JSON.stringify(data.config, null, 2));
+        setText(els.timerConfigStatus, "Configuraci\u00f3n copiada", { animate: true });
+      } catch (e) {
+        setText(els.timerConfigStatus, "Error al exportar", { animate: true });
+      }
+    });
+
+    els.timerImportConfig?.addEventListener("click", async () => {
+      try {
+        const text = await navigator.clipboard.readText();
+        const config = JSON.parse(text);
+        if (typeof config !== "object" || config === null) throw new Error("No es un objeto JSON");
+        // Fill form fields from imported config
+        const parseTimeStr = (v) => typeof v === "number" ? String(Math.round(v)) : (v || "");
+        if (config.initial_time_s !== undefined) els.timerInitialTime.value = parseTimeStr(config.initial_time_s);
+        if (config.max_time_s !== undefined) els.timerMaxTime.value = config.max_time_s;
+        if (config.time_per_like_s !== undefined) els.timerPerLike.value = config.time_per_like_s;
+        if (config.time_per_share_s !== undefined) els.timerPerShare.value = config.time_per_share_s;
+        if (config.time_per_follow_s !== undefined) els.timerPerFollow.value = config.time_per_follow_s;
+        if (config.time_per_gift_coin_s !== undefined) els.timerPerGiftCoin.value = config.time_per_gift_coin_s;
+        if (config.time_per_chat_s !== undefined) els.timerPerChat.value = config.time_per_chat_s;
+        if (config.title_text !== undefined) els.timerTitleText.value = config.title_text;
+        if (config.subtitle_text !== undefined) els.timerSubtitleText.value = config.subtitle_text;
+        if (config.popup_add_color !== undefined) els.timerPopupAddColor.value = config.popup_add_color;
+        if (config.popup_subtract_color !== undefined) els.timerPopupSubtractColor.value = config.popup_subtract_color;
+        if (config.on_complete_text !== undefined) els.timerCompleteText.value = config.on_complete_text;
+        if (config.on_complete_text_color !== undefined) els.timerCompleteTextColor.value = config.on_complete_text_color;
+        if (config.on_complete_text_size !== undefined) els.timerCompleteTextSize.value = config.on_complete_text_size;
+        if (config.on_complete_sound_path !== undefined) els.timerSoundPath.value = config.on_complete_sound_path;
+        if (config.on_complete_repeat !== undefined) els.timerSoundRepeat.checked = !!config.on_complete_repeat;
+        if (config.on_complete_volume !== undefined) els.timerSoundVolume.value = config.on_complete_volume;
+        if (config.title_font_size !== undefined) els.timerTitleFontSize.value = config.title_font_size;
+        if (config.title_font_color !== undefined) els.timerTitleFontColor.value = config.title_font_color;
+        if (config.title_font_family !== undefined) els.timerTitleFontFamily.value = config.title_font_family;
+        if (config.title_bold !== undefined) els.timerTitleBold.checked = !!config.title_bold;
+        if (config.counter_font_size !== undefined) els.timerCounterFontSize.value = config.counter_font_size;
+        if (config.counter_font_color !== undefined) els.timerCounterFontColor.value = config.counter_font_color;
+        if (config.counter_font_family !== undefined) els.timerCounterFontFamily.value = config.counter_font_family;
+        if (config.counter_bold !== undefined) els.timerCounterBold.checked = !!config.counter_bold;
+        if (config.subtitle_font_size !== undefined) els.timerSubtitleFontSize.value = config.subtitle_font_size;
+        if (config.subtitle_font_color !== undefined) els.timerSubtitleFontColor.value = config.subtitle_font_color;
+        if (config.subtitle_font_family !== undefined) els.timerSubtitleFontFamily.value = config.subtitle_font_family;
+        if (config.subtitle_bold !== undefined) els.timerSubtitleBold.checked = !!config.subtitle_bold;
+        if (config.tick_sound_path !== undefined) els.timerTickSoundPath.value = config.tick_sound_path;
+        if (config.tick_sound_volume !== undefined) els.timerTickSoundVolume.value = config.tick_sound_volume;
+        if (config.add_sound_path !== undefined) els.timerAddSoundPath.value = config.add_sound_path;
+        if (config.add_sound_volume !== undefined) els.timerAddSoundVolume.value = config.add_sound_volume;
+        // Trigger preview update
+        updateSubtitlePreview();
+        setText(els.timerConfigStatus, "Campos rellenados. Aplicar para enviar.", { animate: true });
+      } catch (e) {
+        setText(els.timerConfigStatus, "Error al importar: formato inv\u00e1lido", { animate: true });
       }
     });
 

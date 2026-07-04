@@ -864,7 +864,16 @@ std::string build_live_timer_config_json(const nlp3::games::LiveTimerGame* game)
     add("subtitle_font_size"); out << ",";
     add("subtitle_font_color"); out << ",";
     add("subtitle_font_family"); out << ",";
-    add("subtitle_bold");
+    add("subtitle_bold"); out << ",";
+    add("popup_add_color"); out << ",";
+    add("popup_subtract_color"); out << ",";
+    add("on_complete_text"); out << ",";
+    add("on_complete_text_color"); out << ",";
+    add("on_complete_text_size"); out << ",";
+    add("tick_sound_path"); out << ",";
+    add("tick_sound_volume"); out << ",";
+    add("add_sound_path"); out << ",";
+    add("add_sound_volume");
     out << "}";
     return out.str();
 }
@@ -947,6 +956,26 @@ std::string handle_timer_configure(PanelApp* app, std::string_view body) {
     if (maybe_bool.has_value()) config.set("counter_bold", *maybe_bool);
     maybe_bool = parse_json_bool(body, "subtitle_bold");
     if (maybe_bool.has_value()) config.set("subtitle_bold", *maybe_bool);
+
+    maybe_str = parse_json_string(body, "popup_add_color");
+    if (maybe_str.has_value()) config.set("popup_add_color", *maybe_str);
+    maybe_str = parse_json_string(body, "popup_subtract_color");
+    if (maybe_str.has_value()) config.set("popup_subtract_color", *maybe_str);
+    maybe_str = parse_json_string(body, "on_complete_text");
+    if (maybe_str.has_value()) config.set("on_complete_text", *maybe_str);
+    maybe_str = parse_json_string(body, "on_complete_text_color");
+    if (maybe_str.has_value()) config.set("on_complete_text_color", *maybe_str);
+    maybe_i64 = parse_json_uint64(body, "on_complete_text_size");
+    if (maybe_i64.has_value()) config.set("on_complete_text_size", static_cast<std::int64_t>(std::clamp<uint64_t>(*maybe_i64, 8, 200)));
+
+    maybe_str = parse_json_string(body, "tick_sound_path");
+    if (maybe_str.has_value()) config.set("tick_sound_path", *maybe_str);
+    maybe_d = parse_json_double(body, "tick_sound_volume");
+    if (maybe_d.has_value()) config.set("tick_sound_volume", std::clamp(*maybe_d, 0.0, 2.0));
+    maybe_str = parse_json_string(body, "add_sound_path");
+    if (maybe_str.has_value()) config.set("add_sound_path", *maybe_str);
+    maybe_d = parse_json_double(body, "add_sound_volume");
+    if (maybe_d.has_value()) config.set("add_sound_volume", std::clamp(*maybe_d, 0.0, 2.0));
 
     timer->apply_config(config);
     return make_simple_result(true, "config_applied");
