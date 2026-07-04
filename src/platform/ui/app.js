@@ -15,6 +15,35 @@
   const VOICE_NOTICES_STORAGE_KEY = "nlp3-custom-voice-notices-v1";
   let _timerOverlayUrl = "";
   const AUDIO_NOTICE_MAX_BYTES = 1572864;
+
+  function formatCompactNumber(n) {
+    const s = Math.abs(n).toString();
+    if (s.indexOf('.') !== -1) {
+      let trimmed = s.replace(/0+$/, '');
+      if (trimmed.endsWith('.')) trimmed = trimmed.slice(0, -1);
+      return (n < 0 ? '-' : '') + trimmed;
+    }
+    return n.toString();
+  }
+
+  function parseTimeString(str) {
+    if (!str || typeof str !== 'string') return NaN;
+    str = str.trim();
+    if (str.includes(':')) {
+      const parts = str.split(':');
+      if (parts.length === 2) {
+        const minutes = parseInt(parts[0], 10);
+        const seconds = parseInt(parts[1], 10);
+        if (!isNaN(minutes) && !isNaN(seconds)) return minutes * 60 + seconds;
+      } else if (parts.length === 3) {
+        const hours = parseInt(parts[0], 10);
+        const minutes = parseInt(parts[1], 10);
+        const seconds = parseInt(parts[2], 10);
+        if (!isNaN(hours) && !isNaN(minutes) && !isNaN(seconds)) return hours * 3600 + minutes * 60 + seconds;
+      }
+    }
+    return parseFloat(str);
+  }
   const MAX_RECENT_ITEMS = 20;
   const FREQUENCY_INTERVAL_MAP = {
     low: "120000",
@@ -269,6 +298,12 @@
     timerPerChat: $("#timer-per-chat"),
     timerTitleText: $("#timer-title-text"),
     timerSubtitleText: $("#timer-subtitle-text"),
+    timerAllowNegatives: $("#timer-allow-negatives"),
+    timerPopupAddColor: $("#timer-popup-add-color"),
+    timerPopupSubtractColor: $("#timer-popup-subtract-color"),
+    timerCompleteText: $("#timer-complete-text"),
+    timerCompleteTextColor: $("#timer-complete-text-color"),
+    timerCompleteTextSize: $("#timer-complete-text-size"),
     timerSoundPath: $("#timer-sound-path"),
     timerSoundRepeat: $("#timer-sound-repeat"),
     timerSoundVolume: $("#timer-sound-volume"),
@@ -2094,7 +2129,7 @@
       setText(els.timerState, "Completado");
       els.timerValue.style.color = "var(--danger)";
     } else {
-      setText(els.timerState, "Inactivo");
+      setText(els.timerState, "Listo (vista previa initial)");
       els.timerValue.style.color = "var(--text-muted)";
     }
     if (els.timerEnabled) {
@@ -3070,9 +3105,134 @@
     });
 
     // --- Live Timer handlers ---
+    function applyTimerNegativeAllowed() {
+      const allowNeg = !!els.timerAllowNegatives?.checked;
+      const minVal = allowNeg ? -10 : 0;
+      ["timerPerLike", "timerPerShare", "timerPerFollow", "timerPerGiftCoin", "timerPerChat"].forEach((id) => {
+        if (els[id]) els[id].min = minVal;
+      });
+    }
+    els.timerAllowNegatives?.addEventListener("change", applyTimerNegativeAllowed);
+    applyTimerNegativeAllowed();
+
+    function updateSubtitlePreview() {
+      const previewEl = document.getElementById('timer-subtitle-preview');
+      if (!previewEl) return;
+      const tmpl = els.timerSubtitleText?.value || '';
+      const title = els.timerTitleText?.value || '';
+      const vals = {
+        time_per_like: parseFloat(els.timerPerLike?.value) || 0,
+        time_per_share: parseFloat(els.timerPerShare?.value) || 0,
+        time_per_follow: parseFloat(els.timerPerFollow?.value) || 0,
+        time_per_gift_coin: parseFloat(els.timerPerGiftCoin?.value) || 0,
+        time_per_chat: parseFloat(els.timerPerChat?.value) || 0,
+        initial_time: parseTimeString(els.timerInitialTime?.value) || 0,
+        title: title,
+      };
+      let result = tmpl;
+      for (const [key, value] of Object.entries(vals)) {
+        const placeholder = '{' + key + '}';
+        const valStr = typeof value === 'string' ? value : formatCompactNumber(value);
+        result = result.replaceAll(placeholder, valStr);
+      }
+      previewEl.textContent = result || '';
+    }
+    const previewTriggers = ['timerSubtitleText', 'timerTitleText', 'timerPerLike', 'timerPerShare', 'timerPerFollow', 'timerPerGiftCoin', 'timerPerChat', 'timerInitialTime'];
+    previewTriggers.forEach(id => {
+      const el = els[id];
+      if (el) el.addEventListener('input', updateSubtitlePreview);
+    });
+    updateSubtitlePreview();
+
+    document.querySelectorAll('.preset-btn').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const preset = btn.dataset.preset;
+        function setVal(id, val) { const el = els[id]; if (el) el.value = val; }
+        function setCheck(id, val) { const el = els[id]; if (el) el.checked = !!val; }
+        switch (preset) {
+          case 'rapido':
+            setVal('timerInitialTime', '01:00');
+            setVal('timerPerLike', '1');
+            setVal('timerPerShare', '3');
+            setVal('timerPerFollow', '5');
+            setVal('timerPerGiftCoin', '0.3');
+            setVal('timerPerChat', '0');
+            setVal('timerMaxTime', '0');
+            break;
+          case 'maraton':
+            setVal('timerInitialTime', '01:00:00');
+            setVal('timerPerLike', '2');
+            setVal('timerPerShare', '5');
+            setVal('timerPerFollow', '10');
+            setVal('timerPerGiftCoin', '0.5');
+            setVal('timerPerChat', '0');
+            setVal('timerMaxTime', '0');
+            break;
+          case 'punitivo':
+            setCheck('timerAllowNegatives', true);
+            setVal('timerInitialTime', '05:00');
+            setVal('timerPerLike', '-1.5');
+            setVal('timerPerShare', '-3');
+            setVal('timerPerFollow', '-5');
+            setVal('timerPerGiftCoin', '0.3');
+            setVal('timerPerChat', '-1');
+            setVal('timerMaxTime', '0');
+            applyTimerNegativeAllowed();
+            break;
+          case 'solo-regalo':
+            setVal('timerInitialTime', '00:10');
+            setVal('timerPerLike', '0');
+            setVal('timerPerShare', '0');
+            setVal('timerPerFollow', '0');
+            setVal('timerPerGiftCoin', '1');
+            setVal('timerPerChat', '0');
+            setVal('timerMaxTime', '0');
+            break;
+        }
+        updateSubtitlePreview();
+      });
+    });
+
+    let lastEventId = 0;
+    const eventsListEl = document.getElementById('timer-events-list');
+    async function pollTimerEvents() {
+      if (!eventsListEl) return;
+      try {
+        const resp = await fetch('/api/overlay/live-timer/state');
+        if (!resp.ok) return;
+        const data = await resp.json();
+        if (!data.recentEvents || !data.recentEvents.length) {
+          eventsListEl.innerHTML = '<span class="timer-events-empty">Esperando eventos...</span>';
+          return;
+        }
+        let html = '';
+        let maxId = lastEventId;
+        data.recentEvents.forEach(ev => {
+          if (ev.id > maxId) maxId = ev.id;
+          const cls = ev.isAddition ? 'add' : 'sub';
+          const sign = ev.isAddition ? '+' : '';
+          html += '<div class="timer-event-item">'
+            + '<span class="timer-event-icon">' + (ev.icon || '') + '</span>'
+            + '<span class="timer-event-label">' + (ev.label || '') + '</span>'
+            + '<span class="timer-event-delta ' + cls + '">' + sign + ev.delta + 's</span>'
+            + '</div>';
+        });
+        if (!html) {
+          eventsListEl.innerHTML = '<span class="timer-events-empty">Esperando eventos...</span>';
+        } else {
+          eventsListEl.innerHTML = html;
+        }
+        lastEventId = maxId;
+      } catch {
+        // ignore
+      }
+    }
+    setInterval(pollTimerEvents, 2000);
+    pollTimerEvents();
+
     els.timerApplyConfig?.addEventListener("click", async () => {
       const config = {
-        initial_time_s: parseFloat(els.timerInitialTime?.value) || 300,
+        initial_time_s: parseTimeString(els.timerInitialTime?.value) || 300,
         max_time_s: parseFloat(els.timerMaxTime?.value) || 0,
         time_per_like_s: parseFloat(els.timerPerLike?.value) || 2.0,
         time_per_share_s: parseFloat(els.timerPerShare?.value) || 5.0,
@@ -3081,6 +3241,11 @@
         time_per_chat_s: parseFloat(els.timerPerChat?.value) || 0.0,
         title_text: els.timerTitleText?.value || "🎯 Extiende el Live",
         subtitle_text: els.timerSubtitleText?.value || "📌 Cada coin suma {time_per_gift_coin}s",
+        popup_add_color: els.timerPopupAddColor?.value || "#00AAFF",
+        popup_subtract_color: els.timerPopupSubtractColor?.value || "#FF4444",
+        on_complete_text: els.timerCompleteText?.value || "TIEMPO CUMPLIDO",
+        on_complete_text_color: els.timerCompleteTextColor?.value || "#FFD700",
+        on_complete_text_size: parseInt(els.timerCompleteTextSize?.value, 10) || 48,
         on_complete_sound_path: els.timerSoundPath?.value || "",
         on_complete_repeat: !!els.timerSoundRepeat?.checked,
         on_complete_volume: parseFloat(els.timerSoundVolume?.value) || 1.0,

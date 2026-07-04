@@ -31,6 +31,9 @@ std::string build_live_timer_state_json(const games::LiveTimerGame* game) {
             "\"counterStyle\":{},"
             "\"subtitleStyle\":{},"
             "\"bgColor\":\"transparent\","
+            "\"completedText\":\"TIEMPO CUMPLIDO\","
+            "\"completedTextColor\":\"#FFD700\","
+            "\"completedTextSize\":48,"
             "\"recentEvents\":[]"
             "}";
     }
@@ -96,6 +99,11 @@ std::string build_live_timer_state_json(const games::LiveTimerGame* game) {
         << "\"titleStyle\":" << style_json(s.title_style) << ","
         << "\"counterStyle\":" << style_json(s.counter_style) << ","
         << "\"subtitleStyle\":" << style_json(s.subtitle_style) << ","
+        << "\"popupAddColor\":" << json_quote(s.popup_style.add_color) << ","
+        << "\"popupSubtractColor\":" << json_quote(s.popup_style.subtract_color) << ","
+        << "\"completedText\":" << json_quote(s.on_complete_text) << ","
+        << "\"completedTextColor\":" << json_quote(s.on_complete_text_color) << ","
+        << "\"completedTextSize\":" << s.on_complete_text_size << ","
         << "\"bgColor\":\"transparent\","
         << "\"recentEvents\":" << events_json.str()
         << "}";

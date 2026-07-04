@@ -745,7 +745,7 @@ bool PanelApp::initialize(const std::string& config_path) {
 
         live_timer_game_ = std::make_unique<games::LiveTimerGame>();
         live_timer_game_->apply_config(live_timer_game_->default_config());
-        live_timer_game_->on_activated();
+        live_timer_game_->arm();
 
         refresh_external_game_manifests();
 

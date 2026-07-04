@@ -52,7 +52,7 @@ int main() {
         const auto snapshot = panel_app.snapshot();
         NLP3_TEST_REQUIRE(snapshot.timer.has_timer);
         NLP3_TEST_REQUIRE(snapshot.timer.timer_id == "live-timer");
-        NLP3_TEST_REQUIRE(snapshot.timer.running);
+        NLP3_TEST_REQUIRE(!snapshot.timer.running);
         NLP3_TEST_REQUIRE(snapshot.timer.enabled);
         NLP3_TEST_REQUIRE(!snapshot.timer.paused);
         NLP3_TEST_REQUIRE(snapshot.timer.remaining_seconds > 0.0);
@@ -134,7 +134,7 @@ int main() {
         const auto live_timer = panel_app.live_timer();
         NLP3_TEST_REQUIRE(live_timer != nullptr);
         NLP3_TEST_REQUIRE(live_timer->game_id() == "live-timer");
-        NLP3_TEST_REQUIRE(live_timer->state().running);
+        NLP3_TEST_REQUIRE(!live_timer->state().running);
 
         panel_app.stop_http_ui();
     }

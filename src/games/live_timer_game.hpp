@@ -24,6 +24,11 @@ struct LiveTimerVisualStyle {
     bool bold = true;
 };
 
+struct LiveTimerPopupStyle {
+    std::string add_color = "#00AAFF";
+    std::string subtract_color = "#FF4444";
+};
+
 struct LiveTimerRecentEvent {
     int64_t id = 0;
     std::string icon;
@@ -55,10 +60,15 @@ struct LiveTimerGameState {
     LiveTimerVisualStyle counter_style{120, "#00FF88", "Segoe UI, monospace", true};
     LiveTimerVisualStyle subtitle_style{32, "#AAAAAA", "Segoe UI, sans-serif", false};
 
+    LiveTimerPopupStyle popup_style{};
+
     std::string on_complete_sound_path;
     bool on_complete_repeat = false;
     double on_complete_volume = 1.0;
     std::string on_complete_video_url;
+    std::string on_complete_text = "TIEMPO CUMPLIDO";
+    std::string on_complete_text_color = "#FFD700";
+    int on_complete_text_size = 48;
 
     std::vector<LiveTimerRecentEvent> recent_events;
 };
@@ -72,6 +82,7 @@ public:
     void apply_config(const gamesdk::GameConfig& config) override;
     gamesdk::GameConfig default_config() const override;
     void on_activated() override;
+    void arm() noexcept;
     void on_host_event(
         const events::HostEvent& event,
         const host::HostSessionSnapshot& session_snapshot) override;

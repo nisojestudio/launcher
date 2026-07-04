@@ -54,6 +54,13 @@ constexpr std::string_view kSoundVolume = "on_complete_volume";
 constexpr std::string_view kVideoUrl = "on_complete_video_url";
 constexpr std::string_view kMaxTimeS = "max_time_s";
 
+constexpr std::string_view kPopupAddColor = "popup_add_color";
+constexpr std::string_view kPopupSubtractColor = "popup_subtract_color";
+
+constexpr std::string_view kOnCompleteText = "on_complete_text";
+constexpr std::string_view kOnCompleteTextColor = "on_complete_text_color";
+constexpr std::string_view kOnCompleteTextSize = "on_complete_text_size";
+
 constexpr double kMaxRecentEventsAgeS = 4.0;
 constexpr std::size_t kMaxRecentEvents = 6;
 
@@ -76,8 +83,23 @@ std::string substitute_timer_placeholders(
     const LiveTimerGameState& state) {
     std::string result(template_str);
 
+    auto format_compact = [](double value) -> std::string {
+        std::ostringstream oss;
+        oss << std::fixed << std::setprecision(2) << value;
+        std::string s = oss.str();
+        if (s.find('.') != std::string::npos) {
+            std::size_t last = s.find_last_not_of('0');
+            if (last == s.find('.')) {
+                s.resize(last);
+            } else if (last != std::string::npos) {
+                s.resize(last + 1);
+            }
+        }
+        return s;
+    };
+
     auto replace_num = [&](std::string_view placeholder, double value) {
-        std::string val_str = std::to_string(value);
+        std::string val_str = format_compact(value);
         auto pos = result.find(placeholder);
         while (pos != std::string::npos) {
             result.replace(pos, placeholder.size(), val_str);
@@ -183,6 +205,13 @@ gamesdk::GameConfig LiveTimerGame::default_config() const {
     config.set(std::string(kVideoUrl), std::string(""));
     config.set(std::string(kMaxTimeS), 0.0);
 
+    config.set(std::string(kPopupAddColor), std::string("#00AAFF"));
+    config.set(std::string(kPopupSubtractColor), std::string("#FF4444"));
+
+    config.set(std::string(kOnCompleteText), std::string("TIEMPO CUMPLIDO"));
+    config.set(std::string(kOnCompleteTextColor), std::string("#FFD700"));
+    config.set(std::string(kOnCompleteTextSize), std::int64_t{48});
+
     return config;
 }
 
@@ -242,6 +271,11 @@ void LiveTimerGame::apply_config(const gamesdk::GameConfig& config) {
     apply_bool(kSoundRepeat);
     apply_double(kSoundVolume);
     apply_string(kVideoUrl);
+    apply_string(kPopupAddColor);
+    apply_string(kPopupSubtractColor);
+    apply_string(kOnCompleteText);
+    apply_string(kOnCompleteTextColor);
+    apply_int(kOnCompleteTextSize);
 
     config_ = std::move(effective);
 
@@ -263,6 +297,11 @@ void LiveTimerGame::apply_config(const gamesdk::GameConfig& config) {
     state_.on_complete_repeat = config_.get_bool(kSoundRepeat, false);
     state_.on_complete_volume = config_.get_double(kSoundVolume, 1.0);
     state_.on_complete_video_url = config_.get_string(kVideoUrl, "");
+    state_.popup_style.add_color = config_.get_string(kPopupAddColor, "#00AAFF");
+    state_.popup_style.subtract_color = config_.get_string(kPopupSubtractColor, "#FF4444");
+    state_.on_complete_text = config_.get_string(kOnCompleteText, "TIEMPO CUMPLIDO");
+    state_.on_complete_text_color = config_.get_string(kOnCompleteTextColor, "#FFD700");
+    state_.on_complete_text_size = static_cast<int>(config_.get_double(kOnCompleteTextSize, 48.0));
 
     apply_visual_style(config_, state_.title_style,
         kTitleFontSize, kTitleFontColor, kTitleFontFamily, kTitleBold,
@@ -283,6 +322,19 @@ void LiveTimerGame::on_activated() {
     state_.remaining_seconds = state_.initial_seconds;
     state_.recent_events.clear();
     total_time_added_ = 0.0;
+    start_time_ = std::chrono::steady_clock::now();
+}
+
+void LiveTimerGame::arm() noexcept {
+    stop_sound();
+    completion_sound_triggered_ = false;
+    state_.completed = false;
+    state_.paused = false;
+    state_.running = false;
+    state_.remaining_seconds = state_.initial_seconds;
+    state_.recent_events.clear();
+    total_time_added_ = 0.0;
+    event_id_counter_ = 0;
     start_time_ = std::chrono::steady_clock::now();
 }
 
@@ -327,7 +379,7 @@ std::string LiveTimerGame::format_time() const {
 
     std::ostringstream oss;
     if (days > 0) {
-        oss << "Dia " << days << " ";
+        oss << days << (days == 1 ? " dia " : " dias ");
     }
     oss << std::setfill('0') << std::setw(2) << hours << ":"
         << std::setfill('0') << std::setw(2) << minutes << ":"

@@ -193,14 +193,14 @@ void test_format_time_display() {
 
     // Test HH:MM:SS (just over 1 hour)
     auto fmt = game.format_time();
-    assert(fmt.find("Dia") == std::string::npos);
+    assert(fmt.find("dia") == std::string::npos);
 
     // Test with days
     config.set("initial_time_s", 90061.0); // 1 day 1:01:01
     game.apply_config(config);
     game.on_activated();
     fmt = game.format_time();
-    assert(fmt.find("Dia") != std::string::npos);
+    assert(fmt.find("dia") != std::string::npos);
 
     // Test zero
     config.set("initial_time_s", 0.0);
@@ -415,11 +415,11 @@ void test_substitute_placeholders_shared() {
 
     auto result = nlp3::games::substitute_timer_placeholders(
         "{title}: {time_per_like}s per like", state);
-    assert(result == "Test Title: 2.500000s per like");
+    assert(result == "Test Title: 2.5s per like");
 
     result = nlp3::games::substitute_timer_placeholders(
         "{initial_time}s initial", state);
-    assert(result == "300.000000s initial");
+    assert(result == "300s initial");
 
     std::cout << "PASS: substitute_placeholders_shared\n";
 }

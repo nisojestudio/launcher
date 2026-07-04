@@ -191,9 +191,21 @@
               <div class="timer-grid">
                 <div class="timer-config-section">
                   <h3 class="timer-config-title">Tiempos por evento</h3>
+                  <div class="timer-presets">
+                    <button class="secondary-button preset-btn" type="button" data-preset="rapido">R&aacute;pido (60s)</button>
+                    <button class="secondary-button preset-btn" type="button" data-preset="maraton">Marat&oacute;n (1h)</button>
+                    <button class="secondary-button preset-btn" type="button" data-preset="punitivo">Punitivo</button>
+                    <button class="secondary-button preset-btn" type="button" data-preset="solo-regalo">Solo regalo</button>
+                  </div>
                   <label class="timer-field">
                     <span>Tiempo inicial (s)</span>
-                    <input class="timer-input" id="timer-initial-time" type="number" step="0.0001" min="1" max="86400" value="300">
+                    <input class="timer-input" id="timer-initial-time" type="text" value="05:00" placeholder="mm:ss o segundos">
+                  </label>
+                  <label class="timer-field">
+                    <span class="option-chip">
+                      <input id="timer-allow-negatives" type="checkbox">
+                      <span>Permitir valores negativos</span>
+                    </span>
                   </label>
                   <label class="timer-field">
                     <span>Tiempo m&aacute;ximo (s)</span>
@@ -230,6 +242,7 @@
                   <label class="timer-field">
                     <span>Subt&iacute;tulo</span>
                     <input class="timer-input" id="timer-subtitle-text" type="text" value="📌 Cada coin suma {time_per_gift_coin}s">
+                    <span class="timer-field-hint" id="timer-subtitle-preview"></span>
                   </label>
                 </div>
 
@@ -325,7 +338,31 @@
                 </div>
 
                 <div class="timer-config-section">
-                  <h3 class="timer-config-title">Sonido al completar</h3>
+                  <h3 class="timer-config-title">Avisos (popups)</h3>
+                  <label class="timer-field">
+                    <span>Color cuando suma</span>
+                    <input class="timer-input timer-color-picker" id="timer-popup-add-color" type="color" value="#00AAFF">
+                  </label>
+                  <label class="timer-field">
+                    <span>Color cuando resta</span>
+                    <input class="timer-input timer-color-picker" id="timer-popup-subtract-color" type="color" value="#FF4444">
+                  </label>
+                </div>
+
+                <div class="timer-config-section">
+                  <h3 class="timer-config-title">Al completar</h3>
+                  <label class="timer-field">
+                    <span>Texto del banner</span>
+                    <input class="timer-input" id="timer-complete-text" type="text" value="TIEMPO CUMPLIDO">
+                  </label>
+                  <label class="timer-field">
+                    <span>Color del banner</span>
+                    <input class="timer-input timer-color-picker" id="timer-complete-text-color" type="color" value="#FFD700">
+                  </label>
+                  <label class="timer-field">
+                    <span>Tama&ntilde;o del banner</span>
+                    <input class="timer-input" id="timer-complete-text-size" type="number" min="12" max="200" value="48">
+                  </label>
                   <label class="timer-field">
                     <span>Archivo .wav</span>
                     <input class="timer-input" id="timer-sound-path" type="text" value="" placeholder="Ruta o vac&iacute;o para beep">
@@ -341,6 +378,13 @@
                     <span>Volumen</span>
                     <input class="timer-input" id="timer-sound-volume" type="number" step="0.1" min="0" max="1" value="1.0">
                   </label>
+                </div>
+              </div>
+
+              <div class="timer-events-feed" id="timer-events-feed">
+                <h4 class="timer-events-title">Eventos recientes</h4>
+                <div class="timer-events-list" id="timer-events-list">
+                  <span class="timer-events-empty">Esperando eventos...</span>
                 </div>
               </div>
 
