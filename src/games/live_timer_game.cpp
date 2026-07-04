@@ -370,13 +370,13 @@ void LiveTimerGame::apply_config(const gamesdk::GameConfig& config) {
     apply_string(kParticleColor);
 
     // Validate effect names — fall back to "none" if invalid
-    auto validate_effect = [&](std::string_view key, std::string_view fallback) {
+    auto validate_effect = [&](std::string_view key, std::string fallback) {
         auto raw = config_.get_string(key, fallback);
         if (raw != "none" && raw != "glow" && raw != "pulse" && raw != "shake" && raw != "wave") {
             raw = fallback;
-            config_.set(std::string(key), std::string(raw));
+            config_.set(std::string(key), raw);
         }
-        return std::string(raw);
+        return raw;
     };
     state_.title_effect = validate_effect(kTitleEffect, "none");
     state_.counter_effect = validate_effect(kCounterEffect, "none");
