@@ -437,6 +437,58 @@ void test_reset_config_to_defaults() {
     std::cout << "PASS: reset_config_to_defaults\n";
 }
 
+void test_font_size_changes() {
+    nlp3::games::LiveTimerGame game;
+    
+    // Default check
+    assert(game.state().title_style.font_size_px == 48);
+    assert(game.state().counter_style.font_size_px == 120);
+    assert(game.state().subtitle_style.font_size_px == 32);
+    
+    // Apply new font sizes via partial config (simulating frontend HTTP request)
+    nlp3::gamesdk::GameConfig config;
+    config.set("title_font_size", std::int64_t{72});
+    config.set("counter_font_size", std::int64_t{200});
+    config.set("subtitle_font_size", std::int64_t{50});
+    
+    game.apply_config(config);
+    
+    // Read them back from state
+    assert(game.state().title_style.font_size_px == 72);
+    assert(game.state().counter_style.font_size_px == 200);
+    assert(game.state().subtitle_style.font_size_px == 50);
+    
+    // Verify config_ has them too
+    assert(game.config().get_int("title_font_size", 0) == 72);
+    assert(game.config().get_int("counter_font_size", 0) == 200);
+    assert(game.config().get_int("subtitle_font_size", 0) == 50);
+    
+    // Partial update preserves unchanged values
+    nlp3::gamesdk::GameConfig config2;
+    config2.set("title_font_size", std::int64_t{36});
+    game.apply_config(config2);
+    assert(game.state().title_style.font_size_px == 36);
+    assert(game.state().counter_style.font_size_px == 200); // unchanged
+    
+    // Font size + effects together
+    nlp3::gamesdk::GameConfig config3;
+    config3.set("title_font_size", std::int64_t{60});
+    config3.set("title_effect", std::string("pulse"));
+    config3.set("title_glow_enabled", true);
+    game.apply_config(config3);
+    assert(game.state().title_style.font_size_px == 60);
+    assert(game.state().title_effect == "pulse");
+    assert(game.state().title_glow_enabled == true);
+    
+    // Reset restores defaults
+    game.reset_config_to_defaults();
+    assert(game.state().title_style.font_size_px == 48);
+    assert(game.state().counter_style.font_size_px == 120);
+    assert(game.state().subtitle_style.font_size_px == 32);
+    
+    std::cout << "PASS: font_size_changes\n";
+}
+
 void test_remaining_seconds_auto_completed() {
     LiveTimerGame game;
     auto config = game.default_config();
@@ -481,6 +533,7 @@ int main() {
     test_substitute_placeholders_shared();
     test_reset_config_to_defaults();
     test_remaining_seconds_auto_completed();
+    test_font_size_changes();
 
     std::cout << "\nAll tests passed!\n";
     return 0;

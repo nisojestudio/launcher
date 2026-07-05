@@ -21,5 +21,5 @@ target_include_directories(nlp3_bridge PUBLIC ${PROJECT_SOURCE_DIR}/src)
 target_link_libraries(nlp3_bridge PUBLIC nlp3_events)
 
 if(WIN32)
-    target_link_libraries(nlp3_bridge PRIVATE ws2_32)
+    target_link_libraries(nlp3_bridge PRIVATE ws2_32 iphlpapi)
 endif()

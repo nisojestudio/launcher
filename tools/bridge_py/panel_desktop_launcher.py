@@ -18,8 +18,10 @@ NLP3_PANEL_DESKTOP_LAUNCHER_SIGNATURE = "nlp3-panel-desktop-launcher-v1"
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 DEFAULT_UI_PORT = 18913
+PORT_FALLBACK_ATTEMPTS = 20
 LOCK_ROOT = Path(tempfile.gettempdir()) / "NisojeStudio"
 LOCK_PATH = LOCK_ROOT / "desktop_launcher.lock"
+STATE_PATH = LOCK_ROOT / "desktop_launcher_state.json"
 
 
 def resolve_default_games_root() -> Path:
@@ -137,6 +139,64 @@ def can_bind_local_port(port: int) -> bool:
     return True
 
 
+def find_available_loopback_port(start_port: int, attempts: int = PORT_FALLBACK_ATTEMPTS) -> int | None:
+    if start_port <= 0 or start_port > 65535:
+        return None
+
+    end_port = min(65535, start_port + max(0, attempts - 1))
+    for port in range(start_port, end_port + 1):
+        if port_is_idle(port) and can_bind_local_port(port):
+            return port
+    return None
+
+
+def use_fallback_ui_port(current_port: int, reason: str) -> int:
+    fallback_port = find_available_loopback_port(current_port + 1)
+    if fallback_port is None:
+        raise RuntimeError(
+            f"UI port {current_port} is unavailable and no fallback port was free. {reason}"
+        )
+
+    print(
+        f"[panel-launcher] ui port {current_port} is unavailable; using fallback port {fallback_port}.",
+        flush=True,
+    )
+    if reason.strip():
+        print(f"[panel-launcher] port fallback reason: {reason.strip()}", flush=True)
+    return fallback_port
+
+
+def read_last_ui_port() -> int | None:
+    try:
+        if not STATE_PATH.exists():
+            return None
+        data = json.loads(STATE_PATH.read_text(encoding="utf-8"))
+        port = int(data.get("ui_port", 0))
+    except Exception:
+        return None
+
+    if port <= 0 or port > 65535:
+        return None
+    return port
+
+
+def write_last_ui_port(port: int) -> None:
+    try:
+        LOCK_ROOT.mkdir(parents=True, exist_ok=True)
+        STATE_PATH.write_text(json.dumps({"ui_port": port}, indent=2), encoding="utf-8")
+    except OSError:
+        pass
+
+
+def ready_fallback_port(preferred_port: int) -> int | None:
+    last_port = read_last_ui_port()
+    if last_port is None or last_port == preferred_port:
+        return None
+    if health_is_ready(last_port):
+        return last_port
+    return None
+
+
 def acquire_launcher_lock(port: int, timeout_seconds: int) -> int | None:
     LOCK_ROOT.mkdir(parents=True, exist_ok=True)
     deadline = time.monotonic() + timeout_seconds
@@ -200,9 +260,9 @@ $targets = Get-CimInstance Win32_Process | Where-Object {{
 foreach ($target in $targets) {{
     try {{
         Stop-Process -Id $target.ProcessId -Force -ErrorAction Stop
-        "{0}`t{1}`t{2}" -f $target.ProcessId, $target.Name, $target.ExecutablePath
+        "{{0}}`t{{1}}`t{{2}}" -f $target.ProcessId, $target.Name, $target.ExecutablePath
     }} catch {{
-        Write-Error ("Could not stop process {0}: {1}" -f $target.ProcessId, $_.Exception.Message)
+        Write-Error ("Could not stop process {{0}}: {{1}}" -f $target.ProcessId, $_.Exception.Message)
         exit 1
     }}
 }}
@@ -295,51 +355,88 @@ def main() -> int:
         raise SystemExit("shutdown-timeout must be > 0.")
 
     panel_executable = find_panel_executable(args.panel_exe)
+    ui_port = args.ui_port
+
+    fallback_port = ready_fallback_port(ui_port)
+    if fallback_port is not None:
+        print(
+            f"[panel-launcher] Nisoje Studio already appears to be running on fallback port {fallback_port}.",
+            flush=True,
+        )
+        return 0
+
     launcher_lock_fd = acquire_launcher_lock(
-        args.ui_port,
+        ui_port,
         max(args.startup_timeout, args.shutdown_timeout) + 5,
     )
     if launcher_lock_fd is None:
         print(
-            f"[panel-launcher] another launcher instance already finished startup on port {args.ui_port}.",
+            f"[panel-launcher] another launcher instance already finished startup on port {ui_port}.",
             flush=True,
         )
         return 0
 
     try:
-        if health_is_ready(args.ui_port):
-            if args.restart_if_running:
-                terminated = terminate_existing_repo_panel(REPO_ROOT)
-                if terminated:
-                    print("[panel-launcher] terminated existing panel instances:", flush=True)
-                    for line in terminated:
-                        print(f"[panel-launcher]   {line}", flush=True)
-                wait_for_port_to_become_idle(args.ui_port, args.shutdown_timeout)
-            else:
-                print(
-                    f"[panel-launcher] Nisoje Studio already appears to be running on port {args.ui_port}.",
-                    flush=True,
-                )
-                return 0
-
-        if not port_is_idle(args.ui_port) or not can_bind_local_port(args.ui_port):
-            if args.restart_if_running:
-                terminated = terminate_existing_repo_panel(REPO_ROOT)
-                if terminated:
-                    print("[panel-launcher] terminated existing panel instances:", flush=True)
-                    for line in terminated:
-                        print(f"[panel-launcher]   {line}", flush=True)
-                wait_for_port_to_become_idle(args.ui_port, args.shutdown_timeout)
-            else:
-                raise SystemExit(
-                    f"UI port {args.ui_port} is already in use by another process. Close it or use another port."
-                )
-
-        if health_is_ready(args.ui_port):
+        fallback_port = ready_fallback_port(ui_port)
+        if fallback_port is not None:
             print(
-                f"[panel-launcher] Nisoje Studio already appears to be running on port {args.ui_port}.",
+                f"[panel-launcher] Nisoje Studio already appears to be running on fallback port {fallback_port}.",
                 flush=True,
             )
+            return 0
+
+        if health_is_ready(ui_port):
+            if args.restart_if_running:
+                terminated = terminate_existing_repo_panel(REPO_ROOT)
+                if terminated:
+                    print("[panel-launcher] terminated existing panel instances:", flush=True)
+                    for line in terminated:
+                        print(f"[panel-launcher]   {line}", flush=True)
+                    try:
+                        wait_for_port_to_become_idle(ui_port, args.shutdown_timeout)
+                    except RuntimeError as exc:
+                        ui_port = use_fallback_ui_port(ui_port, str(exc))
+                else:
+                    ui_port = use_fallback_ui_port(
+                        ui_port,
+                        "No running panel process from this repo could be terminated.",
+                    )
+            else:
+                print(
+                    f"[panel-launcher] Nisoje Studio already appears to be running on port {ui_port}.",
+                    flush=True,
+                )
+                write_last_ui_port(ui_port)
+                return 0
+
+        if not port_is_idle(ui_port) or not can_bind_local_port(ui_port):
+            if args.restart_if_running:
+                terminated = terminate_existing_repo_panel(REPO_ROOT)
+                if terminated:
+                    print("[panel-launcher] terminated existing panel instances:", flush=True)
+                    for line in terminated:
+                        print(f"[panel-launcher]   {line}", flush=True)
+                    try:
+                        wait_for_port_to_become_idle(ui_port, args.shutdown_timeout)
+                    except RuntimeError as exc:
+                        ui_port = use_fallback_ui_port(ui_port, str(exc))
+                else:
+                    ui_port = use_fallback_ui_port(
+                        ui_port,
+                        "No running panel process from this repo could be terminated.",
+                    )
+            else:
+                ui_port = use_fallback_ui_port(
+                    ui_port,
+                    "The preferred port is already in use by another process.",
+                )
+
+        if health_is_ready(ui_port):
+            print(
+                f"[panel-launcher] Nisoje Studio already appears to be running on port {ui_port}.",
+                flush=True,
+            )
+            write_last_ui_port(ui_port)
             return 0
 
         try:
@@ -352,12 +449,12 @@ def main() -> int:
                 "--ui",
                 "--no-browser",
                 "--ui-port",
-                str(args.ui_port),
+                str(ui_port),
             ]
 
             print(f"[panel-launcher] panel exe: {panel_executable}", flush=True)
             print(f"[panel-launcher] games root: {games_root}", flush=True)
-            print(f"[panel-launcher] ui port: {args.ui_port}", flush=True)
+            print(f"[panel-launcher] ui port: {ui_port}", flush=True)
             print(f"[panel-launcher] command: {' '.join(panel_command)}", flush=True)
 
             creationflags = 0
@@ -378,7 +475,7 @@ def main() -> int:
 
             if args.wait_until_ready:
                 try:
-                    wait_for_health(args.ui_port, panel_process, args.startup_timeout)
+                    wait_for_health(ui_port, panel_process, args.startup_timeout)
                 except Exception:
                     try:
                         if panel_process.poll() is None:
@@ -386,7 +483,8 @@ def main() -> int:
                     except OSError:
                         pass
                     raise
-                print(f"[panel-launcher] panel ready at http://127.0.0.1:{args.ui_port}/", flush=True)
+                write_last_ui_port(ui_port)
+                print(f"[panel-launcher] panel ready at http://127.0.0.1:{ui_port}/", flush=True)
 
             return 0
         finally:
