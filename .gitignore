@@ -44,3 +44,7 @@ __pycache__/
 /panel_console_demo_output.txt
 /runtime_bridge.obj
 /runtime_bridge_check.obj
+
+# Runtime state and temp files
+live_timer_save.json
+temp_release_body.md

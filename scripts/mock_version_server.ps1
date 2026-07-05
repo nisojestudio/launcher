@@ -1,8 +1,8 @@
 $ErrorActionPreference = "Stop"
 
 $version_response = @{
-    latest_version = "0.2.10"
-    installer_url = "file:///C:\Users\Nisoje\Desktop\Panel%20live%203.0\dist\releases\0.2.10\installer\panel-live-0.2.10-win-x64.exe"
+    latest_version = "0.2.11"
+    installer_url = "file:///C:\Users\Nisoje\Desktop\Panel%20live%203.0\dist\releases\0.2.11\installer\panel-live-0.2.11-win-x64.exe"
 } | ConvertTo-Json
 
 $listener = New-Object System.Net.HttpListener

@@ -16,17 +16,23 @@
 #define WIN32_LEAN_AND_MEAN
 #endif
 #include <windows.h>
+#include <wininet.h>
+#pragma comment(lib, "wininet.lib")
 #endif
 
 namespace nlp3::platform {
 
-static std::filesystem::path resolve_cloudflared_path() {
+/// Returns the first existing tools/cloudflared/cloudflared.exe
+/// by climbing up from the exe directory, or the deepest candidate
+/// even if it doesn't exist (for download target).
+static std::filesystem::path resolve_cloudflared_path(bool accept_missing = false) {
 #ifdef _WIN32
     wchar_t buffer[MAX_PATH];
     const auto length = GetModuleFileNameW(nullptr, buffer, MAX_PATH);
     if (length == 0 || length >= MAX_PATH) {
         return {};
     }
+    std::filesystem::path best;
     auto exe_dir = std::filesystem::path(std::wstring(buffer, buffer + length)).parent_path();
 
     for (int depth = 0; depth < 8 && !exe_dir.empty(); ++depth) {
@@ -34,11 +40,85 @@ static std::filesystem::path resolve_cloudflared_path() {
         if (std::filesystem::exists(candidate)) {
             return candidate;
         }
+        best = candidate; // remember the first project-root-level candidate
         auto parent = exe_dir.parent_path();
         if (parent == exe_dir) break;
         exe_dir = parent;
     }
+    if (accept_missing && !best.empty()) {
+        return best;
+    }
 #endif
+    return {};
+}
+
+/// Download cloudflared.exe from GitHub Releases to the expected tools/ path.
+/// If the tool already exists, returns its path immediately.
+static std::filesystem::path ensure_cloudflared_downloaded() {
+    auto path = resolve_cloudflared_path(/*accept_missing=*/false);
+    if (!path.empty()) {
+        return path; // already exists
+    }
+
+    // Determine where to save it (use the best candidate from project root)
+    path = resolve_cloudflared_path(/*accept_missing=*/true);
+    if (path.empty()) {
+        return {}; // cannot determine target directory
+    }
+
+    // Create directory if needed
+    std::error_code ec;
+    std::filesystem::create_directories(path.parent_path(), ec);
+    if (ec) return {};
+
+    // Download from GitHub
+    constexpr const char* kDownloadUrl =
+        "https://github.com/cloudflare/cloudflared/releases/latest/download/"
+        "cloudflared-windows-amd64.exe";
+
+    // Use WinInet for a synchronous download with no external dependencies
+    HINTERNET hOpen = InternetOpenW(
+        L"NisojeStudio/1.0",
+        INTERNET_OPEN_TYPE_PRECONFIG,
+        nullptr, nullptr, 0);
+    if (!hOpen) return {};
+
+    HINTERNET hFile = InternetOpenUrlA(
+        hOpen, kDownloadUrl, nullptr, 0,
+        INTERNET_FLAG_RELOAD | INTERNET_FLAG_NO_CACHE_WRITE |
+        INTERNET_FLAG_PRAGMA_NOCACHE | INTERNET_FLAG_NO_UI,
+        0);
+    if (!hFile) {
+        InternetCloseHandle(hOpen);
+        return {};
+    }
+
+    HANDLE outFile = CreateFileW(
+        path.wstring().c_str(),
+        GENERIC_WRITE, 0, nullptr,
+        CREATE_ALWAYS,
+        FILE_ATTRIBUTE_NORMAL,
+        nullptr);
+    if (outFile == INVALID_HANDLE_VALUE) {
+        InternetCloseHandle(hFile);
+        InternetCloseHandle(hOpen);
+        return {};
+    }
+
+    std::array<char, 65536> buf{};
+    DWORD bytesRead = 0;
+    while (InternetReadFile(hFile, buf.data(), static_cast<DWORD>(buf.size()), &bytesRead) && bytesRead > 0) {
+        DWORD written = 0;
+        WriteFile(outFile, buf.data(), bytesRead, &written, nullptr);
+    }
+
+    CloseHandle(outFile);
+    InternetCloseHandle(hFile);
+    InternetCloseHandle(hOpen);
+
+    if (std::filesystem::exists(path) && std::filesystem::file_size(path) > 1024) {
+        return path;
+    }
     return {};
 }
 
@@ -53,14 +133,11 @@ bool CloudflareTunnelService::start_tunnel(std::uint16_t port, TunnelUrlCallback
     tunnel_url_.clear();
     last_error_.clear();
 
-    auto cloudflared_path = resolve_cloudflared_path();
+    // Auto-download cloudflared if missing (so git clean -fdx never breaks the tunnel)
+    auto cloudflared_path = ensure_cloudflared_downloaded();
     if (cloudflared_path.empty()) {
-        last_error_ = "cloudflared.exe not found in tools/cloudflared/";
-        return false;
-    }
-
-    if (!std::filesystem::exists(cloudflared_path)) {
-        last_error_ = "cloudflared.exe not found at " + cloudflared_path.string();
+        last_error_ = "cloudflared.exe not found and could not be downloaded. "
+                      "See tools/cloudflared/ manually or run the installer.";
         return false;
     }
 

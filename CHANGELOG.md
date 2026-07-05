@@ -4,7 +4,11 @@ All notable Panel Live changes should be recorded here.
 
 Format follows a lightweight Keep a Changelog style. Versions use SemVer.
 
-## 0.2.10 - 2026-07-04
+## 0.2.11 - 2026-07-05
+
+### Added
+
+- **Auto-descarga de cloudflared.exe**: El `CloudflareTunnelService` ahora descarga automáticamente `cloudflared.exe` desde GitHub Releases si no está presente en `tools/cloudflared/`. Esto evita que el túnel de Cloudflare se pierda después de operaciones de limpieza (`git clean -fdx`) o reinstalaciones. Usa WinInet sin dependencias externas. El instalador ya lo incluye en `tools/cloudflared/`.
 
 ### Fixed
 
