@@ -14,6 +14,31 @@ Format follows a lightweight Keep a Changelog style. Versions use SemVer.
 
 - **CRITICAL — Efectos visuales nunca se aplicaban**: Bug en `LiveTimerGame::apply_config()` donde las 14 propiedades de efectos visuales (`title_effect`, `counter_effect`, `subtitle_effect`, glow, wave, pulse, shake, partículas) se escribían en `effective` DESPUÉS de `config_ = std::move(effective)`, perdiendo todos los valores. Como resultado, `state_.*_effect` siempre quedaba en `"none"` y `state_.*_glow_enabled` / `particles_enabled` siempre en `false`. Ahora los efectos se aplican antes del move y el estado los recibe correctamente.
 
+## 0.2.12 - 2026-07-06
+
+### Added
+
+- **A11 — Save atómico con backup**: `panel_app.cpp` ahora escribe el estado del timer a un archivo temporal y lo renombra atómicamente. Si el archivo principal se corrompe, `load_timer_state` hace fallback al `.bak`. Esto previene pérdida de estado por crash mid-write.
+- **A12 — NaN/inf guard en SSOT**: `remaining_seconds()`, `adjust_time()` y `apply_config()` rechazan silenciosamente valores NaN o infinito, evitando que el estado interno se corrompa.
+- **Validación cliente en Apply**: El formulario de configuración del timer valúa tipos y rangos en el cliente antes de enviar al backend. El botón Apply se deshabilita durante el request para evitar doble envío.
+- **Import config auto-aplica**: Al importar una configuración JSON, el formulario se llena y se aplica automáticamente al backend.
+- **4 tests de regresión**: delta clamp (A7), skip popup en timer exhausto (A8), sanitize NaN/inf (A12), round-trip JSON save/load.
+
+### Fixed
+
+- **A1 — CSS !important eliminado**: Las clases `.warning`, `.danger` y `.completed` ya no usan `!important` en el color, permitiendo que el color personalizado del counter se respete siempre.
+- **A4 — Cleanup de particleTimeouts**: Los `setTimeout` del burst inicial de partículas se trackean en un array y se limpian en `beforeunload`, evitando fugas de memoria y errores tras recarga del overlay.
+- **A7 — adjust_time reporta delta real**: El popup ahora muestra el delta realmente aplicado (clampeado por `max_time_s`), no el delta raw solicitado.
+- **A8 — Skip popup en timer exhausto**: Cuando un evento de game input agota el timer (lo lleva a 0 o negativo), se suprime el popup para evitar que el overlay muestre "-Xs" junto con el confetti de completion.
+- **A10 — pollTimerEvents recursivo**: El polling de eventos del timer cambió de `setInterval` a un chain recursivo con `setTimeout` y cleanup en `beforeunload`, eliminando fugas de intervalos huérfanos.
+- **A13 — Label popup consistente**: El label del evento (like, share, follow, gift) ahora se muestra siempre en el popup, no solo cuando `|delta| == 1`.
+- **A6 — int64_t namespaced**: Unificado `int64_t` → `std::int64_t` en `live_timer_game.hpp`.
+
+### Changed
+
+- **Accesibilidad del overlay**: El counter ahora tiene `aria-live="polite"` y `role="region"` para lectores de pantalla. Los popups de eventos tienen `aria-label`. El banner de completed usa `role="status"` con `aria-live="assertive"`. Los contenedores decorativos (partículas, confetti) tienen `aria-hidden="true"`.
+- **Refactor Apply handler**: Extraído `readTimerConfigFromForm()` como helper reutilizable desde Apply e Import.
+
 ## 0.2.9 - 2026-07-04
 
 ### Added
