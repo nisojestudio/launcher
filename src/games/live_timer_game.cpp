@@ -3,19 +3,9 @@
 #include <algorithm>
 #include <chrono>
 #include <cmath>
+#include <cstdint>
 #include <sstream>
 #include <iomanip>
-
-#ifdef _WIN32
-#ifndef NOMINMAX
-#define NOMINMAX
-#endif
-#ifndef WIN32_LEAN_AND_MEAN
-#define WIN32_LEAN_AND_MEAN
-#endif
-#include <windows.h>
-#include <mmsystem.h>
-#endif
 
 #include "host/session_state.hpp"
 
@@ -95,6 +85,14 @@ std::string resolve_actor_name(const gamesdk::GameInputActor& actor) {
     if (!actor.display_name.empty()) return actor.display_name;
     if (!actor.username.empty()) return actor.username;
     return "unknown";
+}
+
+// T1.3: monotonic session id derived from the wall clock so save/restore and
+// arm() flows can reset the overlay's lastShownEventId deterministically.
+std::int64_t now_wall_ms_int64() noexcept {
+    using namespace std::chrono;
+    return static_cast<std::int64_t>(
+        duration_cast<milliseconds>(system_clock::now().time_since_epoch()).count());
 }
 
 } // namespace
@@ -349,9 +347,18 @@ void LiveTimerGame::apply_config(const gamesdk::GameConfig& config) {
     state_.max_time_s = config_.get_double(kMaxTimeS, 0.0);
 
     double new_initial = config_.get_double(kInitialTimeS, 300.0);
-    double diff = new_initial - old_initial;
     state_.initial_seconds = new_initial;
-    state_.remaining_seconds = std::max(0.0, state_.remaining_seconds + diff);
+    // T2.1: only adjust remaining when the timer is actively running. When
+    // completed or paused the runtime is the SSOT and apply_config must NOT
+    // re-inflate remaining_seconds from the new initial value.
+    if (state_.running && !state_.paused && !state_.completed) {
+        double diff = new_initial - old_initial;
+        state_.remaining_seconds = std::max(0.0, state_.remaining_seconds + diff);
+    }
+    // T2.2: clamp caliente — keep remaining within max_time_s even after live edits.
+    if (state_.max_time_s > 0.0 && state_.remaining_seconds > state_.max_time_s) {
+        state_.remaining_seconds = state_.max_time_s;
+    }
 
     state_.title_text = config_.get_string(kTitleText, "\xf0\x9f\x8e\xaf Extiende el Live");
     state_.subtitle_text = config_.get_string(kSubtitleText, "\xf0\x9f\x93\x8c Cada coin suma {time_per_gift_coin}s");
@@ -420,9 +427,15 @@ void LiveTimerGame::on_activated() {
     state_.remaining_seconds = state_.initial_seconds;
     state_.recent_events.clear();
     total_time_added_ = 0.0;
+    // T1.3: session id is regenerated on each activation so the overlay resets
+    // lastShownEventId. event_id_counter_ is intentionally NOT reset here so it
+    // stays monotonic across activations, arm() and save/restore cycles.
+    state_.session_id = now_wall_ms_int64();
     start_time_ = std::chrono::steady_clock::now();
     last_tick_second_ = -1;
-    play_event_sound(state_.tick_sound_path, state_.tick_sound_volume);
+    // N2/N9: sounds moved to overlay HTML5 audio. Backend stays silent here.
+    // The overlay plays ticks/add-chime/completion via applySounds() in JS,
+    // driven by JSON state fields, never via this backend stub.
 }
 
 void LiveTimerGame::arm() noexcept {
@@ -435,7 +448,9 @@ void LiveTimerGame::arm() noexcept {
     state_.remaining_seconds = state_.initial_seconds;
     state_.recent_events.clear();
     total_time_added_ = 0.0;
-    event_id_counter_ = 0;
+    // T1.3: event_id_counter_ stays monotonic across arm(); only the session id
+    // is regenerated so the overlay clears its lastShownEventId cursor.
+    state_.session_id = now_wall_ms_int64();
     start_time_ = std::chrono::steady_clock::now();
 }
 
@@ -445,20 +460,30 @@ void LiveTimerGame::on_host_event(
 }
 
 double LiveTimerGame::remaining_seconds() const noexcept {
+    // T1.1: pure read. Completion is committed by tick(), never here.
     if (!state_.running || state_.paused) {
         return state_.remaining_seconds;
     }
-
     auto elapsed = std::chrono::steady_clock::now() - start_time_;
     auto elapsed_s = std::chrono::duration<double>(elapsed).count();
     double current = state_.remaining_seconds - elapsed_s;
-    if (current <= 0.0) {
-        current = 0.0;
-        const_cast<LiveTimerGame*>(this)->state_.running = false;
-        const_cast<LiveTimerGame*>(this)->state_.completed = true;
-        const_cast<LiveTimerGame*>(this)->state_.remaining_seconds = 0.0;
-    }
+    if (current < 0.0) current = 0.0;
     return current;
+}
+
+void LiveTimerGame::tick() noexcept {
+    // T1.1: single SSOT mutator. Called by the polling loop before JSON build.
+    if (!state_.running || state_.paused || state_.completed) return;
+    auto elapsed = std::chrono::steady_clock::now() - start_time_;
+    auto elapsed_s = std::chrono::duration<double>(elapsed).count();
+    double current = state_.remaining_seconds - elapsed_s;
+    if (current > 0.0) return;
+    state_.remaining_seconds = 0.0;
+    state_.running = false;
+    state_.completed = true;
+    // Re-arm the completion-sound one-shot poll so poll_completion_sound can fire.
+    completion_sound_triggered_ = false;
+    last_tick_second_ = -1;
 }
 
 std::string LiveTimerGame::format_time() const {
@@ -493,7 +518,8 @@ void LiveTimerGame::on_game_input_event(
     const host::HostSessionSnapshot& session_snapshot) {
     (void)session_snapshot;
 
-    if (!enabled_ || state_.completed || !state_.running || state_.paused) return;
+    // T2.6: hidden_ blocks event input while preserving runtime counters.
+    if (hidden_ || state_.completed || !state_.running || state_.paused) return;
 
     double delta = 0.0;
     std::string_view icon;
@@ -580,11 +606,9 @@ void LiveTimerGame::prune_old_events() {
 }
 
 bool LiveTimerGame::poll_completion_sound() noexcept {
-    if (!enabled_ || completion_sound_triggered_) return false;
-    if (!state_.paused) {
-        remaining_seconds();
-    }
-    if (state_.completed && !completion_sound_triggered_) {
+    // T1.1: tick() commits completion to the SSOT before we observe it.
+    tick();
+    if (!hidden_ && state_.completed && !completion_sound_triggered_) {
         completion_sound_triggered_ = true;
         play_completion_sound();
         return true;
@@ -592,47 +616,25 @@ bool LiveTimerGame::poll_completion_sound() noexcept {
     return false;
 }
 
+// T1.4: sounds moved to overlay HTML5 audio. Backend keeps these signatures
+// (called by poll loops and arm/stop) as empty stubs so includes stay clean and
+// the overlay owns all audio playback driven by JSON state fields.
 void LiveTimerGame::play_completion_sound() const {
-#ifdef _WIN32
-    if (state_.on_complete_sound_path.empty()) {
-        Beep(880, 500);
-        Beep(660, 300);
-        Beep(880, 800);
-        return;
-    }
-
-    auto flags = SND_FILENAME | SND_ASYNC;
-    if (state_.on_complete_repeat) {
-        flags |= SND_LOOP;
-    }
-    PlaySoundA(state_.on_complete_sound_path.c_str(), nullptr, flags);
-#else
     (void)state_;
-#endif
 }
 
 void LiveTimerGame::stop_sound() const noexcept {
-#ifdef _WIN32
-    PlaySoundA(nullptr, nullptr, 0);
-#endif
 }
 
 void LiveTimerGame::play_event_sound(const std::string& path, double volume) const {
-#ifdef _WIN32
-    if (path.empty()) {
-        // No fallback beep (would be synchronous). User should configure a .wav.
-        return;
-    }
-    auto flags = SND_FILENAME | SND_ASYNC | SND_NOSTOP;
-    PlaySoundA(path.c_str(), nullptr, flags);
-#else
     (void)path;
     (void)volume;
-#endif
 }
 
 bool LiveTimerGame::poll_tick_sound() noexcept {
-    if (!enabled_ || !state_.running || state_.paused || state_.completed) {
+    // T1.1: tick() flushes elapsed time before computing tick sound cadence.
+    tick();
+    if (hidden_ || !state_.running || state_.paused || state_.completed) {
         last_tick_second_ = -1;
         return false;
     }
@@ -642,7 +644,7 @@ bool LiveTimerGame::poll_tick_sound() noexcept {
         return false;
     }
     int current_sec = static_cast<int>(std::floor(rem));
-    if (current_sec != last_tick_second_) {
+    if (current_sec >= 0 && current_sec != last_tick_second_) {
         last_tick_second_ = current_sec;
         play_event_sound(state_.tick_sound_path, state_.tick_sound_volume);
         return true;
@@ -670,7 +672,7 @@ std::vector<gamesdk::GameTelemetryItem> LiveTimerGame::telemetry() const {
         {"completed", "Completado", state_.completed ? "1" : "0",
             state_.completed ? "danger" : "neutral"},
         {"total_time_added", "Tiempo agregado", std::to_string(total_time_added_), "neutral"},
-        {"total_actions", "Eventos procesados", std::to_string(state_.recent_events.size()), "neutral"},
+        {"total_actions", "Eventos procesados", std::to_string(event_id_counter_), "neutral"},
         {"title_text", "Titulo", state_.title_text, "neutral"},
         {"subtitle_text", "Subtitulo", substitute_timer_placeholders(state_.subtitle_text, state_), "neutral"},
     };
@@ -678,7 +680,10 @@ std::vector<gamesdk::GameTelemetryItem> LiveTimerGame::telemetry() const {
 
 void LiveTimerGame::pause() noexcept {
     if (!state_.running || state_.paused) return;
+    // T1.1: state_.remaining_seconds is the SSOT; capture the live remaining at
+    // pause time so future reads (paused path) return a stable value.
     paused_remaining_seconds_ = remaining_seconds();
+    state_.remaining_seconds = paused_remaining_seconds_;
     state_.paused = true;
     state_.running = false;
 }
@@ -707,7 +712,8 @@ void LiveTimerGame::stop() noexcept {
 }
 
 void LiveTimerGame::adjust_time(double delta) noexcept {
-    if (!enabled_) return;
+    // T2.6: blocked while hidden; runtime preserved.
+    if (hidden_) return;
     if (state_.completed) return;
 
     state_.remaining_seconds += delta;
@@ -730,25 +736,44 @@ void LiveTimerGame::adjust_time(double delta) noexcept {
 }
 
 void LiveTimerGame::set_enabled(bool enabled) noexcept {
-    enabled_ = enabled;
+    // T2.6: conservative hide semantics. Disabling pauses the timer (running
+    // goes false) and stops any in-flight sound, but recent_events, total_time_
+    // added_, event_id_counter_ and remaining_seconds are preserved. Restoring
+    // only clears hidden_; the user starts the timer explicitly afterwards.
     if (!enabled) {
+        hidden_ = true;
         stop_sound();
-        state_.running = false;
-        state_.completed = false;
-        state_.paused = false;
-        state_.remaining_seconds = 0.0;
-        state_.recent_events.clear();
-        total_time_added_ = 0.0;
-        event_id_counter_ = 0;
+        // Commit the live remaining into the SSOT before stopping so the runtime
+        // is preserved across hide -> restore (remaining_seconds() == R after).
+        if (state_.running) {
+            state_.remaining_seconds = remaining_seconds();
+            state_.running = false;
+        }
+    } else {
+        // Rehabilitar restaura runtime; el usuario arranca con start explicito.
+        hidden_ = false;
     }
 }
 
 bool LiveTimerGame::is_enabled() const noexcept {
-    return enabled_;
+    return !hidden_;
 }
 
 bool LiveTimerGame::is_running() const noexcept {
     return state_.running;
+}
+
+// T1.3: getters used by persistence (PanelApp save/load).
+std::int64_t LiveTimerGame::event_id_counter() const noexcept {
+    return event_id_counter_;
+}
+
+std::int64_t LiveTimerGame::session_id() const noexcept {
+    return state_.session_id;
+}
+
+double LiveTimerGame::total_time_added() const noexcept {
+    return total_time_added_;
 }
 
 void LiveTimerGame::reset_config_to_defaults() noexcept {
@@ -756,28 +781,50 @@ void LiveTimerGame::reset_config_to_defaults() noexcept {
     apply_config(config_);
 }
 
+// T1.3: 5-arg overload delegates to the extended one with neutral defaults
+// so existing callers (tests) keep working while persistence restores extras.
 void LiveTimerGame::restore_state(double remaining_seconds, bool running, bool paused,
-                                   bool completed, bool enabled) noexcept {
+                                    bool completed, bool enabled) noexcept {
+    restore_state(remaining_seconds, running, paused, completed, enabled,
+                  0, 0, 0.0);
+}
+
+void LiveTimerGame::restore_state(double remaining_seconds, bool running, bool paused,
+                                    bool completed, bool enabled,
+                                    std::int64_t event_id_counter,
+                                    std::int64_t session_id,
+                                    double total_time_added) noexcept {
     stop_sound();
     completion_sound_triggered_ = false;
     last_tick_second_ = -1;
     state_.recent_events.clear();
-    event_id_counter_ = 0;
-    total_time_added_ = 0.0;
-    enabled_ = enabled;
+    // T1.3: persisted counters are restored verbatim so event ids stay monotonic
+    // across save/load and the overlay's lastShownEventId stays aligned.
+    event_id_counter_ = (event_id_counter > 0) ? event_id_counter : 0;
+    total_time_added_ = total_time_added;
+    // T2.6: enabled toggles hidden_; runtime is NOT cleared on hide and is left
+    // as-is on restore so the user starts the timer explicitly.
+    hidden_ = !enabled;
 
     state_.remaining_seconds = std::max(0.0, remaining_seconds);
+    // T2.3: paused + running is interpreted as paused awaiting explicit resume
+    // (state_.running is forced to false regardless of the requested running).
+    if (paused) {
+        running = false;
+    }
     state_.running = running && !completed && remaining_seconds > 0.0;
     state_.paused = paused;
     state_.completed = completed;
 
-    if (state_.running && !state_.paused) {
+    // T1.3: session id — generate fresh if none was persisted.
+    state_.session_id = (session_id > 0) ? session_id : now_wall_ms_int64();
+
+    if (state_.running) {
         start_time_ = std::chrono::steady_clock::now();
         paused_remaining_seconds_ = 0.0;
     } else {
         start_time_ = std::chrono::steady_clock::now();
         paused_remaining_seconds_ = state_.remaining_seconds;
-        state_.running = false;
     }
 
     if (state_.completed) {

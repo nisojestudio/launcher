@@ -855,6 +855,11 @@ bool PanelApp::save_timer_state() {
         state_json["completed"] = st.completed;
         state_json["enabled"] = live_timer_game_->is_enabled();
         state_json["saved_at_ms"] = now_ms;
+        // T1.3: persist runtime counters so event ids stay monotonic across
+        // restarts and the overlay can re-align its lastShownEventId cursor.
+        state_json["event_id_counter"] = live_timer_game_->event_id_counter();
+        state_json["session_id"] = live_timer_game_->session_id();
+        state_json["total_time_added"] = live_timer_game_->total_time_added();
         root["state"] = std::move(state_json);
 
         // Ensure directory exists
@@ -918,8 +923,16 @@ bool PanelApp::load_timer_state() {
             const bool paused = s.value("paused", false);
             const bool completed = s.value("completed", false);
             const bool enabled = s.value("enabled", true);
+            // T1.3: read persisted counters; safe defaults if absent or invalid.
+            const std::int64_t event_id_counter =
+                s.value("event_id_counter", static_cast<std::int64_t>(0));
+            const std::int64_t session_id =
+                s.value("session_id", static_cast<std::int64_t>(0));
+            const double total_time_added = s.value("total_time_added", 0.0);
 
-            live_timer_game_->restore_state(remaining, running, paused, completed, enabled);
+            live_timer_game_->restore_state(remaining, running, paused, completed,
+                                              enabled, event_id_counter, session_id,
+                                              total_time_added);
         }
 
         return true;

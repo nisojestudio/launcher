@@ -17,6 +17,15 @@ std::string_view panel_overlay_live_timer_html() noexcept {
 }
 
 std::string build_live_timer_state_json(const games::LiveTimerGame* game) {
+    // N1: drive completion to SSOT before serializing. The pointer is const
+    // because callers treat the public surface as read-only, but LiveTimerGame
+    // exposes tick() as a non-const SSOT mutator we MUST call here so the
+    // auto-completion by elapsed wall time is committed before the overlay
+    // observes state_.completed. We use const_cast intentionally and document
+    // that all callers MUST be single-threaded with respect to the game.
+    if (game != nullptr) {
+        const_cast<games::LiveTimerGame*>(game)->tick();
+    }
     if (game == nullptr) {
         return "{"
             "\"remainingSeconds\":0,"
@@ -25,6 +34,7 @@ std::string build_live_timer_state_json(const games::LiveTimerGame* game) {
             "\"paused\":false,"
             "\"enabled\":true,"
             "\"completed\":false,"
+            "\"sessionId\":0,"
             "\"title\":\"\","
             "\"subtitle\":\"\","
             "\"titleStyle\":{},"
@@ -34,6 +44,13 @@ std::string build_live_timer_state_json(const games::LiveTimerGame* game) {
             "\"completedText\":\"TIEMPO CUMPLIDO\","
             "\"completedTextColor\":\"#FFD700\","
             "\"completedTextSize\":48,"
+            "\"tick_sound_path\":\"\","
+            "\"tick_sound_volume\":1.0,"
+            "\"add_sound_path\":\"\","
+            "\"add_sound_volume\":1.0,"
+            "\"on_complete_sound_path\":\"\","
+            "\"on_complete_volume\":1.0,"
+            "\"on_complete_repeat\":false,"
             "\"recentEvents\":[]"
             "}";
     }
@@ -94,6 +111,7 @@ std::string build_live_timer_state_json(const games::LiveTimerGame* game) {
         << "\"paused\":" << (s.paused ? "true" : "false") << ","
         << "\"enabled\":" << (game->is_enabled() ? "true" : "false") << ","
         << "\"completed\":" << (s.completed ? "true" : "false") << ","
+        << "\"sessionId\":" << s.session_id << ","
         << "\"title\":" << json_quote(s.title_text) << ","
         << "\"subtitle\":" << json_quote(substitute_placeholders(s.subtitle_text)) << ","
         << "\"titleStyle\":" << style_json(s.title_style) << ","
@@ -119,6 +137,15 @@ std::string build_live_timer_state_json(const games::LiveTimerGame* game) {
         << "\"particles_enabled\":" << (s.particles_enabled ? "true" : "false") << ","
         << "\"particle_count\":" << s.particle_count << ","
         << "\"particle_color\":" << json_quote(s.particle_color) << ","
+        // T1.4: overlay HTML5 audio reads these fields and plays via new Audio().
+        // Empty path = total silence. Backend never plays sounds itself.
+        << "\"tick_sound_path\":" << json_quote(s.tick_sound_path) << ","
+        << "\"tick_sound_volume\":" << s.tick_sound_volume << ","
+        << "\"add_sound_path\":" << json_quote(s.add_sound_path) << ","
+        << "\"add_sound_volume\":" << s.add_sound_volume << ","
+        << "\"on_complete_sound_path\":" << json_quote(s.on_complete_sound_path) << ","
+        << "\"on_complete_volume\":" << s.on_complete_volume << ","
+        << "\"on_complete_repeat\":" << (s.on_complete_repeat ? "true" : "false") << ","
         << "\"recentEvents\":" << events_json.str()
         << "}";
     return oss.str();

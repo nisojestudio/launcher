@@ -45,6 +45,8 @@ struct LiveTimerGameState {
     bool completed = false;
     bool paused = false;
 
+    std::int64_t session_id = 0;
+
     double max_time_s = 0.0;
 
     double time_per_like = 2.0;
@@ -121,6 +123,9 @@ public:
 
     double remaining_seconds() const noexcept;
     std::string format_time() const;
+    // T1.1: tick() advances SSOT state_. Drives completion without relying on
+    // side-effecting const reads. Called by the polling loop before serialization.
+    void tick() noexcept;
     bool poll_completion_sound() noexcept;
     bool poll_tick_sound() noexcept;
 
@@ -134,8 +139,22 @@ public:
     bool is_enabled() const noexcept;
     bool is_running() const noexcept;
     void reset_config_to_defaults() noexcept;
+    // T1.3: 5-arg overload kept for backward compatibility; delegates to the
+    // extended overload below with neutral defaults.
     void restore_state(double remaining_seconds, bool running, bool paused,
                        bool completed, bool enabled) noexcept;
+    // T1.3: persisted runtime members are restored explicitly so event ids stay
+    // monotonic across save/load and the overlay's lastShownEventId stays in sync.
+    void restore_state(double remaining_seconds, bool running, bool paused,
+                       bool completed, bool enabled,
+                       std::int64_t event_id_counter,
+                       std::int64_t session_id,
+                       double total_time_added) noexcept;
+
+    // T1.3: public getters used by persistence (PanelApp save/load).
+    std::int64_t event_id_counter() const noexcept;
+    std::int64_t session_id() const noexcept;
+    double total_time_added() const noexcept;
 
 private:
     void add_event_popup(std::string_view icon, std::string_view label, double delta);
@@ -152,7 +171,10 @@ private:
     int64_t event_id_counter_ = 0;
     bool completion_sound_triggered_ = false;
     int last_tick_second_ = -1;
-    bool enabled_ = true;
+    // T2.6: hidden_ replaces enabled_. When true, event input and adjust_time
+    // are blocked and the overlay renders "--:--:--". Runtime counters and
+    // recent_events are preserved; user starts the timer explicitly after restore.
+    bool hidden_ = false;
 };
 
 class LiveTimerGameFactory final : public gamesdk::IGameFactory {

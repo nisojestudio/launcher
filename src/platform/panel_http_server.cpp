@@ -44,6 +44,7 @@ using nlp3::events::HostActor;
 using nlp3::events::HostEvent;
 using nlp3::events::HostEventKind;
 using nlp3::gamesdk::GameConfig;
+using nlp3::gamesdk::GameConfigValue;
 using nlp3::platform::PanelApp;
 using nlp3::platform::PanelAuthLoginResult;
 using nlp3::platform::PanelConsole;
@@ -1029,9 +1030,44 @@ std::string handle_timer_configure(PanelApp* app, std::string_view body) {
     maybe_str = parse_json_string(body, "particle_color");
     if (maybe_str.has_value()) config.set("particle_color", *maybe_str);
 
+    // T3.1: capture the requested config snapshot so we can compare against the
+    // effective post-apply config and report normalization/clamps to the caller.
+    const GameConfig requested = config;
+
     timer->apply_config(config);
     app->save_timer_state();
-    return make_simple_result(true, "config_applied");
+
+    // Build a stringified side-by-side comparison of the keys the client set.
+    auto value_to_string = [](const GameConfigValue& v) -> std::string {
+        if (std::holds_alternative<bool>(v)) return std::get<bool>(v) ? "true" : "false";
+        if (std::holds_alternative<std::int64_t>(v)) return std::to_string(std::get<std::int64_t>(v));
+        if (std::holds_alternative<double>(v)) return std::to_string(std::get<double>(v));
+        return std::get<std::string>(v);
+    };
+
+    std::vector<std::string> warnings;
+    for (const auto& [key, req_val] : requested.values()) {
+        const auto* eff = timer->config().find(key);
+        if (eff == nullptr) continue;
+        // For numeric keys the request may have been stored as int64_t while the
+        // effective (clamped/validated) form is double, or vice versa — compare
+        // normalized string forms so we don't spuriously flag type differences.
+        std::string req_str = value_to_string(req_val);
+        std::string eff_str = value_to_string(*eff);
+        if (req_str != eff_str) {
+            warnings.push_back(
+                std::string(key) + " normalized from '" + req_str + "' to '" + eff_str + "'");
+        }
+    }
+
+    std::ostringstream out;
+    out << "{\"ok\":true,\"message\":\"config_applied\",\"warnings\":[";
+    for (std::size_t i = 0; i < warnings.size(); ++i) {
+        if (i > 0) out << ",";
+        out << "\"" << json_escape(warnings[i]) << "\"";
+    }
+    out << "]}";
+    return out.str();
 }
 
 std::string handle_game_trigger_rest(PanelApp* app, std::string_view body, HostEvent& event) {

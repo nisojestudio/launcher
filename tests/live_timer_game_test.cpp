@@ -9,6 +9,7 @@
 #include "events/host_event.hpp"
 #include "gamesdk/game_input_event.hpp"
 #include "host/session_state.hpp"
+#include "platform/overlay_assets.hpp"
 
 namespace {
 
@@ -498,12 +499,196 @@ void test_remaining_seconds_auto_completed() {
 
     std::this_thread::sleep_for(std::chrono::milliseconds(50));
 
+    // T1.1: remaining_seconds() is a pure read; poll_completion_sound() drives
+    // tick() which is what commits the completion to the SSOT state.
+    game.poll_completion_sound();
+
     auto rem = game.remaining_seconds();
     assert(rem == 0.0);
     assert(game.state().completed);
     assert(!game.state().running);
 
     std::cout << "PASS: remaining_seconds_auto_completed\n";
+}
+
+// Fase 0 regression test
+void test_pause_remaining_seconds_correct() {
+    LiveTimerGame game;
+    auto config = game.default_config();
+    config.set("initial_time_s", 300.0);
+    game.apply_config(config);
+    game.on_activated();
+
+    std::this_thread::sleep_for(std::chrono::milliseconds(500));
+    game.pause();
+    double at_pause = game.remaining_seconds();
+    std::this_thread::sleep_for(std::chrono::milliseconds(500));
+    double after_pause = game.remaining_seconds();
+
+    assert(std::abs(at_pause - 299.5) < 0.15);
+    assert(std::abs(after_pause - at_pause) < 0.05);
+    assert(game.state().paused);
+
+    std::cout << "PASS: pause_remaining_seconds_correct\n";
+}
+
+// EXPECTED-FAIL until T1.1/T2.1
+// Fase 0 regression test
+void test_apply_config_completed_does_not_inflate() {
+    LiveTimerGame game;
+    auto config = game.default_config();
+    config.set("initial_time_s", 0.01);
+    game.apply_config(config);
+    game.on_activated();
+
+    std::this_thread::sleep_for(std::chrono::milliseconds(50));
+
+    bool triggered = game.poll_completion_sound();
+    if (!triggered) {
+        std::this_thread::sleep_for(std::chrono::milliseconds(50));
+        triggered = game.poll_completion_sound();
+    }
+    assert(triggered);
+    assert(game.state().completed);
+    assert(game.remaining_seconds() == 0.0);
+
+    auto config2 = game.default_config();
+    config2.set("initial_time_s", 600.0);
+    game.apply_config(config2);
+
+    assert(game.remaining_seconds() == 0.0);
+    assert(game.state().completed);
+
+    std::cout << "PASS: apply_config_completed_does_not_inflate\n";
+}
+
+// EXPECTED-FAIL until T2.1
+// Fase 0 regression test
+void test_apply_config_paused_does_not_alter_remaining() {
+    LiveTimerGame game;
+    auto config = game.default_config();
+    config.set("initial_time_s", 50.0);
+    game.apply_config(config);
+    game.on_activated();
+    game.pause();
+    double before = game.remaining_seconds();
+
+    auto config2 = game.default_config();
+    config2.set("initial_time_s", 120.0);
+    game.apply_config(config2);
+
+    double after = game.remaining_seconds();
+    assert(std::abs(after - before) < 0.1);
+
+    std::cout << "PASS: apply_config_paused_does_not_alter_remaining\n";
+}
+
+// EXPECTED-FAIL until T2.3
+// Fase 0 regression test
+void test_restore_state_running_paused_keeps_paused() {
+    LiveTimerGame game;
+    game.restore_state(50.0, true, true, false, true);
+    assert(game.state().paused == true);
+    assert(game.state().running == false);
+
+    std::cout << "PASS: restore_state_running_paused_keeps_paused\n";
+}
+
+// EXPECTED-FAIL until T1.3
+// Fase 0 regression test
+void test_event_id_monotonic_across_arm() {
+    LiveTimerGame game;
+    game.on_activated();
+    game.on_game_input_event(make_test_event(GameInputEventKind::like), kEmptySnapshot);
+    game.on_game_input_event(make_test_event(GameInputEventKind::like), kEmptySnapshot);
+    game.on_game_input_event(make_test_event(GameInputEventKind::like), kEmptySnapshot);
+    assert(!game.state().recent_events.empty());
+    assert(game.state().recent_events.back().id == 3);
+
+    game.arm();
+    assert(game.event_id_counter() == 3);
+
+    game.on_activated();
+    game.on_game_input_event(make_test_event(GameInputEventKind::like), kEmptySnapshot);
+    assert(!game.state().recent_events.empty());
+    assert(game.state().recent_events.back().id == 4);
+
+    std::cout << "PASS: event_id_monotonic_across_arm\n";
+}
+
+// EXPECTED-FAIL until T1.1
+// Fase 0 regression test
+void test_poll_tick_sound_below_60s() {
+    LiveTimerGame game;
+    auto config = game.default_config();
+    config.set("initial_time_s", 65.0);
+    game.apply_config(config);
+    game.on_activated();
+
+    std::this_thread::sleep_for(std::chrono::milliseconds(6000));
+
+    bool any_true = false;
+    for (int i = 0; i < 10; ++i) {
+        if (game.poll_tick_sound()) any_true = true;
+        std::this_thread::sleep_for(std::chrono::milliseconds(50));
+    }
+    assert(any_true);
+
+    std::cout << "PASS: poll_tick_sound_below_60s\n";
+}
+
+// EXPECTED-FAIL until T1.3
+// Fase 0 regression test
+void test_build_live_timer_state_json_contract() {
+    LiveTimerGame game;
+    game.apply_config(game.default_config());
+    game.on_activated();
+
+    const std::string json = nlp3::platform::build_live_timer_state_json(&game);
+    assert(json.find("\"remainingSeconds\"") != std::string::npos);
+    assert(json.find("\"running\"") != std::string::npos);
+    assert(json.find("\"paused\"") != std::string::npos);
+    assert(json.find("\"enabled\"") != std::string::npos);
+    assert(json.find("\"completed\"") != std::string::npos);
+    assert(json.find("\"recentEvents\"") != std::string::npos);
+    assert(json.find("\"sessionId\"") != std::string::npos);
+
+    std::cout << "PASS: build_live_timer_state_json_contract\n";
+}
+
+// EXPECTED-FAIL until T2.6/T1.3
+// Fase 0 regression test
+void test_set_enabled_preserves_runtime() {
+    LiveTimerGame game;
+    auto config = game.default_config();
+    config.set("initial_time_s", 30.0);
+    game.apply_config(config);
+    game.on_activated();
+    game.on_game_input_event(make_test_event(GameInputEventKind::like), kEmptySnapshot);
+    assert(!game.state().recent_events.empty());
+    assert(game.state().recent_events.back().id == 1);
+
+    std::this_thread::sleep_for(std::chrono::milliseconds(500));
+    double R = game.remaining_seconds();
+    assert(R > 0.0);
+
+    game.set_enabled(false);
+    assert(!game.is_enabled());
+    game.set_enabled(true);
+    assert(game.is_enabled());
+
+    double after = game.remaining_seconds();
+    assert(after > 0.0);
+    assert(std::abs(after - R) < 0.2);
+
+    assert(game.event_id_counter() == 1);
+
+    game.on_activated();
+    game.on_game_input_event(make_test_event(GameInputEventKind::like), kEmptySnapshot);
+    assert(!game.state().recent_events.empty());
+    assert(game.state().recent_events.back().id == 2);
+
+    std::cout << "PASS: set_enabled_preserves_runtime\n";
 }
 
 } // namespace
@@ -534,6 +719,14 @@ int main() {
     test_reset_config_to_defaults();
     test_remaining_seconds_auto_completed();
     test_font_size_changes();
+    test_pause_remaining_seconds_correct();
+    test_apply_config_completed_does_not_inflate();
+    test_apply_config_paused_does_not_alter_remaining();
+    test_restore_state_running_paused_keeps_paused();
+    test_event_id_monotonic_across_arm();
+    test_poll_tick_sound_below_60s();
+    test_build_live_timer_state_json_contract();
+    test_set_enabled_preserves_runtime();
 
     std::cout << "\nAll tests passed!\n";
     return 0;
