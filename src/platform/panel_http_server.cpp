@@ -4,6 +4,7 @@
 #include <array>
 #include <cctype>
 #include <chrono>
+#include <cmath>
 #include <cstring>
 #include <optional>
 #include <sstream>
@@ -1038,10 +1039,23 @@ std::string handle_timer_configure(PanelApp* app, std::string_view body) {
     app->save_timer_state();
 
     // Build a stringified side-by-side comparison of the keys the client set.
+    // A5: normalize numeric values so that int64_t(2) and double(2.0) compare
+    // equal and we don't emit spurious "normalized" warnings for harmless
+    // type-only differences. Doubles are rendered with trailing zeros and
+    // decimal point stripped when the value is integral, matching the
+    // canonical JSON number form.
     auto value_to_string = [](const GameConfigValue& v) -> std::string {
         if (std::holds_alternative<bool>(v)) return std::get<bool>(v) ? "true" : "false";
         if (std::holds_alternative<std::int64_t>(v)) return std::to_string(std::get<std::int64_t>(v));
-        if (std::holds_alternative<double>(v)) return std::to_string(std::get<double>(v));
+        if (std::holds_alternative<double>(v)) {
+            const double d = std::get<double>(v);
+            if (std::isfinite(d) && d == std::floor(d) && std::abs(d) < 1e15) {
+                return std::to_string(static_cast<std::int64_t>(d));
+            }
+            std::ostringstream oss;
+            oss << d;
+            return oss.str();
+        }
         return std::get<std::string>(v);
     };
 
@@ -1049,9 +1063,6 @@ std::string handle_timer_configure(PanelApp* app, std::string_view body) {
     for (const auto& [key, req_val] : requested.values()) {
         const auto* eff = timer->config().find(key);
         if (eff == nullptr) continue;
-        // For numeric keys the request may have been stored as int64_t while the
-        // effective (clamped/validated) form is double, or vice versa — compare
-        // normalized string forms so we don't spuriously flag type differences.
         std::string req_str = value_to_string(req_val);
         std::string eff_str = value_to_string(*eff);
         if (req_str != eff_str) {

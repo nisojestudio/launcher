@@ -566,13 +566,19 @@ void LiveTimerGame::on_game_input_event(
 
     state_.remaining_seconds += delta;
     total_time_added_ += delta;
-    if (state_.remaining_seconds < 0.0) {
+    const bool completed_by_event = state_.remaining_seconds < 0.0;
+    if (completed_by_event) {
         state_.remaining_seconds = 0.0;
         state_.running = false;
         state_.completed = true;
     } else if (state_.max_time_s > 0.0 && state_.remaining_seconds > state_.max_time_s) {
         state_.remaining_seconds = state_.max_time_s;
     }
+
+    // A8: skip the popup when this event is what exhausted the timer. The
+    // overlay will fire confetti and the completed banner; a simultaneous
+    // negative-time popup is confusing UX.
+    if (completed_by_event) return;
 
     add_event_popup(icon, label, delta);
 }
@@ -716,8 +722,10 @@ void LiveTimerGame::adjust_time(double delta) noexcept {
     if (hidden_) return;
     if (state_.completed) return;
 
+    const double before = state_.remaining_seconds;
     state_.remaining_seconds += delta;
     total_time_added_ += delta;
+    double applied_delta = state_.remaining_seconds - before;
     if (state_.remaining_seconds < 0.0) {
         state_.remaining_seconds = 0.0;
         if (state_.running) {
@@ -725,6 +733,10 @@ void LiveTimerGame::adjust_time(double delta) noexcept {
             state_.completed = true;
         }
     } else if (state_.max_time_s > 0.0 && state_.remaining_seconds > state_.max_time_s) {
+        // A7: surface the actually-applied delta (clamped to max_time_s) so the
+        // popup and the SSOT agree. Otherwise a +100s adjust with a 10s cap
+        // would display "+100s" while the timer only accepted +10s.
+        applied_delta = state_.max_time_s - before;
         state_.remaining_seconds = state_.max_time_s;
     }
 
@@ -732,7 +744,7 @@ void LiveTimerGame::adjust_time(double delta) noexcept {
         play_event_sound(state_.add_sound_path, state_.add_sound_volume);
     }
 
-    add_event_popup("\xf0\x9f\x93\x9d", "manual", delta);
+    add_event_popup("\xf0\x9f\x93\x9d", "manual", applied_delta);
 }
 
 void LiveTimerGame::set_enabled(bool enabled) noexcept {
