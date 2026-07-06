@@ -237,15 +237,19 @@ body.preview-mode #completed-banner { font-size: 20px !important; margin-top: 4p
 </style>
 </head>
 <body>
-<div id="particle-container"></div>
-<div id="confetti-container"></div>
-<div id="title"></div>
-<div id="counter">00:00:00</div>
-<div id="subtitle"></div>
-<div id="completed-banner"></div>
-<div id="connection-error" style="display:none;position:fixed;top:10px;left:50%;transform:translateX(-50%);background:rgba(255,0,0,0.7);color:#fff;padding:6px 16px;border-radius:8px;font-size:16px;font-weight:bold;z-index:999;">Desconectado del panel</div>
-<div id="preview-badge">PREVIEW</div>
-<div id="event-container"></div>
+<!-- aria-live="polite" announces time updates to assistive tech without
+     interrupting the user. The counter is wrapped in a role=region so
+     it is announced as a discrete unit rather than as part of the page
+     flow. -->
+<div id="particle-container" aria-hidden="true"></div>
+<div id="confetti-container" aria-hidden="true"></div>
+<h1 id="title"></h1>
+<div id="counter" role="region" aria-live="polite" aria-atomic="true" aria-label="Tiempo restante del temporizador">00:00:00</div>
+<p id="subtitle"></p>
+<div id="completed-banner" role="status" aria-live="assertive"></div>
+<div id="connection-error" role="alert" style="display:none;position:fixed;top:10px;left:50%;transform:translateX(-50%);background:rgba(255,0,0,0.7);color:#fff;padding:6px 16px;border-radius:8px;font-size:16px;font-weight:bold;z-index:999;">Desconectado del panel</div>
+<div id="preview-badge" aria-hidden="true">PREVIEW</div>
+<div id="event-container" role="log" aria-live="polite" aria-relevant="additions" aria-label="Eventos recientes del temporizador"></div>
 
 <script>
 // Detect preview mode (shown in panel iframe)
@@ -542,8 +546,14 @@ function showPopup(icon, label, delta) {
   el.className = 'event-popup ' + (delta >= 0 ? 'add' : 'subtract');
   el.style.color = delta >= 0 ? popupColors.add : popupColors.subtract;
   const deltaText = formatCompactDelta(delta) + 's';
-  const labelText = Math.abs(delta) === 1 ? icon + ' ' + label + ' ' + deltaText : icon + ' ' + deltaText;
+  // A13: show the label consistently for every event so the operator can
+  // always tell what triggered the popup, regardless of the magnitude.
+  // We only suppress the label for the auto-generated "manual" entry to
+  // avoid duplicating the icon already in the manual marker.
+  const showLabel = label !== 'manual';
+  const labelText = showLabel ? icon + ' ' + label + ' ' + deltaText : icon + ' ' + deltaText;
   el.textContent = labelText;
+  el.setAttribute('aria-label', (label || 'evento') + ' ' + deltaText);
   const counterSize = (styles.counter && styles.counter.font_size_px) || 120;
   el.style.fontSize = Math.max(28, Math.round(counterSize * 0.45)) + 'px';
   const existing = container.querySelectorAll('.event-popup');

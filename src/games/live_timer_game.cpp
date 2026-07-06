@@ -260,14 +260,43 @@ void LiveTimerGame::apply_config(const gamesdk::GameConfig& config) {
 
     double old_initial = effective.get_double(kInitialTimeS, 300.0);
 
+    // A12: sanitize numeric values before storing so NaN/inf cannot poison
+    // the SSOT. The server already clamps, but the gameplay layer must also
+    // defend itself in case the config comes from somewhere less strict.
+    auto read_finite_double = [](const gamesdk::GameConfigValue& v) -> std::optional<double> {
+        if (std::holds_alternative<double>(v)) {
+            const double d = std::get<double>(v);
+            if (std::isfinite(d)) return d;
+            return std::nullopt;
+        }
+        if (std::holds_alternative<std::int64_t>(v)) {
+            return static_cast<double>(std::get<std::int64_t>(v));
+        }
+        return std::nullopt;
+    };
+    auto read_finite_int = [](const gamesdk::GameConfigValue& v) -> std::optional<std::int64_t> {
+        if (std::holds_alternative<std::int64_t>(v)) {
+            return std::get<std::int64_t>(v);
+        }
+        if (std::holds_alternative<double>(v)) {
+            const double d = std::get<double>(v);
+            if (!std::isfinite(d)) return std::nullopt;
+            return static_cast<std::int64_t>(d);
+        }
+        return std::nullopt;
+    };
     auto apply_double = [&](std::string_view key) {
         if (const auto* v = config.find(key); v != nullptr) {
-            effective.set(std::string(key), *v);
+            if (auto sanitized = read_finite_double(*v); sanitized.has_value()) {
+                effective.set(std::string(key), *sanitized);
+            }
         }
     };
     auto apply_int = [&](std::string_view key) {
         if (const auto* v = config.find(key); v != nullptr) {
-            effective.set(std::string(key), *v);
+            if (auto sanitized = read_finite_int(*v); sanitized.has_value()) {
+                effective.set(std::string(key), *sanitized);
+            }
         }
     };
     auto apply_string = [&](std::string_view key) {
@@ -461,12 +490,19 @@ void LiveTimerGame::on_host_event(
 
 double LiveTimerGame::remaining_seconds() const noexcept {
     // T1.1: pure read. Completion is committed by tick(), never here.
+    // A12: never propagate NaN/inf to the JSON output. If the SSOT was
+    // poisoned (it should not be, but defence in depth), report 0 so the
+    // overlay does not render an invalid time.
+    if (!std::isfinite(state_.remaining_seconds)) {
+        return 0.0;
+    }
     if (!state_.running || state_.paused) {
         return state_.remaining_seconds;
     }
     auto elapsed = std::chrono::steady_clock::now() - start_time_;
     auto elapsed_s = std::chrono::duration<double>(elapsed).count();
     double current = state_.remaining_seconds - elapsed_s;
+    if (!std::isfinite(current)) current = 0.0;
     if (current < 0.0) current = 0.0;
     return current;
 }
@@ -566,6 +602,17 @@ void LiveTimerGame::on_game_input_event(
 
     state_.remaining_seconds += delta;
     total_time_added_ += delta;
+    // A12: defend against NaN/inf polluting the SSOT. A bad delta (e.g. NaN
+    // from a corrupt upstream) or a massive time_per_* would otherwise
+    // produce an inf that the JSON serializer could not emit and that the
+    // overlay would render as "NaN". Clamp to a sane upper bound.
+    constexpr double kMaxReasonableSeconds = 365.0 * 86400.0;  // 1 year
+    if (!std::isfinite(state_.remaining_seconds)) {
+        state_.remaining_seconds = 0.0;
+    }
+    if (state_.remaining_seconds > kMaxReasonableSeconds) {
+        state_.remaining_seconds = kMaxReasonableSeconds;
+    }
     const bool completed_by_event = state_.remaining_seconds < 0.0;
     if (completed_by_event) {
         state_.remaining_seconds = 0.0;
@@ -721,23 +768,34 @@ void LiveTimerGame::adjust_time(double delta) noexcept {
     // T2.6: blocked while hidden; runtime preserved.
     if (hidden_) return;
     if (state_.completed) return;
+    // A12: ignore non-finite deltas so the SSOT never gets poisoned with NaN.
+    if (!std::isfinite(delta)) return;
 
     const double before = state_.remaining_seconds;
     state_.remaining_seconds += delta;
     total_time_added_ += delta;
     double applied_delta = state_.remaining_seconds - before;
-    if (state_.remaining_seconds < 0.0) {
-        state_.remaining_seconds = 0.0;
-        if (state_.running) {
-            state_.running = false;
-            state_.completed = true;
+    if (!std::isfinite(state_.remaining_seconds)) {
+        state_.remaining_seconds = before;  // revert to safe value
+        applied_delta = 0.0;
+    } else {
+        constexpr double kMaxReasonableSeconds = 365.0 * 86400.0;
+        if (state_.remaining_seconds > kMaxReasonableSeconds) {
+            state_.remaining_seconds = kMaxReasonableSeconds;
         }
-    } else if (state_.max_time_s > 0.0 && state_.remaining_seconds > state_.max_time_s) {
-        // A7: surface the actually-applied delta (clamped to max_time_s) so the
-        // popup and the SSOT agree. Otherwise a +100s adjust with a 10s cap
-        // would display "+100s" while the timer only accepted +10s.
-        applied_delta = state_.max_time_s - before;
-        state_.remaining_seconds = state_.max_time_s;
+        if (state_.remaining_seconds < 0.0) {
+            state_.remaining_seconds = 0.0;
+            if (state_.running) {
+                state_.running = false;
+                state_.completed = true;
+            }
+        } else if (state_.max_time_s > 0.0 && state_.remaining_seconds > state_.max_time_s) {
+            // A7: surface the actually-applied delta (clamped to max_time_s) so the
+            // popup and the SSOT agree. Otherwise a +100s adjust with a 10s cap
+            // would display "+100s" while the timer only accepted +10s.
+            applied_delta = state_.max_time_s - before;
+            state_.remaining_seconds = state_.max_time_s;
+        }
     }
 
     if (delta > 0.0) {

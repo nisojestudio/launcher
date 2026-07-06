@@ -3264,8 +3264,11 @@
       if (pollTimerEventsTimerId) clearTimeout(pollTimerEventsTimerId);
     });
 
-    els.timerApplyConfig?.addEventListener("click", async () => {
-      const config = {
+    // Read the form into a plain config object. Each field is read with a
+    // type-appropriate default; bad inputs (NaN, empty strings) are
+    // sanitized so the panel never sends the server garbage.
+    function readTimerConfigFromForm() {
+      const cfg = {
         initial_time_s: parseTimeString(els.timerInitialTime?.value) || 300,
         max_time_s: parseFloat(els.timerMaxTime?.value) || 0,
         time_per_like_s: parseFloat(els.timerPerLike?.value) || 2.0,
@@ -3315,24 +3318,123 @@
         particle_count: parseInt(els.timerParticleCount?.value, 10) || 15,
         particle_color: els.timerParticleColor?.value || "#FFD700",
       };
+      // Sanitize any NaN that the parser may have produced on bad input.
+      for (const k of Object.keys(cfg)) {
+        if (typeof cfg[k] === 'number' && !Number.isFinite(cfg[k])) {
+          delete cfg[k];  // let the server apply its default for that key
+        }
+      }
+      return cfg;
+    }
+
+    // Client-side validation: surface any obviously-wrong inputs before the
+    // round-trip. The server still re-validates; this is purely UX so the
+    // operator sees a clear "fix this" instead of "applied with N warnings".
+    function validateTimerConfigClientSide(cfg) {
+      const issues = [];
+      if (cfg.initial_time_s !== undefined && (cfg.initial_time_s < 1 || cfg.initial_time_s > 31536000)) {
+        issues.push("initial_time_s debe estar entre 1s y 1 año");
+      }
+      if (cfg.max_time_s !== undefined && (cfg.max_time_s < 0 || cfg.max_time_s > 31536000)) {
+        issues.push("max_time_s debe estar entre 0 y 1 año");
+      }
+      for (const key of ['time_per_like_s','time_per_share_s','time_per_follow_s','time_per_gift_coin_s','time_per_chat_s']) {
+        if (cfg[key] !== undefined && Math.abs(cfg[key]) > 3600) {
+          issues.push(key + " debe estar entre -3600 y 3600");
+        }
+      }
+      for (const key of ['on_complete_volume','tick_sound_volume','add_sound_volume']) {
+        if (cfg[key] !== undefined && (cfg[key] < 0 || cfg[key] > 2)) {
+          issues.push(key + " debe estar entre 0 y 2");
+        }
+      }
+      for (const key of ['on_complete_text_size','title_font_size','counter_font_size','subtitle_font_size']) {
+        if (cfg[key] !== undefined && (cfg[key] < 8 || cfg[key] > 400)) {
+          issues.push(key + " debe estar entre 8 y 400");
+        }
+      }
+      const hexRe = /^#[0-9A-Fa-f]{3,8}$/;
+      for (const key of ['popup_add_color','popup_subtract_color','on_complete_text_color',
+                         'title_font_color','counter_font_color','subtitle_font_color','glow_color','particle_color']) {
+        if (cfg[key] !== undefined && cfg[key] !== '' && !hexRe.test(cfg[key])) {
+          issues.push(key + " debe ser un color hex (#RRGGBB)");
+        }
+      }
+      const effects = ['title_effect','counter_effect','subtitle_effect'];
+      const validEffects = new Set(['none','glow','pulse','shake','wave']);
+      for (const key of effects) {
+        if (cfg[key] !== undefined && !validEffects.has(cfg[key])) {
+          issues.push(key + " debe ser uno de: none, glow, pulse, shake, wave");
+        }
+      }
+      if (cfg.shake_intensity !== undefined && !['light','normal','heavy'].includes(cfg.shake_intensity)) {
+        issues.push("shake_intensity debe ser light, normal o heavy");
+      }
+      return issues;
+    }
+
+    // Apply config (form or pre-built object) to the backend with consistent
+    // UX: show validation errors, surface backend warnings, and update the
+    // status line accordingly.
+    async function applyTimerConfig(cfg, { fromImport = false } = {}) {
+      const issues = validateTimerConfigClientSide(cfg);
+      if (issues.length > 0) {
+        const summary = issues.length > 3
+          ? issues.slice(0, 3).join("; ") + " (+" + (issues.length - 3) + " más)"
+          : issues.join("; ");
+        setText(els.timerConfigStatus, "Corrige antes de aplicar: " + summary, { animate: true });
+        return false;
+      }
       try {
-        const result = await apiPostJson("/api/timer/configure", config);
+        const result = await apiPostJson("/api/timer/configure", cfg);
         if (result.ok) {
-          // N3: surface backend warnings (effect/clamps normalizations) so the
-          // operator understands when a value was rewritten on the server side.
           const warnings = Array.isArray(result.warnings) ? result.warnings : [];
-          const msg = warnings.length > 0
-            ? "Configuraci\u00f3n aplicada (" + warnings.length + " ajuste" + (warnings.length === 1 ? "" : "s") + ")"
-            : "Configuraci\u00f3n aplicada";
+          let msg;
+          if (fromImport) {
+            msg = warnings.length > 0
+              ? "Configuración importada y aplicada (" + warnings.length + " ajuste" + (warnings.length === 1 ? "" : "s") + ")"
+              : "Configuración importada y aplicada";
+          } else {
+            msg = warnings.length > 0
+              ? "Configuraci\u00f3n aplicada (" + warnings.length + " ajuste" + (warnings.length === 1 ? "" : "s") + ")"
+              : "Configuraci\u00f3n aplicada";
+          }
           setText(els.timerConfigStatus, msg, { animate: true });
           if (warnings.length > 0 && typeof console !== "undefined" && console.warn) {
             console.warn("timer configure warnings:", warnings);
           }
+          return true;
         } else {
           setText(els.timerConfigStatus, "Error al aplicar configuraci\u00f3n", { animate: true });
+          return false;
         }
       } catch (e) {
         setText(els.timerConfigStatus, "Error de red", { animate: true });
+        return false;
+      }
+    }
+
+    // Disable the apply button while a request is in flight to avoid
+    // double-submits on fast clicks.
+    function setApplyBusy(busy) {
+      if (!els.timerApplyConfig) return;
+      els.timerApplyConfig.disabled = !!busy;
+      const orig = els.timerApplyConfig.dataset.origLabel;
+      if (busy) {
+        if (!orig) els.timerApplyConfig.dataset.origLabel = els.timerApplyConfig.textContent;
+        els.timerApplyConfig.textContent = "Aplicando...";
+      } else if (orig) {
+        els.timerApplyConfig.textContent = orig;
+        delete els.timerApplyConfig.dataset.origLabel;
+      }
+    }
+
+    els.timerApplyConfig?.addEventListener("click", async () => {
+      setApplyBusy(true);
+      try {
+        await applyTimerConfig(readTimerConfigFromForm());
+      } finally {
+        setApplyBusy(false);
       }
     });
 
@@ -3562,7 +3664,10 @@
         if (typeof updateGlowToggles === 'function') updateGlowToggles();
         // Trigger preview update
         updateSubtitlePreview();
-        setText(els.timerConfigStatus, "Campos rellenados. Aplicar para enviar.", { animate: true });
+        // Auto-apply imported config so the operator does not have to click
+        // "Aplicar" again. If validation fails the status line shows the
+        // issue and the form keeps the imported values.
+        await applyTimerConfig(readTimerConfigFromForm(), { fromImport: true });
       } catch (e) {
         setText(els.timerConfigStatus, "Error al importar: formato inv\u00e1lido", { animate: true });
       }

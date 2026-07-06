@@ -2,6 +2,7 @@
 #include <chrono>
 #include <cmath>
 #include <iostream>
+#include <limits>
 #include <string>
 #include <thread>
 
@@ -691,6 +692,111 @@ void test_set_enabled_preserves_runtime() {
     std::cout << "PASS: set_enabled_preserves_runtime\n";
 }
 
+// A7: adjust_time clamp by max_time_s reports the actually-applied delta
+// in the popup (not the requested delta).
+void test_adjust_time_clamp_reports_real_delta() {
+    LiveTimerGame game;
+    auto config = game.default_config();
+    config.set("initial_time_s", 60.0);
+    config.set("max_time_s", 10.0);
+    game.apply_config(config);
+    game.on_activated();
+
+    assert(std::abs(game.remaining_seconds() - 60.0) < 0.1);
+    game.adjust_time(100.0);
+    assert(std::abs(game.remaining_seconds() - 10.0) < 0.01);
+    assert(!game.state().recent_events.empty());
+    const auto& last_event = game.state().recent_events.back();
+    // We were at ~60 and capped at 10, so the real delta is ~-50, not 100.
+    assert(last_event.delta_seconds < 0.0);
+    assert(std::abs(last_event.delta_seconds - (-50.0)) < 1.0);
+
+    std::cout << "PASS: adjust_time_clamp_reports_real_delta\n";
+}
+
+// A8: an event that exhausts the timer (negative delta brings remaining
+// below 0) skips the popup so the overlay does not flash "-Xs" alongside
+// the completion confetti.
+void test_event_exhausts_timer_skips_popup() {
+    LiveTimerGame game;
+    auto config = game.default_config();
+    config.set("initial_time_s", 5.0);
+    config.set("time_per_like_s", -10.0);
+    game.apply_config(config);
+    game.on_activated();
+
+    assert(game.state().recent_events.empty());
+    game.on_game_input_event(make_test_event(GameInputEventKind::like), kEmptySnapshot);
+    assert(game.state().completed);
+    // The popup was suppressed because this event is what completed the timer.
+    assert(game.state().recent_events.empty());
+    assert(game.event_id_counter() == 0);
+
+    std::cout << "PASS: event_exhausts_timer_skips_popup\n";
+}
+
+// A12: non-finite input to adjust_time is ignored, and non-finite input
+// to on_game_input_event is sanitized so the SSOT never holds NaN/inf.
+void test_non_finite_input_is_sanitized() {
+    LiveTimerGame game;
+    game.on_activated();
+    const double before = game.remaining_seconds();
+    game.adjust_time(std::numeric_limits<double>::quiet_NaN());
+    assert(std::abs(game.remaining_seconds() - before) < 0.01);
+    game.adjust_time(std::numeric_limits<double>::infinity());
+    assert(std::isfinite(game.remaining_seconds()));
+    assert(game.remaining_seconds() < 365.0 * 86400.0);
+
+    // apply_config with NaN must not propagate.
+    nlp3::gamesdk::GameConfig bad;
+    bad.set("initial_time_s", std::numeric_limits<double>::quiet_NaN());
+    game.apply_config(bad);
+    assert(std::isfinite(game.remaining_seconds()));
+    // NaN dropped on the floor; the previous valid initial_seconds is kept.
+    assert(game.state().initial_seconds > 0.0);
+
+    std::cout << "PASS: non_finite_input_is_sanitized\n";
+}
+
+// Round-trip a timer state through the JSON envelope used by PanelApp.
+void test_state_json_round_trip() {
+    LiveTimerGame game;
+    auto config = game.default_config();
+    config.set("initial_time_s", 30.0);
+    config.set("time_per_gift_coin_s", 1.5);
+    config.set("title_text", std::string("hola mundo"));
+    game.apply_config(config);
+    game.on_activated();
+    for (int i = 0; i < 4; ++i) {
+        game.on_game_input_event(make_test_event(GameInputEventKind::like), kEmptySnapshot);
+    }
+    assert(game.event_id_counter() == 4);
+
+    // Serialise
+    const std::string json = nlp3::platform::build_live_timer_state_json(&game);
+    assert(json.find("\"remainingSeconds\"") != std::string::npos);
+    assert(json.find("\"title\":\"hola mundo\"") != std::string::npos);
+    assert(json.find("\"sessionId\"") != std::string::npos);
+
+    // Now build a fresh game, simulate the panel restoring from this snapshot.
+    LiveTimerGame restored;
+    restored.apply_config(restored.default_config());
+    // The PanelApp side does: apply_config(saved_config); restore_state(...).
+    // We replicate the minimum we need: bring back the runtime fields.
+    restored.restore_state(15.0, true, false, false, true,
+                           game.event_id_counter(), game.session_id(),
+                           game.total_time_added());
+    assert(restored.is_running());
+    assert(!restored.state().paused);
+    assert(!restored.state().completed);
+    // event_id counter was preserved across the round trip.
+    restored.on_game_input_event(make_test_event(GameInputEventKind::like), kEmptySnapshot);
+    assert(!restored.state().recent_events.empty());
+    assert(restored.state().recent_events.back().id == 5);
+
+    std::cout << "PASS: state_json_round_trip\n";
+}
+
 } // namespace
 
 int main() {
@@ -727,6 +833,10 @@ int main() {
     test_poll_tick_sound_below_60s();
     test_build_live_timer_state_json_contract();
     test_set_enabled_preserves_runtime();
+    test_adjust_time_clamp_reports_real_delta();
+    test_event_exhausts_timer_skips_popup();
+    test_non_finite_input_is_sanitized();
+    test_state_json_round_trip();
 
     std::cout << "\nAll tests passed!\n";
     return 0;

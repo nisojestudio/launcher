@@ -30,7 +30,7 @@ struct LiveTimerPopupStyle {
 };
 
 struct LiveTimerRecentEvent {
-    int64_t id = 0;
+    std::int64_t id = 0;
     std::string icon;
     std::string label;
     double delta_seconds = 0.0;

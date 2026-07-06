@@ -869,10 +869,40 @@ bool PanelApp::save_timer_state() {
             std::filesystem::create_directories(path.parent_path(), ec);
         }
 
-        std::ofstream output(timer_save_path_, std::ios::binary | std::ios::trunc);
-        if (!output) return false;
-        output << root.dump(2) << "\n";
-        return output.good();
+        // A11: atomic write — write to a sibling temp file then rename, so a
+        // mid-write crash never leaves a half-written save. We additionally
+        // snapshot a backup of the previous save before overwriting.
+        const std::filesystem::path temp_path = path.string() + ".tmp";
+        const std::filesystem::path backup_path = path.string() + ".bak";
+        {
+            std::ofstream output(temp_path, std::ios::binary | std::ios::trunc);
+            if (!output) return false;
+            output << root.dump(2) << "\n";
+            output.flush();
+            if (!output.good()) {
+                std::error_code ec;
+                std::filesystem::remove(temp_path, ec);
+                return false;
+            }
+        }
+        // Keep a copy of the previous good save before rotating.
+        {
+            std::error_code ec;
+            if (std::filesystem::exists(path, ec)) {
+                std::filesystem::copy_file(path, backup_path,
+                    std::filesystem::copy_options::overwrite_existing, ec);
+            }
+        }
+        std::error_code rename_ec;
+        std::filesystem::rename(temp_path, path, rename_ec);
+        if (rename_ec) {
+            // On Windows rename across same volume is atomic, but if it fails
+            // (e.g. AV holding the file) fall back to copy + remove.
+            std::filesystem::copy_file(temp_path, path,
+                std::filesystem::copy_options::overwrite_existing, rename_ec);
+            std::filesystem::remove(temp_path, rename_ec);
+        }
+        return std::filesystem::exists(path);
     } catch (...) {
         return false;
     }
@@ -882,63 +912,73 @@ bool PanelApp::load_timer_state() {
     if (live_timer_game_ == nullptr || timer_save_path_.empty()) {
         return false;
     }
-    try {
-        if (!std::filesystem::exists(timer_save_path_)) {
-            return false;
-        }
-        std::ifstream input(timer_save_path_, std::ios::binary);
-        if (!input) return false;
+    // Helper lambda: parse and apply a save file at the given path. Returns
+    // true on success, false on any parse / shape error.
+    auto try_load_from = [&](const std::filesystem::path& path) -> bool {
+        try {
+            if (!std::filesystem::exists(path)) return false;
+            std::ifstream input(path, std::ios::binary);
+            if (!input) return false;
 
-        std::ostringstream buffer;
-        buffer << input.rdbuf();
-        if (!input.good() && !input.eof()) return false;
+            std::ostringstream buffer;
+            buffer << input.rdbuf();
+            if (!input.good() && !input.eof()) return false;
 
-        const auto root = nlohmann::json::parse(buffer.str(), nullptr, false);
-        if (root.is_discarded() || !root.is_object()) return false;
+            const auto root = nlohmann::json::parse(buffer.str(), nullptr, false);
+            if (root.is_discarded() || !root.is_object()) return false;
 
-        // 1. Restore config
-        gamesdk::GameConfig saved_config = live_timer_game_->default_config();
-        const auto it_cfg = root.find("config");
-        if (it_cfg != root.end() && it_cfg->is_object()) {
-            for (const auto& [key, val] : it_cfg->items()) {
-                if (val.is_boolean()) {
-                    saved_config.set(key, val.get<bool>());
-                } else if (val.is_number_integer()) {
-                    saved_config.set(key, val.get<std::int64_t>());
-                } else if (val.is_number_float()) {
-                    saved_config.set(key, val.get<double>());
-                } else if (val.is_string()) {
-                    saved_config.set(key, val.get<std::string>());
+            // 1. Restore config
+            gamesdk::GameConfig saved_config = live_timer_game_->default_config();
+            const auto it_cfg = root.find("config");
+            if (it_cfg != root.end() && it_cfg->is_object()) {
+                for (const auto& [key, val] : it_cfg->items()) {
+                    if (val.is_boolean()) {
+                        saved_config.set(key, val.get<bool>());
+                    } else if (val.is_number_integer()) {
+                        saved_config.set(key, val.get<std::int64_t>());
+                    } else if (val.is_number_float()) {
+                        saved_config.set(key, val.get<double>());
+                    } else if (val.is_string()) {
+                        saved_config.set(key, val.get<std::string>());
+                    }
                 }
             }
+            live_timer_game_->apply_config(saved_config);
+
+            // 2. Restore saved runtime state
+            const auto it_st = root.find("state");
+            if (it_st != root.end() && it_st->is_object()) {
+                const auto& s = *it_st;
+                const double remaining = s.value("remaining_seconds", live_timer_game_->state().initial_seconds);
+                const bool running = s.value("running", false);
+                const bool paused = s.value("paused", false);
+                const bool completed = s.value("completed", false);
+                const bool enabled = s.value("enabled", true);
+                // T1.3: read persisted counters; safe defaults if absent or invalid.
+                const std::int64_t event_id_counter =
+                    s.value("event_id_counter", static_cast<std::int64_t>(0));
+                const std::int64_t session_id =
+                    s.value("session_id", static_cast<std::int64_t>(0));
+                const double total_time_added = s.value("total_time_added", 0.0);
+
+                live_timer_game_->restore_state(remaining, running, paused, completed,
+                                                  enabled, event_id_counter, session_id,
+                                                  total_time_added);
+            }
+            return true;
+        } catch (...) {
+            return false;
         }
-        live_timer_game_->apply_config(saved_config);
+    };
 
-        // 2. Restore saved runtime state
-        const auto it_st = root.find("state");
-        if (it_st != root.end() && it_st->is_object()) {
-            const auto& s = *it_st;
-            const double remaining = s.value("remaining_seconds", live_timer_game_->state().initial_seconds);
-            const bool running = s.value("running", false);
-            const bool paused = s.value("paused", false);
-            const bool completed = s.value("completed", false);
-            const bool enabled = s.value("enabled", true);
-            // T1.3: read persisted counters; safe defaults if absent or invalid.
-            const std::int64_t event_id_counter =
-                s.value("event_id_counter", static_cast<std::int64_t>(0));
-            const std::int64_t session_id =
-                s.value("session_id", static_cast<std::int64_t>(0));
-            const double total_time_added = s.value("total_time_added", 0.0);
-
-            live_timer_game_->restore_state(remaining, running, paused, completed,
-                                              enabled, event_id_counter, session_id,
-                                              total_time_added);
-        }
-
-        return true;
-    } catch (...) {
-        return false;
-    }
+    // A11: try primary save first, fall back to the .bak snapshot that
+    // save_timer_state rotates before each atomic rename. If both fail
+    // the timer falls back to defaults, which is safer than crashing.
+    const std::filesystem::path primary(timer_save_path_);
+    const std::filesystem::path backup = primary.string() + ".bak";
+    if (try_load_from(primary)) return true;
+    if (try_load_from(backup)) return true;
+    return false;
 }
 
 bool PanelApp::apply_live_config() {
