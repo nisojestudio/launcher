@@ -3306,7 +3306,16 @@
       try {
         const result = await apiPostJson("/api/timer/configure", config);
         if (result.ok) {
-          setText(els.timerConfigStatus, "Configuraci\u00f3n aplicada", { animate: true });
+          // N3: surface backend warnings (effect/clamps normalizations) so the
+          // operator understands when a value was rewritten on the server side.
+          const warnings = Array.isArray(result.warnings) ? result.warnings : [];
+          const msg = warnings.length > 0
+            ? "Configuraci\u00f3n aplicada (" + warnings.length + " ajuste" + (warnings.length === 1 ? "" : "s") + ")"
+            : "Configuraci\u00f3n aplicada";
+          setText(els.timerConfigStatus, msg, { animate: true });
+          if (warnings.length > 0 && typeof console !== "undefined" && console.warn) {
+            console.warn("timer configure warnings:", warnings);
+          }
         } else {
           setText(els.timerConfigStatus, "Error al aplicar configuraci\u00f3n", { animate: true });
         }

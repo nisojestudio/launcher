@@ -57,7 +57,6 @@ body.preview-mode #completed-banner { font-size: 20px !important; margin-top: 4p
   background-clip: unset !important;
   -webkit-background-clip: unset !important;
   background: none !important;
-  animation: pulse 0.5s ease-in-out infinite !important;
 }
 #counter.effect-wave.warning {
   -webkit-text-fill-color: #ff8c00 !important;
@@ -70,7 +69,6 @@ body.preview-mode #completed-banner { font-size: 20px !important; margin-top: 4p
   background-clip: unset !important;
   -webkit-background-clip: unset !important;
   background: none !important;
-  animation: pulse 0.3s ease-in-out infinite !important;
 }
 @keyframes waveAnim {
   0%   { background-position: 0% 50%; }
@@ -164,11 +162,18 @@ body.preview-mode #completed-banner { font-size: 20px !important; margin-top: 4p
 #counter.warning { color: #ff8c00 !important; }
 #counter.danger {
   color: #ff4444 !important;
-  animation: pulse 0.5s ease-in-out infinite;
 }
 #counter.completed {
   color: #ff4444 !important;
-  animation: pulse 0.3s ease-in-out infinite;
+}
+/* T2.5: danger/completed pulse is opt-in via .counter-danger-pulse and only
+   applied by JS when no other counter_effect is active. Color is kept above. */
+@keyframes pulseDanger {
+  0%, 100% { transform: scale(1); }
+  50%      { transform: scale(1.05); }
+}
+.counter-danger-pulse {
+  animation: pulseDanger 0.5s ease-in-out infinite;
 }
 #subtitle {
   font-size: 32px;
@@ -255,10 +260,29 @@ let styles = {};
 let popupColors = { add: '#00AAFF', subtract: '#FF4444' };
 let completedStyle = { text: 'TIEMPO CUMPLIDO', color: '#FFD700', size: 48 };
 let lastShownEventId = 0;
+// T1.3: sessionId cursor — when it changes (arm/activate/restore) we reset the
+// event cursor and clear cached effect state so the overlay re-syncs cleanly.
+let currentSessionId = 0;
 let effectState = null;      // { effects, glow, wave, pulse, shake, particles }
 let particleContainer = null;
 let particleColor_ = '#FFD700';
 let particleCount_ = 15;
+// T1.2: confetti is spawned at most once per completion cycle.
+var confettiSpawned = false;
+// T3.5: track particle removal timeouts so we can clear them before wiping DOM.
+let particleTimeouts = [];
+// T1.4: HTML5 audio refs owned by the overlay. C++ backend only ships config.
+let tickAudio = null;
+let addAudio = null;
+let completeAudio = null;
+let lastTickSecondPlayed = -1;
+
+function clampVolume(v) {
+  v = Number(v) || 0;
+  if (v < 0) return 0;
+  if (v > 1) return 1;
+  return v;
+}
 
 /* ---- Compare two effect config objects ---- */
 function effectConfigChanged(data) {
@@ -283,6 +307,8 @@ function clearEffectClasses(el) {
   el.style.removeProperty('--pulse-speed');
   el.style.removeProperty('--shake-speed');
   el.style.textShadow = '';
+  // T2.5: drop-shadow filter is set for glow; clear it so it doesn't leak.
+  el.style.filter = '';
   el.style.background = '';
   el.style.webkitBackgroundClip = '';
   el.style.backgroundClip = '';
@@ -294,12 +320,15 @@ function applyEffects(el, effectName, glowEnabled, glowColor, glowIntensity,
                        waveColors, pulseSpeed, shakeIntensity) {
   clearEffectClasses(el);
 
-  // Glow (text-shadow) — compatible with everything
+  // T2.5: glow uses drop-shadow() on the whole element (filter) instead of
+  // text-shadow so it renders on transparent-filled wave text correctly.
+  // When glow is OFF we restore the default text-shadow halo for readability
+  // and clear any leftover filter (already cleared by clearEffectClasses).
   if (glowEnabled && glowColor) {
-    el.style.textShadow =
-      '0 0 ' + glowIntensity + 'px ' + glowColor + ',' +
-      '0 0 ' + (glowIntensity * 2) + 'px ' + glowColor + ',' +
-      '0 0 20px rgba(0,0,0,0.8), 0 0 40px rgba(0,0,0,0.6)';
+    el.style.textShadow = '';
+    el.style.filter =
+      'drop-shadow(0 0 ' + glowIntensity + 'px ' + glowColor + ') ' +
+      'drop-shadow(0 0 ' + (glowIntensity * 2) + 'px ' + glowColor + ')';
   } else {
     el.style.textShadow = '0 0 20px rgba(0,0,0,0.8), 0 0 40px rgba(0,0,0,0.6)';
   }
@@ -365,10 +394,15 @@ function spawnParticle(container, color) {
   p.style.animation = 'particleRise ' + duration + 's ease-in ' + delay + 's forwards';
   p.style.setProperty('--drift', drift + 'px');
   container.appendChild(p);
-  // Remove after animation completes to avoid DOM bloat
-  setTimeout(function() {
+  // T3.5: track the timeout so updateParticles can cancel pending removals
+  // before wiping the container DOM, preventing late removeChild() on a node
+  // that no longer belongs to the live document.
+  const tid = setTimeout(function() {
     if (p.parentNode) p.parentNode.removeChild(p);
+    const idx = particleTimeouts.indexOf(tid);
+    if (idx >= 0) particleTimeouts.splice(idx, 1);
   }, (duration + delay) * 1000 + 100);
+  particleTimeouts.push(tid);
 }
 
 /* ---- Confetti celebration ---- */
@@ -411,6 +445,10 @@ function updateParticles(enabled, count, color) {
     clearInterval(particleContainer._timer);
     particleContainer._timer = null;
   }
+  // T3.5: cancel pending particle removal timeouts so they don't fire after we
+  // wipe the container innerHTML (which would otherwise throw on removeChild).
+  particleTimeouts.forEach(clearTimeout);
+  particleTimeouts = [];
   // Remove existing particles
   particleContainer.innerHTML = '';
 
@@ -491,6 +529,12 @@ function formatCompactDelta(d) {
 
 function showPopup(icon, label, delta) {
   const container = document.getElementById('event-container');
+  // T3.4: keep the popup stack bounded so rapid event bursts don't pile up
+  // DOM nodes and starve the layout.
+  const MAX_POPUPS = 5;
+  if (container && container.children.length >= MAX_POPUPS) {
+    container.removeChild(container.firstChild);
+  }
   const el = document.createElement('div');
   el.className = 'event-popup ' + (delta >= 0 ? 'add' : 'subtract');
   el.style.color = delta >= 0 ? popupColors.add : popupColors.subtract;
@@ -517,6 +561,67 @@ function styleEqual(a, b) {
     && a.bold === b.bold;
 }
 
+// T1.4: completion audio driven by JSON state. Empty path = silence (never a
+// fallback beep). The backend ships only configuration; playback lives here.
+function applySounds(data) {
+  try {
+    const compPath = data.on_complete_sound_path || '';
+    if (data.completed && compPath) {
+      if (!completeAudio || completeAudio._path !== compPath) {
+        if (completeAudio) { try { completeAudio.pause(); } catch (e) {} }
+        completeAudio = new Audio(compPath);
+        completeAudio._path = compPath;
+        completeAudio.volume = clampVolume(data.on_complete_volume);
+        completeAudio.loop = !!data.on_complete_repeat;
+      }
+      try { completeAudio.play().catch(function () {}); } catch (e) {}
+    } else {
+      // State left completion (or path cleared): stop and release so the next
+      // completion can replay cleanly.
+      if (completeAudio) { try { completeAudio.pause(); } catch (e) {} completeAudio = null; }
+    }
+
+    const tickPath = data.tick_sound_path || '';
+    const tickActive = data.running && !data.paused && !data.completed
+        && tickPath && Number(data.remainingSeconds) <= 60;
+    if (tickActive) {
+      const sec = Math.floor(Number(data.remainingSeconds) || 0);
+      if (sec >= 0 && sec !== lastTickSecondPlayed) {
+        lastTickSecondPlayed = sec;
+        if (!tickAudio || tickAudio._path !== tickPath) {
+          if (tickAudio) { try { tickAudio.pause(); } catch (e) {} }
+          tickAudio = new Audio(tickPath);
+          tickAudio._path = tickPath;
+        }
+        tickAudio.volume = clampVolume(data.tick_sound_volume);
+        try { tickAudio.currentTime = 0; } catch (e) {}
+        try { tickAudio.play().catch(function () {}); } catch (e) {}
+      }
+    } else {
+      lastTickSecondPlayed = -1;
+    }
+  } catch (e) {
+    // Sounds are best-effort: never let audio errors break the overlay.
+  }
+}
+
+// T1.4: add chime played when a new time-gaining event popup appears. Empty
+// path = silence; the previous addAudio is stopped and replaced on path change.
+function playAddSound(data) {
+  try {
+    const p = data.add_sound_path || '';
+    if (!p) return;
+    if (!addAudio || addAudio._path !== p) {
+      if (addAudio) { try { addAudio.pause(); } catch (e) {} }
+      addAudio = new Audio(p);
+      addAudio._path = p;
+    }
+    addAudio.volume = clampVolume(data.add_sound_volume);
+    try { addAudio.currentTime = 0; } catch (e) {}
+    try { addAudio.play().catch(function () {}); } catch (e) {}
+  } catch (e) {}
+}
+
 function updateOverlay() {
   fetch(API_STATE)
     .then(r => r.json())
@@ -528,6 +633,21 @@ function updateOverlay() {
       const previewBadge = document.getElementById('preview-badge');
       const errorEl = document.getElementById('connection-error');
       if (errorEl) errorEl.style.display = 'none';
+
+      // T1.3: detect session switches (arm/activate/restore) and reset the
+      // event cursor + cached effect/glow state so the overlay re-syncs.
+      if (data.sessionId !== undefined && data.sessionId !== currentSessionId) {
+        currentSessionId = data.sessionId;
+        lastShownEventId = 0;
+        confettiSpawned = false;
+        effectState = null;
+      }
+      // T1.2: confetti must not spawn again on a completion that just un-set.
+      if (!data.completed) confettiSpawned = false;
+      if (data.enabled === false) {
+        confettiSpawned = false;
+        effectState = null;
+      }
 
       // Show preview badge when idle (not running, not completed, enabled)
       const isLive = data.running && !data.paused && !data.completed;
@@ -567,38 +687,46 @@ function updateOverlay() {
       // Apply visual effects (sets effect classes only)
       updateEffects(data);
 
-      // Set counter state class (preserves effect classes)
-      function setCounterState(state) {
+      // Set counter state class (preserves effect classes).
+      // T2.5: a gentle pulse is opt-in via .counter-danger-pulse and only added
+      // when the timer rolled into danger/completed AND no counter_effect was
+      // active (effectName === 'none'); otherwise the active effect owns motion.
+      function setCounterState(state, effectName) {
         counterEl.classList.remove('danger', 'warning', 'completed', 'paused-state');
+        const noEffect = !effectName || effectName === 'none';
+        const wantPulse = (state === 'danger' || state === 'completed') && noEffect;
         if (state) counterEl.classList.add(state);
+        if (wantPulse) counterEl.classList.add('counter-danger-pulse');
+        else counterEl.classList.remove('counter-danger-pulse');
       }
+      const counterEffectName = data.counter_effect || 'none';
 
       if (data.enabled === false) {
         counterEl.textContent = '--:--:--';
-        setCounterState(null);
+        setCounterState(null, counterEffectName);
         bannerEl.classList.remove('visible');
       } else if (data.paused) {
         counterEl.textContent = formatTime(data.remainingSeconds);
-        setCounterState('warning');
+        setCounterState('warning', counterEffectName);
         bannerEl.classList.remove('visible');
       } else if (data.completed) {
         counterEl.textContent = '00:00:00';
-        setCounterState('completed');
+        setCounterState('completed', counterEffectName);
         bannerEl.textContent = completedStyle.text;
         bannerEl.style.color = completedStyle.color;
         bannerEl.style.fontSize = completedStyle.size + 'px';
         bannerEl.classList.add('visible');
-        // Confetti celebration (only once per completion)
-        spawnConfetti();
+        // T1.2: confetti celebration (only once per completion cycle).
+        if (!confettiSpawned) { spawnConfetti(); confettiSpawned = true; }
       } else {
         const formatted = data.format || formatTime(data.remainingSeconds);
         counterEl.textContent = formatted;
         if (data.remainingSeconds <= 10) {
-          setCounterState('danger');
+          setCounterState('danger', counterEffectName);
         } else if (data.remainingSeconds <= 60) {
-          setCounterState('warning');
+          setCounterState('warning', counterEffectName);
         } else {
-          setCounterState(null);
+          setCounterState(null, counterEffectName);
         }
         bannerEl.classList.remove('visible');
       }
@@ -608,18 +736,33 @@ function updateOverlay() {
           if (!ev.id || ev.id > lastShownEventId) {
             showPopup(ev.icon, ev.label, ev.delta);
             if (ev.id) lastShownEventId = ev.id;
+            // T1.4: play the add chime for genuine time gains only.
+            if (ev.isAddition && ev.delta > 0) playAddSound(data);
           }
         });
       }
+
+      // T1.4: completion + tick audio driven by JSON state from the backend.
+      applySounds(data);
+
+      // T3.3: success resets the backoff; the next poll is scheduled below.
+      pollDelay = 500;
     })
     .catch(() => {
       const errorEl = document.getElementById('connection-error');
       if (errorEl) errorEl.style.display = 'block';
+      // T3.3: exponential backoff capped at 5s when the panel is unreachable.
+      pollDelay = Math.min(5000, pollDelay * 2);
     });
+  // T3.3: chain the next poll regardless of success/failure (replaces setInterval).
+  schedulePoll();
 }
 
-updateOverlay();
-setInterval(updateOverlay, 500);
+// T3.3: poll scheduling with adaptive backoff — never use setInterval.
+let pollDelay = 500;
+function schedulePoll() { setTimeout(updateOverlay, pollDelay); }
+
+schedulePoll();
 </script>
 </body>
 </html>
