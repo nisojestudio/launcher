@@ -159,13 +159,14 @@ body.preview-mode #completed-banner { font-size: 20px !important; margin-top: 4p
   position: relative;
   z-index: 10;
 }
-#counter.warning { color: #ff8c00 !important; }
-#counter.danger {
-  color: #ff4444 !important;
-}
-#counter.completed {
-  color: #ff4444 !important;
-}
+/* A1: warning/danger/completed no longer force a hardcoded color with
+   !important. The operator's counter_font_color is now respected at all
+   times; the state classes only attach an opt-in pulse animation when no
+   effect is active. To color the last 10s in red, set counter_font_color
+   to #ff4444 from the panel instead. */
+#counter.warning { }
+#counter.danger { }
+#counter.completed { }
 /* T2.5: danger/completed pulse is opt-in via .counter-danger-pulse and only
    applied by JS when no other counter_effect is active. Color is kept above. */
 @keyframes pulseDanger {
@@ -453,9 +454,11 @@ function updateParticles(enabled, count, color) {
   particleContainer.innerHTML = '';
 
   if (enabled && particleCount_ > 0) {
-    // Initial burst
+    // Initial burst — A4: tracked in particleTimeouts so updateParticles(false)
+    // can cancel pending burst spawns before they fire on a cleared container.
     for (let i = 0; i < Math.min(particleCount_, 10); i++) {
-      setTimeout(function() { spawnParticle(particleContainer, particleColor_); }, i * 200);
+      const tid = setTimeout(function() { spawnParticle(particleContainer, particleColor_); }, i * 200);
+      particleTimeouts.push(tid);
     }
     // Continuous spawn
     particleContainer._timer = setInterval(function() {
@@ -763,6 +766,22 @@ let pollDelay = 500;
 function schedulePoll() { setTimeout(updateOverlay, pollDelay); }
 
 schedulePoll();
+
+// A12: cancel pending timeouts and audio on unload so popups and ticks
+// don't fire against a torn-down DOM / Audio element. Browsers throttle or
+// ignore setTimeout after the page is being torn down, but cancelTimeout is
+// cheap and keeps behaviour deterministic during hot reloads.
+window.addEventListener('beforeunload', function() {
+  particleTimeouts.forEach(clearTimeout);
+  particleTimeouts = [];
+  if (particleContainer && particleContainer._timer) {
+    clearInterval(particleContainer._timer);
+    particleContainer._timer = null;
+  }
+  if (tickAudio) { try { tickAudio.pause(); } catch (e) {} tickAudio = null; }
+  if (addAudio) { try { addAudio.pause(); } catch (e) {} addAudio = null; }
+  if (completeAudio) { try { completeAudio.pause(); } catch (e) {} completeAudio = null; }
+});
 </script>
 </body>
 </html>

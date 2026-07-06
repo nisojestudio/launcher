@@ -3217,8 +3217,12 @@
 
     let lastEventId = 0;
     const eventsListEl = document.getElementById('timer-events-list');
+    // A10: chain-based polling so the timer can be stopped on teardown
+    // (page reload / panel re-init) without leaking intervals.
+    let pollTimerEventsTimerId = 0;
+    let pollTimerEventsStopped = false;
     async function pollTimerEvents() {
-      if (!eventsListEl) return;
+      if (pollTimerEventsStopped) return;
       try {
         const resp = await fetch('/api/overlay/live-timer/state');
         if (!resp.ok) return;
@@ -3247,10 +3251,18 @@
         lastEventId = maxId;
       } catch {
         // ignore
+      } finally {
+        if (!pollTimerEventsStopped) {
+          pollTimerEventsTimerId = setTimeout(pollTimerEvents, 2000);
+        }
       }
     }
-    setInterval(pollTimerEvents, 2000);
     pollTimerEvents();
+    // Best-effort cleanup on panel reload.
+    window.addEventListener('beforeunload', () => {
+      pollTimerEventsStopped = true;
+      if (pollTimerEventsTimerId) clearTimeout(pollTimerEventsTimerId);
+    });
 
     els.timerApplyConfig?.addEventListener("click", async () => {
       const config = {
@@ -3362,7 +3374,6 @@
     }
 
     // Refresh preview when config is applied
-    const origApplyTimerConfig = els.timerApplyConfig?.click;
     if (els.timerApplyConfig) {
       els.timerApplyConfig.addEventListener('click', function() {
         // Refresh preview after a short delay (config needs time to propagate)
