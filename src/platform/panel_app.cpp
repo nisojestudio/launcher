@@ -842,10 +842,10 @@ bool PanelApp::save_timer_state() {
         }
         root["config"] = std::move(config_json);
 
-        // Serialize runtime state
+        // Serialize runtime state — T1.1f: sync SSOT before saving.
+        live_timer_game_->tick();
         const auto& st = live_timer_game_->state();
         const auto now_ms = now_wall_clock_ms();
-        // Use remaining_seconds() to get current remaining (accounts for elapsed time when running)
         const double current_remaining = live_timer_game_->remaining_seconds();
 
         ordered_json state_json = ordered_json::object();
@@ -1121,6 +1121,8 @@ PanelSnapshot PanelApp::snapshot() const {
     }
 
     if (live_timer_game_ != nullptr) {
+        // T1.1f: sync SSOT before snapshot so remaining values are current.
+        live_timer_game_->tick();
         const auto& s = live_timer_game_->state();
         snapshot.timer.has_timer = true;
         snapshot.timer.timer_id = std::string(games::kLiveTimerGameId);
