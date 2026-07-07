@@ -4,6 +4,17 @@ All notable Panel Live changes should be recorded here.
 
 Format follows a lightweight Keep a Changelog style. Versions use SemVer.
 
+## 0.2.13 - 2026-07-06
+
+### Fixed
+
+- **T1.1f — Timer SSOT actualizado en cada tick()**: `tick()` ahora actualiza `state_.remaining_seconds` Y resetea `start_time_` en CADA llamado, no solo al expirar. Antes `tick()` era no-op cuando `current > 0.0` y `remaining_seconds()` computaba todo dinámicamente — mismo resultado matemático pero convergencia asegurada entre SSOT y getter dinámico.
+- **Missing `#include <mutex>`**: `cloudflare_tunnel_service.hpp` usaba `std::mutex` sin incluir `<mutex>`, causando error de compilación C2039.
+
+### Added
+
+- **Watchdog de Cloudflare Tunnel**: Hilo watchdog que monitorea el proceso `cloudflared` cada 12 segundos + health check HTTP al endpoint `/health`. Reinicio automático si el proceso muere o el health check falla.
+
 ## 0.2.11 - 2026-07-05
 
 ### Added

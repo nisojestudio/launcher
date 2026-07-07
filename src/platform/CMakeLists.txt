@@ -5,7 +5,7 @@ set(NLP3_WEBVIEW2_INCLUDE_DIR "${NLP3_WEBVIEW2_SDK_DIR}/build/native/include")
 set(NLP3_WEBVIEW2_LOADER_DLL "${NLP3_WEBVIEW2_SDK_DIR}/build/native/x64/WebView2Loader.dll")
 
 if(NOT DEFINED NLP3_PANEL_VERSION)
-    set(NLP3_PANEL_VERSION "0.2.12")
+    set(NLP3_PANEL_VERSION "0.2.13")
 endif()
 
 if(NOT TARGET nlohmann_json::nlohmann_json)
