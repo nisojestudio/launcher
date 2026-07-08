@@ -10,6 +10,7 @@
 #include "gamesdk/game_runtime_controller.hpp"
 #include "platform/panel_activity.hpp"
 #include "platform/panel_app.hpp"
+#include "platform/wall_clock.h"
 #include "platform/panel_diagnostics.hpp"
 #include "platform/panel_view_model_builder.hpp"
 
@@ -30,11 +31,7 @@ using nlp3::platform::PanelTimerStatus;
 using nlp3::platform::PanelViewModel;
 using nlp3::platform::PanelViewSection;
 using nlp3::platform::PanelViewSectionItem;
-
-std::int64_t now_wall_clock_ms() {
-    using namespace std::chrono;
-    return duration_cast<milliseconds>(system_clock::now().time_since_epoch()).count();
-}
+using nlp3::platform::now_wall_clock_ms;
 
 std::string escape_json_string(std::string_view value) {
     std::string escaped;

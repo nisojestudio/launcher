@@ -107,7 +107,7 @@ int main() {
     assert(game_registry.can_activate("mock-game"));
     assert(!game_registry.can_activate("future-game"));
 
-    nlp3::host::HostRuntime runtime{nullptr, nullptr, nullptr};
+    nlp3::host::HostRuntime runtime{nullptr, nullptr};
     nlp3::gamesdk::GameRuntimeController game_runtime_controller{&game_registry};
 
     const auto initial_status = game_runtime_controller.status();

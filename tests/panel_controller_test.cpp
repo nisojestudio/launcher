@@ -71,7 +71,6 @@ int main() {
         nullptr,
         &tts_service,
         nullptr,
-        nullptr,
         nlp3::bridge::TikTokEventMapper{config.bridge},
         &bridge_controller,
         nlp3::host::HostAutomationEngine{config.automation},

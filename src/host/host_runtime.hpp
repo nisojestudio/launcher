@@ -7,7 +7,6 @@
 #include <string_view>
 #include <unordered_map>
 
-#include "bridge/bridge_adapter.hpp"
 #include "bridge/tiktok_bridge_controller.hpp"
 #include "bridge/tiktok_bridge_session.hpp"
 #include "bridge/tiktok_event_mapper.hpp"
@@ -41,7 +40,6 @@ public:
     HostRuntime(
         gamesdk::IGameModule* active_game,
         tts::ITtsService* tts_service,
-        bridge::IBridgeAdapter* bridge_adapter,
         bridge::ITikTokBridgeSession* bridge_session = nullptr,
         bridge::TikTokEventMapper bridge_mapper = bridge::TikTokEventMapper{},
         bridge::TikTokBridgeController* bridge_controller = nullptr,
@@ -95,7 +93,6 @@ private:
     std::unique_ptr<gamesdk::IGameModule> owned_game_{};
     gamesdk::IGameModule* active_game_ = nullptr;
     tts::ITtsService* tts_service_ = nullptr;
-    bridge::IBridgeAdapter* bridge_adapter_ = nullptr;
     bridge::ITikTokBridgeSession* bridge_session_ = nullptr;
     bridge::TikTokEventMapper bridge_mapper_;
     bridge::TikTokBridgeController* bridge_controller_ = nullptr;

@@ -99,7 +99,6 @@ int main() {
         nullptr,
         &tts_service,
         nullptr,
-        nullptr,
         nlp3::bridge::TikTokEventMapper{config.bridge},
         &bridge_controller,
         nlp3::host::HostAutomationEngine{config.automation},
@@ -258,7 +257,6 @@ int main() {
         nullptr,
         &like_tts_service,
         nullptr,
-        nullptr,
         nlp3::bridge::TikTokEventMapper{config.bridge},
         nullptr,
         nlp3::host::HostAutomationEngine{like_automation_config},
@@ -342,7 +340,6 @@ int main() {
     nlp3::host::HostRuntime cleared_runtime{
         nullptr,
         &cleared_tts_service,
-        nullptr,
         nullptr,
         nlp3::bridge::TikTokEventMapper{config.bridge},
         nullptr,

@@ -110,7 +110,7 @@ int main() {
     assert(incompatible_manifest != nullptr);
     assert(incompatible_manifest->compatibility.min_host_api_version == 99);
 
-    nlp3::host::HostRuntime runtime{nullptr, nullptr, nullptr};
+    nlp3::host::HostRuntime runtime{nullptr, nullptr};
     assert(registry.is_compatible("mock-game", runtime));
     assert(!registry.is_compatible("future-game", runtime));
     assert(!registry.is_compatible("missing-game", runtime));

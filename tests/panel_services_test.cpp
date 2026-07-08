@@ -164,7 +164,6 @@ int main() {
         nullptr,
         &live_tts_service,
         nullptr,
-        nullptr,
         nlp3::bridge::TikTokEventMapper{},
         nullptr,
         nlp3::host::HostAutomationEngine{},

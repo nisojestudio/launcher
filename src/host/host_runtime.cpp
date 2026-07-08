@@ -74,7 +74,6 @@ namespace nlp3::host {
 HostRuntime::HostRuntime(
     gamesdk::IGameModule* active_game,
     tts::ITtsService* tts_service,
-    bridge::IBridgeAdapter* bridge_adapter,
     bridge::ITikTokBridgeSession* bridge_session,
     bridge::TikTokEventMapper bridge_mapper,
     bridge::TikTokBridgeController* bridge_controller,
@@ -83,7 +82,6 @@ HostRuntime::HostRuntime(
     platform::PanelActivityLog* activity_log) noexcept
     : active_game_(active_game),
       tts_service_(tts_service),
-      bridge_adapter_(bridge_adapter),
       bridge_session_(bridge_session),
       bridge_mapper_(std::move(bridge_mapper)),
       bridge_controller_(bridge_controller),
@@ -159,8 +157,6 @@ void HostRuntime::process_event(const events::HostEvent& event) {
         active_game_->on_host_event(event, session_state_.snapshot());
         active_game_->on_game_input_event(game_input_mapper_.map(event), session_state_.snapshot());
     }
-
-    (void)bridge_adapter_;
 }
 
 std::string HostRuntime::like_batch_key_for(const events::HostEvent& event) {
@@ -250,6 +246,15 @@ void HostRuntime::receive_event(const events::HostEvent& event, std::int64_t obs
         batch.metadata.source_timestamp_ms = batch.last_source_timestamp_ms;
     }
     batch.total_magnitude += event.magnitude > 0 ? event.magnitude : 1;
+
+    // M1: cap the batch map to prevent unbounded growth with large audiences.
+    // If this is a new key and we already have 200+ pending batches, skip it.
+    constexpr std::size_t kMaxPendingBatches = 200;
+    const bool is_new_key = (pending_like_batches_.find(key) == pending_like_batches_.end());
+    if (is_new_key && pending_like_batches_.size() >= kMaxPendingBatches) {
+        return;
+    }
+
     pending_like_batches_[key] = batch;
 
     if (batch.total_magnitude >= kLikeBatchThreshold) {

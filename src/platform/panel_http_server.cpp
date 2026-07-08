@@ -31,6 +31,7 @@
 #include "platform/panel_app.hpp"
 #include "platform/panel_console.hpp"
 #include "platform/panel_http_json.hpp"
+#include "platform/wall_clock.h"
 #include "platform/overlay_assets.hpp"
 #include "platform/panel_ui_assets.hpp"
 #include "platform/server_license_service.hpp"
@@ -88,11 +89,7 @@ std::string trim_copy(std::string_view value) {
     return std::string(value.substr(begin, end - begin + 1));
 }
 
-std::uint64_t now_wall_clock_ms() {
-    using namespace std::chrono;
-    return static_cast<std::uint64_t>(
-        duration_cast<milliseconds>(system_clock::now().time_since_epoch()).count());
-}
+using nlp3::platform::now_wall_clock_ms;
 
 struct ParsedRequest {
     std::string method{};
@@ -821,7 +818,7 @@ std::string handle_game_trigger(PanelApp* app, std::string_view body) {
     event.metadata.source_event_type = std::string(nlp3::events::to_string(event.kind));
     event.metadata.source_event_id = "panel-ui-" + std::to_string(now_wall_clock_ms());
     event.metadata.source_room_id = app->snapshot().external_bridge.current_room_id;
-    event.metadata.source_timestamp_ms = static_cast<std::int64_t>(now_wall_clock_ms());
+    event.metadata.source_timestamp_ms = now_wall_clock_ms();
 
     return handle_game_trigger_rest(app, body, event);
 }
@@ -1606,10 +1603,20 @@ void PanelHttpServer::poll() {
             0);
         if (received > 0) {
             request_buffer_.append(buffer.data(), static_cast<std::size_t>(received));
-            const auto parsed = parse_request_buffer(request_buffer_);
-            if (parsed.ready) {
-                pending_response_ = build_route_response(app_, parsed, status_);
+            // R2: reject oversized requests before parsing to prevent OOM.
+            constexpr std::size_t kMaxRequestBytes = 1 * 1024 * 1024;  // 1 MB
+            if (request_buffer_.size() > kMaxRequestBytes) {
+                pending_response_ = make_http_response(
+                    "413 Payload Too Large", "text/plain; charset=utf-8",
+                    "request body too large");
                 request_buffer_.clear();
+                close_client = true;
+            } else {
+                const auto parsed = parse_request_buffer(request_buffer_);
+                if (parsed.ready) {
+                    pending_response_ = build_route_response(app_, parsed, status_);
+                    request_buffer_.clear();
+                }
             }
         } else if (received == 0) {
             close_client = true;

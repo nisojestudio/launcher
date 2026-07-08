@@ -71,7 +71,6 @@ int main() {
         nullptr,
         nullptr,
         nullptr,
-        nullptr,
         nlp3::bridge::TikTokEventMapper{config.bridge},
         &bridge_controller,
         nlp3::host::HostAutomationEngine{config.automation},
@@ -136,7 +135,6 @@ int main() {
     REQUIRE(configured_bridge_controller.start());
 
     nlp3::host::HostRuntime configured_runtime{
-        nullptr,
         nullptr,
         nullptr,
         nullptr,

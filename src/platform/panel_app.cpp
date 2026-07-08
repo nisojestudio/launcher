@@ -52,6 +52,7 @@
 #include "platform/external_game_bridge_runner.hpp"
 #include "platform/cloudflare_tunnel_service.hpp"
 #include "platform/panel_activity.hpp"
+#include "platform/wall_clock.h"
 #include "platform/panel_config_storage.hpp"
 #include "platform/panel_controller.hpp"
 #include "platform/panel_diagnostics_builder.hpp"
@@ -437,10 +438,7 @@ std::string resolve_external_actor_name(const nlp3::bridge::TikTokRawEvent& raw_
     return raw_event.actor.user_id;
 }
 
-std::int64_t now_wall_clock_ms() {
-    using namespace std::chrono;
-    return duration_cast<milliseconds>(system_clock::now().time_since_epoch()).count();
-}
+using nlp3::platform::now_wall_clock_ms;
 
 std::uint16_t resolve_runner_control_port(std::uint16_t ws_port) {
     constexpr std::uint16_t kDefaultControlPort = 8770;
@@ -780,7 +778,6 @@ bool PanelApp::initialize(const std::string& config_path) {
         host_runtime_ = std::make_unique<host::HostRuntime>(
             nullptr,
             tts_service_.get(),
-            nullptr,
             nullptr,
             bridge::TikTokEventMapper{config_.bridge},
             bridge_controller_.get(),

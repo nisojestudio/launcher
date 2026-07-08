@@ -281,7 +281,6 @@ int main() {
         nullptr,
         &tts,
         nullptr,
-        nullptr,
         nlp3::bridge::TikTokEventMapper{config.bridge},
         &bridge_controller,
         nlp3::host::HostAutomationEngine{config.automation},
@@ -595,7 +594,6 @@ int main() {
     nlp3::host::HostRuntime disabled_share_runtime{
         nullptr,
         nullptr,
-        nullptr,
         &disabled_share_bridge,
         nlp3::bridge::TikTokEventMapper{disabled_share_config.bridge},
         nullptr,
@@ -634,7 +632,6 @@ int main() {
     assert(viewer_join_bridge_controller.start());
     MockGameProbe viewer_join_probe;
     nlp3::host::HostRuntime viewer_join_runtime{
-        nullptr,
         nullptr,
         nullptr,
         nullptr,
