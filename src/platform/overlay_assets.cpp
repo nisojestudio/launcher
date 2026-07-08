@@ -17,12 +17,10 @@ std::string_view panel_overlay_live_timer_html() noexcept {
 }
 
 std::string build_live_timer_state_json(const games::LiveTimerGame* game) {
-    // N1: drive completion to SSOT before serializing. The pointer is const
-    // because callers treat the public surface as read-only, but LiveTimerGame
-    // exposes tick() as a non-const SSOT mutator we MUST call here so the
-    // auto-completion by elapsed wall time is committed before the overlay
-    // observes state_.completed. We use const_cast intentionally and document
-    // that all callers MUST be single-threaded with respect to the game.
+    // T1.1f-r2: drive completion to SSOT before serializing. tick() is now a
+    // pure completion detector — it only mutates state on completion, never
+    // while running. The const_cast is still needed because tick() is non-const
+    // (it CAN set completed=true), but it no longer thrashes the SSOT baseline.
     if (game != nullptr) {
         const_cast<games::LiveTimerGame*>(game)->tick();
     }

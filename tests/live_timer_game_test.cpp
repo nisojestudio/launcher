@@ -53,10 +53,10 @@ void test_default_config() {
     auto config = game.default_config();
 
     assert(config.get_double("initial_time_s", 0) == 300.0);
-    assert(config.get_double("time_per_like_s", 0) == 2.0);
-    assert(config.get_double("time_per_share_s", 0) == 5.0);
-    assert(config.get_double("time_per_follow_s", 0) == 10.0);
-    assert(config.get_double("time_per_gift_coin_s", 0) == 0.5);
+    assert(config.get_double("time_per_like_s", 0) == 0.0);
+    assert(config.get_double("time_per_share_s", 0) == 0.0);
+    assert(config.get_double("time_per_follow_s", 0) == 0.0);
+    assert(config.get_double("time_per_gift_coin_s", 0) == 0.0);
     assert(config.get_double("time_per_chat_s", 0) == 0.0);
     assert(config.get_string("title_text", "") == "\xf0\x9f\x8e\xaf Extiende el Live");
     assert(config.get_bool("title_bold", false) == true);
@@ -98,6 +98,9 @@ void test_on_activated_starts_timer() {
 
 void test_like_adds_time() {
     LiveTimerGame game;
+    auto cfg = game.default_config();
+    cfg.set("time_per_like_s", 2.0);
+    game.apply_config(cfg);
     game.on_activated();
     auto before = game.remaining_seconds();
 
@@ -113,6 +116,9 @@ void test_like_adds_time() {
 
 void test_share_adds_time() {
     LiveTimerGame game;
+    auto cfg = game.default_config();
+    cfg.set("time_per_share_s", 5.0);
+    game.apply_config(cfg);
     game.on_activated();
     auto before = game.remaining_seconds();
 
@@ -126,6 +132,9 @@ void test_share_adds_time() {
 
 void test_follow_adds_time() {
     LiveTimerGame game;
+    auto cfg = game.default_config();
+    cfg.set("time_per_follow_s", 10.0);
+    game.apply_config(cfg);
     game.on_activated();
     auto before = game.remaining_seconds();
 
@@ -139,6 +148,9 @@ void test_follow_adds_time() {
 
 void test_gift_adds_time_based_on_diamonds() {
     LiveTimerGame game;
+    auto cfg = game.default_config();
+    cfg.set("time_per_gift_coin_s", 0.5);
+    game.apply_config(cfg);
     game.on_activated();
     auto before = game.remaining_seconds();
 
@@ -395,6 +407,8 @@ void test_max_time_s_limits_addition() {
     auto config = game.default_config();
     config.set("initial_time_s", 10.0);
     config.set("max_time_s", 15.0);
+    config.set("time_per_like_s", 2.0);
+    config.set("time_per_follow_s", 10.0);
     game.apply_config(config);
     game.on_activated();
 
@@ -599,6 +613,9 @@ void test_restore_state_running_paused_keeps_paused() {
 // Fase 0 regression test
 void test_event_id_monotonic_across_arm() {
     LiveTimerGame game;
+    auto cfg = game.default_config();
+    cfg.set("time_per_like_s", 2.0);
+    game.apply_config(cfg);
     game.on_activated();
     game.on_game_input_event(make_test_event(GameInputEventKind::like), kEmptySnapshot);
     game.on_game_input_event(make_test_event(GameInputEventKind::like), kEmptySnapshot);
@@ -663,6 +680,7 @@ void test_set_enabled_preserves_runtime() {
     LiveTimerGame game;
     auto config = game.default_config();
     config.set("initial_time_s", 30.0);
+    config.set("time_per_like_s", 2.0);
     game.apply_config(config);
     game.on_activated();
     game.on_game_input_event(make_test_event(GameInputEventKind::like), kEmptySnapshot);
@@ -764,6 +782,7 @@ void test_state_json_round_trip() {
     auto config = game.default_config();
     config.set("initial_time_s", 30.0);
     config.set("time_per_gift_coin_s", 1.5);
+    config.set("time_per_like_s", 2.0);
     config.set("title_text", std::string("hola mundo"));
     game.apply_config(config);
     game.on_activated();
@@ -780,7 +799,9 @@ void test_state_json_round_trip() {
 
     // Now build a fresh game, simulate the panel restoring from this snapshot.
     LiveTimerGame restored;
-    restored.apply_config(restored.default_config());
+    auto restored_cfg = restored.default_config();
+    restored_cfg.set("time_per_like_s", 2.0);
+    restored.apply_config(restored_cfg);
     // The PanelApp side does: apply_config(saved_config); restore_state(...).
     // We replicate the minimum we need: bring back the runtime fields.
     restored.restore_state(15.0, true, false, false, true,

@@ -49,10 +49,10 @@ struct LiveTimerGameState {
 
     double max_time_s = 0.0;
 
-    double time_per_like = 2.0;
-    double time_per_share = 5.0;
-    double time_per_follow = 10.0;
-    double time_per_gift_coin = 0.5;
+    double time_per_like = 0.0;
+    double time_per_share = 0.0;
+    double time_per_follow = 0.0;
+    double time_per_gift_coin = 0.0;
     double time_per_chat = 0.0;
 
     std::string title_text = "🎯 Extiende el Live";
@@ -123,8 +123,10 @@ public:
 
     double remaining_seconds() const noexcept;
     std::string format_time() const;
-    // T1.1: tick() advances SSOT state_. Drives completion without relying on
-    // side-effecting const reads. Called by the polling loop before serialization.
+    // T1.1f-r2: tick() is a completion-detector. It commits completed=true
+    // when remaining_seconds() reaches 0, but does NOT mutate the SSOT baseline
+    // (state_.remaining_seconds / start_time_) while the timer is running.
+    // Called by the polling loop and PanelApp::tick() before serialization.
     void tick() noexcept;
     bool poll_completion_sound() noexcept;
     bool poll_tick_sound() noexcept;

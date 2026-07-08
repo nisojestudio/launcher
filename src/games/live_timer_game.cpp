@@ -194,10 +194,10 @@ gamesdk::GameManifest LiveTimerGame::manifest() const {
 gamesdk::GameConfig LiveTimerGame::default_config() const {
     gamesdk::GameConfig config;
     config.set(std::string(kInitialTimeS), 300.0);
-    config.set(std::string(kTimePerLikeS), 2.0);
-    config.set(std::string(kTimePerShareS), 5.0);
-    config.set(std::string(kTimePerFollowS), 10.0);
-    config.set(std::string(kTimePerGiftCoinS), 0.5);
+    config.set(std::string(kTimePerLikeS), 0.0);
+    config.set(std::string(kTimePerShareS), 0.0);
+    config.set(std::string(kTimePerFollowS), 0.0);
+    config.set(std::string(kTimePerGiftCoinS), 0.0);
     config.set(std::string(kTimePerChatS), 0.0);
 
     config.set(std::string(kTitleText), std::string("🎯 Extiende el Live"));
@@ -368,10 +368,10 @@ void LiveTimerGame::apply_config(const gamesdk::GameConfig& config) {
 
     config_ = std::move(effective);
 
-    state_.time_per_like = config_.get_double(kTimePerLikeS, 2.0);
-    state_.time_per_share = config_.get_double(kTimePerShareS, 5.0);
-    state_.time_per_follow = config_.get_double(kTimePerFollowS, 10.0);
-    state_.time_per_gift_coin = config_.get_double(kTimePerGiftCoinS, 0.5);
+    state_.time_per_like = config_.get_double(kTimePerLikeS, 0.0);
+    state_.time_per_share = config_.get_double(kTimePerShareS, 0.0);
+    state_.time_per_follow = config_.get_double(kTimePerFollowS, 0.0);
+    state_.time_per_gift_coin = config_.get_double(kTimePerGiftCoinS, 0.0);
     state_.time_per_chat = config_.get_double(kTimePerChatS, 0.0);
     state_.max_time_s = config_.get_double(kMaxTimeS, 0.0);
 
@@ -489,9 +489,10 @@ void LiveTimerGame::on_host_event(
 }
 
 double LiveTimerGame::remaining_seconds() const noexcept {
-    // T1.1f: dual-path — tick() updates the SSOT for non-const callers, but
-    // this const getter also computes dynamically so it always returns the
-    // correct value even if tick() hasn't been called recently (e.g. tests).
+    // T1.1f-r2: remaining_seconds() is the single source of truth for the
+    // live countdown. It computes dynamically from the SSOT pair
+    // (state_.remaining_seconds, start_time_) without mutating anything.
+    // tick() is only a completion-detector and does NOT update baseline values.
     if (!std::isfinite(state_.remaining_seconds)) {
         return 0.0;
     }
@@ -507,19 +508,18 @@ double LiveTimerGame::remaining_seconds() const noexcept {
 }
 
 void LiveTimerGame::tick() noexcept {
-    // T1.1f: update SSOT on every call so state_.remaining_seconds always reflects
-    // the current wall-clock remaining. This eliminates the "virtual computed"
-    // design that caused the timer to appear frozen or incremental when the
-    // overlay poll backoff kicked in. Now remaining_seconds() is a simple getter.
+    // T1.1f-r2: tick() is a completion-detector ONLY. It does NOT mutate
+    // state_.remaining_seconds or start_time_ while the timer is running.
+    // The live remaining is always computed dynamically by remaining_seconds()
+    // so the SSOT (state_.remaining_seconds, start_time_) stays stable and
+    // is only initialized by on_activated() / resume(). This prevents the
+    // micro-thrashing caused by 8+ callers competing to reset start_time_.
     if (!state_.running || state_.paused || state_.completed) return;
-    auto elapsed = std::chrono::steady_clock::now() - start_time_;
-    auto elapsed_s = std::chrono::duration<double>(elapsed).count();
-    double current = state_.remaining_seconds - elapsed_s;
-    if (current > 0.0) {
-        state_.remaining_seconds = current;
-        start_time_ = std::chrono::steady_clock::now();
-        return;
-    }
+
+    double rem = remaining_seconds();  // dynamic compute, no mutation
+    if (rem > 0.0) return;
+
+    // Timer exhausted — commit completion to SSOT
     state_.remaining_seconds = 0.0;
     state_.running = false;
     state_.completed = true;
@@ -562,8 +562,9 @@ void LiveTimerGame::on_game_input_event(
 
     // T2.6: hidden_ blocks event input while preserving runtime counters.
     if (hidden_ || state_.completed || !state_.running || state_.paused) return;
-    // T1.1f: sync SSOT before processing so remaining reflects wall-clock time.
-    tick();
+    // T1.1f-r2: no tick() here — remaining_seconds() computes dynamically.
+    // Events add delta directly to state_.remaining_seconds; the SSOT baseline
+    // (start_time_) stays stable, preserving the countdown integrity.
 
     double delta = 0.0;
     std::string_view icon;
@@ -741,9 +742,11 @@ std::vector<gamesdk::GameTelemetryItem> LiveTimerGame::telemetry() const {
 
 void LiveTimerGame::pause() noexcept {
     if (!state_.running || state_.paused) return;
-    // T1.1f: sync SSOT so we capture the precise wall-clock remaining.
-    tick();
-    paused_remaining_seconds_ = state_.remaining_seconds;
+    // T1.1f-r2: capture the live remaining via the dynamic getter and write it
+    // into the SSOT so reads during pause return a stable, frozen value.
+    // No tick() needed — remaining_seconds() already gives the correct time.
+    paused_remaining_seconds_ = remaining_seconds();
+    state_.remaining_seconds = paused_remaining_seconds_;
     state_.paused = true;
     state_.running = false;
 }
@@ -755,7 +758,8 @@ void LiveTimerGame::resume() noexcept {
     state_.completed = false;
     state_.remaining_seconds = paused_remaining_seconds_;
     start_time_ = std::chrono::steady_clock::now();
-    // T1.1f: tick() next call will see fresh start_time_, so this is correct.
+    // T1.1f-r2: start_time_ is only set here and in on_activated(). It stays
+    // stable across the entire run so remaining_seconds() is drift-free.
 }
 
 void LiveTimerGame::reset() noexcept {
@@ -778,8 +782,9 @@ void LiveTimerGame::adjust_time(double delta) noexcept {
     if (state_.completed) return;
     // A12: ignore non-finite deltas so the SSOT never gets poisoned with NaN.
     if (!std::isfinite(delta)) return;
-    // T1.1f: sync SSOT before adjust so we work with current wall-clock time.
-    tick();
+    // T1.1f-r2: no tick() here. remaining_seconds() computes dynamically from
+    // the stable SSOT. We add delta directly to state_.remaining_seconds so the
+    // countdown baseline stays intact.
 
     const double before = state_.remaining_seconds;
     state_.remaining_seconds += delta;
