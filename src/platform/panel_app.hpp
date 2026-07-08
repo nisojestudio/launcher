@@ -27,6 +27,7 @@
 #include "platform/panel_snapshot.hpp"
 #include "platform/panel_tick_result.hpp"
 #include "games/live_timer_game.hpp"
+#include "gamesdk/game_input_mapper.hpp"
 #include "platform/cloudflare_tunnel_service.hpp"
 #include "platform/panel_updater_service.hpp"
 
@@ -186,10 +187,13 @@ private:
     std::unique_ptr<host::HostRuntime> host_runtime_{};
     std::unique_ptr<PanelController> panel_controller_{};
     std::unique_ptr<games::LiveTimerGame> live_timer_game_{};
+    // P1: cached mapper reused across all timer event forwards (was new per event).
+    gamesdk::GameInputEventMapper timer_event_mapper_{};
 
     std::string config_path_ = "panel_config.json";
     std::string timer_save_path_{};
     std::uint64_t last_timer_save_ms_ = 0;
+    std::int64_t last_saved_event_counter_ = -1;  // B7: skip auto-save if no new events
     std::vector<ExternalGameManifest> external_game_manifests_{};
     std::string active_external_game_id_{};
     PanelExternalGameStatus external_game_status_cache_{};

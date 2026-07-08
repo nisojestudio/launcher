@@ -756,6 +756,8 @@ bool PanelApp::initialize(const std::string& config_path) {
         if (!load_timer_state()) {
             live_timer_game_->arm();
         }
+        // B7: sync dirty tracker with current state after init.
+        last_saved_event_counter_ = live_timer_game_->event_id_counter();
 
         refresh_external_game_manifests();
 
@@ -902,7 +904,12 @@ bool PanelApp::save_timer_state() {
                 std::filesystem::copy_options::overwrite_existing, rename_ec);
             std::filesystem::remove(temp_path, rename_ec);
         }
-        return std::filesystem::exists(path);
+        // B7: track last saved event counter so auto-save skips when idle.
+        const bool saved = std::filesystem::exists(path);
+        if (saved) {
+            last_saved_event_counter_ = live_timer_game_->event_id_counter();
+        }
+        return saved;
     } catch (...) {
         return false;
     }
@@ -1232,9 +1239,13 @@ PanelTickResult PanelApp::tick(std::uint64_t now_ms) {
         live_timer_game_->poll_completion_sound();
         live_timer_game_->poll_tick_sound();
 
-        // Auto-save timer state every 30s to preserve config + runtime on restart
+        // B7: auto-save timer state every 30s only if events or config changed
+        // since last save. Pure countdown progression doesn't need disk I/O.
         if (now_ms > 0 && (now_ms - last_timer_save_ms_ >= 30000)) {
-            save_timer_state();
+            const auto current_counter = live_timer_game_->event_id_counter();
+            if (current_counter != last_saved_event_counter_) {
+                save_timer_state();
+            }
             last_timer_save_ms_ = now_ms;
         }
     }
@@ -2235,8 +2246,8 @@ bool PanelApp::forward_host_event_to_external_game(const events::HostEvent& even
 void PanelApp::forward_event_to_timer(const events::HostEvent& event) {
     if (live_timer_game_ == nullptr) return;
 
-    gamesdk::GameInputEventMapper mapper;
-    auto game_event = mapper.map(event);
+    // P1: reuse cached mapper instead of creating a new one per event.
+    auto game_event = timer_event_mapper_.map(event);
     host::HostSessionSnapshot snapshot{};
     if (host_runtime_ != nullptr) {
         snapshot = host_runtime_->snapshot();
