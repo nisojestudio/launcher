@@ -9,6 +9,9 @@ rem el repo o los juegos tengan espacios en el nombre.
 set "PANEL_ROOT=%~dp0"
 if "%PANEL_ROOT:~-1%"=="\" set "PANEL_ROOT=%PANEL_ROOT:~0,-1%"
 
+rem Limpiar túneles cloudflared zombies que bloquean puertos
+taskkill /f /im cloudflared.exe >nul 2>&1
+
 set "TOOLS_ROOT=%PANEL_ROOT%\tools\bridge_py"
 set "PACKAGED_PYTHON=%TOOLS_ROOT%\python_runtime\python.exe"
 set "VENV_DIR=%TOOLS_ROOT%\.venv"
