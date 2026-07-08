@@ -27,6 +27,8 @@ std::string build_live_timer_state_json(const games::LiveTimerGame* game) {
     if (game == nullptr) {
         return "{"
             "\"remainingSeconds\":0,"
+            "\"initial_seconds\":300,"
+            "\"max_time_s\":0,"
             "\"format\":\"00:00:00\","
             "\"running\":false,"
             "\"paused\":false,"
@@ -104,6 +106,8 @@ std::string build_live_timer_state_json(const games::LiveTimerGame* game) {
     std::ostringstream oss;
     oss << "{"
         << "\"remainingSeconds\":" << rem << ","
+        << "\"initial_seconds\":" << s.initial_seconds << ","
+        << "\"max_time_s\":" << s.max_time_s << ","
         << "\"format\":" << json_quote(game->format_time()) << ","
         << "\"running\":" << (s.running ? "true" : "false") << ","
         << "\"paused\":" << (s.paused ? "true" : "false") << ","

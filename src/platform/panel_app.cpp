@@ -949,7 +949,7 @@ bool PanelApp::load_timer_state() {
             const auto it_st = root.find("state");
             if (it_st != root.end() && it_st->is_object()) {
                 const auto& s = *it_st;
-                const double remaining = s.value("remaining_seconds", live_timer_game_->state().initial_seconds);
+                double remaining = s.value("remaining_seconds", live_timer_game_->state().initial_seconds);
                 const bool running = s.value("running", false);
                 const bool paused = s.value("paused", false);
                 const bool completed = s.value("completed", false);
@@ -960,6 +960,22 @@ bool PanelApp::load_timer_state() {
                 const std::int64_t session_id =
                     s.value("session_id", static_cast<std::int64_t>(0));
                 const double total_time_added = s.value("total_time_added", 0.0);
+
+                // B4: compensar wall-clock transcurrido entre save y load.
+                // Si el timer estaba corriendo al guardar, restamos los segundos
+                // reales que pasaron para evitar que el timer "retroceda en el tiempo".
+                if (running && !completed && !paused) {
+                    const std::int64_t saved_at_ms =
+                        s.value("saved_at_ms", static_cast<std::int64_t>(0));
+                    if (saved_at_ms > 0) {
+                        auto now_sys_ms = std::chrono::duration_cast<std::chrono::milliseconds>(
+                            std::chrono::system_clock::now().time_since_epoch()).count();
+                        double elapsed_s = static_cast<double>(now_sys_ms - saved_at_ms) / 1000.0;
+                        if (elapsed_s > 0.0 && elapsed_s < 86400.0) {  // sanity: max 24h gap
+                            remaining = std::max(0.0, remaining - elapsed_s);
+                        }
+                    }
+                }
 
                 live_timer_game_->restore_state(remaining, running, paused, completed,
                                                   enabled, event_id_counter, session_id,

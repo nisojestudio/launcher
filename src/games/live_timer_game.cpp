@@ -753,6 +753,8 @@ void LiveTimerGame::pause() noexcept {
 
 void LiveTimerGame::resume() noexcept {
     if (state_.running || !state_.paused) return;
+    // B2: si el tiempo pausado es 0 o negativo, no tiene sentido resumir.
+    if (paused_remaining_seconds_ <= 0.0) return;
     state_.paused = false;
     state_.running = true;
     state_.completed = false;
@@ -780,6 +782,7 @@ void LiveTimerGame::adjust_time(double delta) noexcept {
     // T2.6: blocked while hidden; runtime preserved.
     if (hidden_) return;
     if (state_.completed) return;
+    if (state_.paused) return;   // B1: no ajustar mientras esta pausado
     // A12: ignore non-finite deltas so the SSOT never gets poisoned with NaN.
     if (!std::isfinite(delta)) return;
     // T1.1f-r2: no tick() here. remaining_seconds() computes dynamically from
@@ -817,7 +820,10 @@ void LiveTimerGame::adjust_time(double delta) noexcept {
         play_event_sound(state_.add_sound_path, state_.add_sound_volume);
     }
 
-    add_event_popup("\xf0\x9f\x93\x9d", "manual", applied_delta);
+    // B3: no mostrar popup si el delta efectivo fue cero (ej. NaN revertido)
+    if (applied_delta != 0.0) {
+        add_event_popup("\xf0\x9f\x93\x9d", "manual", applied_delta);
+    }
 }
 
 void LiveTimerGame::set_enabled(bool enabled) noexcept {
