@@ -1,6 +1,6 @@
 {
   "panel_name": "Nisoje Studio",
-  "default_game_id": "arena_live",
+  "default_game_id": "push_esferas",
   "bridge_mode": "external",
   "external_target_user": "fs.records",
   "external_ws_port": 8765,
