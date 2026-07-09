@@ -48,3 +48,5 @@ __pycache__/
 # Runtime state and temp files
 live_timer_save.json
 temp_release_body.md
+
+live_timer_save.json*

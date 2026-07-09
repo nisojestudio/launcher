@@ -65,12 +65,10 @@ constexpr std::string_view kCounterGlow = "counter_glow_enabled";
 constexpr std::string_view kSubtitleGlow = "subtitle_glow_enabled";
 constexpr std::string_view kGlowColor = "glow_color";
 constexpr std::string_view kGlowIntensity = "glow_intensity_px";
-constexpr std::string_view kWaveColors = "wave_colors";
 constexpr std::string_view kPulseSpeed = "pulse_speed_s";
-constexpr std::string_view kShakeIntensity = "shake_intensity";
-constexpr std::string_view kParticlesEnabled = "particles_enabled";
-constexpr std::string_view kParticleCount = "particle_count";
-constexpr std::string_view kParticleColor = "particle_color";
+constexpr std::string_view kDigitEffect = "digit_effect";
+constexpr std::string_view kColorPreset = "color_preset";
+constexpr std::string_view kCounterFont = "counter_font";
 
 constexpr double kMaxRecentEventsAgeS = 4.0;
 constexpr std::size_t kMaxRecentEvents = 6;
@@ -245,12 +243,11 @@ gamesdk::GameConfig LiveTimerGame::default_config() const {
     config.set(std::string(kSubtitleGlow), false);
     config.set(std::string(kGlowColor), std::string("#FFD700"));
     config.set(std::string(kGlowIntensity), std::int64_t{8});
-    config.set(std::string(kWaveColors), std::string("#FF6B6B,#4ECDC4,#FFE66D"));
     config.set(std::string(kPulseSpeed), 1.5);
-    config.set(std::string(kShakeIntensity), std::string("normal"));
-    config.set(std::string(kParticlesEnabled), false);
-    config.set(std::string(kParticleCount), std::int64_t{15});
-    config.set(std::string(kParticleColor), std::string("#FFD700"));
+    // V3: digit transition + palette + font
+    config.set(std::string(kDigitEffect), std::string("none"));
+    config.set(std::string(kColorPreset), std::string("neon-green"));
+    config.set(std::string(kCounterFont), std::string("Space Mono"));
 
     return config;
 }
@@ -359,12 +356,11 @@ void LiveTimerGame::apply_config(const gamesdk::GameConfig& config) {
     apply_bool(kSubtitleGlow);
     apply_string(kGlowColor);
     apply_int(kGlowIntensity);
-    apply_string(kWaveColors);
     apply_double(kPulseSpeed);
-    apply_string(kShakeIntensity);
-    apply_bool(kParticlesEnabled);
-    apply_int(kParticleCount);
-    apply_string(kParticleColor);
+    // V3: new visual fields
+    apply_string(kDigitEffect);
+    apply_string(kColorPreset);
+    apply_string(kCounterFont);
 
     config_ = std::move(effective);
 
@@ -405,10 +401,10 @@ void LiveTimerGame::apply_config(const gamesdk::GameConfig& config) {
     state_.add_sound_path = config_.get_string(kAddSoundPath, "");
     state_.add_sound_volume = config_.get_double(kAddSoundVolume, 1.0);
 
-    // Validate effect names — fall back to "none" if invalid
+    // Validate effect names — only "none" | "glow" | "pulse"
     auto validate_effect = [&](std::string_view key, std::string fallback) {
         auto raw = config_.get_string(key, fallback);
-        if (raw != "none" && raw != "glow" && raw != "pulse" && raw != "shake" && raw != "wave") {
+        if (raw != "none" && raw != "glow" && raw != "pulse") {
             raw = fallback;
             config_.set(std::string(key), raw);
         }
@@ -422,20 +418,18 @@ void LiveTimerGame::apply_config(const gamesdk::GameConfig& config) {
     state_.subtitle_glow_enabled = config_.get_bool(kSubtitleGlow, false);
     state_.glow_color = config_.get_string(kGlowColor, "#FFD700");
     state_.glow_intensity_px = static_cast<int>(config_.get_double(kGlowIntensity, 8.0));
-    state_.wave_colors = config_.get_string(kWaveColors, "#FF6B6B,#4ECDC4,#FFE66D");
     state_.pulse_speed_s = config_.get_double(kPulseSpeed, 1.5);
-    // Validate shake_intensity
+    // V3: validate digit_effect, color_preset, counter_font
     {
-        auto raw = config_.get_string(kShakeIntensity, "normal");
-        if (raw != "light" && raw != "normal" && raw != "heavy") {
-            raw = "normal";
-            config_.set(std::string(kShakeIntensity), std::string(raw));
+        auto raw = config_.get_string(kDigitEffect, "none");
+        if (raw != "none" && raw != "flip" && raw != "roll" && raw != "pop" && raw != "fade") {
+            raw = "none";
+            config_.set(std::string(kDigitEffect), raw);
         }
-        state_.shake_intensity = raw;
+        state_.digit_effect = raw;
     }
-    state_.particles_enabled = config_.get_bool(kParticlesEnabled, false);
-    state_.particle_count = static_cast<int>(config_.get_double(kParticleCount, 15.0));
-    state_.particle_color = config_.get_string(kParticleColor, "#FFD700");
+    state_.color_preset = config_.get_string(kColorPreset, "neon-green");
+    state_.counter_font = config_.get_string(kCounterFont, "Space Mono");
 
     apply_visual_style(config_, state_.title_style,
         kTitleFontSize, kTitleFontColor, kTitleFontFamily, kTitleBold,

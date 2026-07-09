@@ -3311,12 +3311,11 @@
         subtitle_glow_enabled: !!els.timerSubtitleGlow?.checked,
         glow_color: els.timerGlowColor?.value || "#FFD700",
         glow_intensity_px: parseInt(els.timerGlowIntensity?.value, 10) || 8,
-        wave_colors: els.timerWaveColors?.value || "#FF6B6B,#4ECDC4,#FFE66D",
         pulse_speed_s: parseFloat(els.timerPulseSpeed?.value) || 1.5,
-        shake_intensity: els.timerShakeIntensity?.value || "normal",
-        particles_enabled: !!els.timerParticlesEnabled?.checked,
-        particle_count: parseInt(els.timerParticleCount?.value, 10) || 15,
-        particle_color: els.timerParticleColor?.value || "#FFD700",
+        // V3: digit effect, palette, font
+        digit_effect: els.timerDigitEffect?.value || "none",
+        color_preset: els.timerColorPreset?.value || "neon-green",
+        counter_font: els.timerCounterFont?.value || "Space Mono",
       };
       // Sanitize any NaN that the parser may have produced on bad input.
       for (const k of Object.keys(cfg)) {
@@ -3361,10 +3360,10 @@
         }
       }
       const effects = ['title_effect','counter_effect','subtitle_effect'];
-      const validEffects = new Set(['none','glow','pulse','shake','wave']);
+      const validEffects = new Set(['none','glow','pulse']);
       for (const key of effects) {
         if (cfg[key] !== undefined && !validEffects.has(cfg[key])) {
-          issues.push(key + " debe ser uno de: none, glow, pulse, shake, wave");
+          issues.push(key + " debe ser uno de: none, glow, pulse");
         }
       }
       if (cfg.shake_intensity !== undefined && !['light','normal','heavy'].includes(cfg.shake_intensity)) {
@@ -3628,21 +3627,6 @@
             if (opt) gi.value = config.glow_intensity_px;
           }
         }
-        if (config.wave_colors !== undefined) {
-          const wc = els.timerWaveColors;
-          if (wc) {
-            const opt = Array.from(wc.options).find(function(o) { return o.value === config.wave_colors; });
-            if (opt) wc.value = config.wave_colors;
-            else {
-              // Add custom option for saved palette not in presets
-              const custom = document.createElement('option');
-              custom.value = config.wave_colors;
-              custom.textContent = 'Personalizado';
-              custom.selected = true;
-              wc.prepend(custom);
-            }
-          }
-        }
         if (config.pulse_speed_s !== undefined) {
           const ps = els.timerPulseSpeed;
           if (ps) {
@@ -3650,16 +3634,10 @@
             if (opt) ps.value = config.pulse_speed_s;
           }
         }
-        if (config.shake_intensity !== undefined) els.timerShakeIntensity.value = config.shake_intensity;
-        if (config.particles_enabled !== undefined) els.timerParticlesEnabled.checked = !!config.particles_enabled;
-        if (config.particle_count !== undefined) {
-          const pc = els.timerParticleCount;
-          if (pc) {
-            const opt = pc.querySelector('option[value="' + config.particle_count + '"]');
-            if (opt) pc.value = config.particle_count;
-          }
-        }
-        if (config.particle_color !== undefined) els.timerParticleColor.value = config.particle_color;
+        // V3: digit effect, palette, font
+        if (config.digit_effect !== undefined) els.timerDigitEffect.value = config.digit_effect;
+        if (config.color_preset !== undefined) els.timerColorPreset.value = config.color_preset;
+        if (config.counter_font !== undefined) els.timerCounterFont.value = config.counter_font;
         // Sync +Resplandor toggles
         if (typeof updateGlowToggles === 'function') updateGlowToggles();
         // Trigger preview update

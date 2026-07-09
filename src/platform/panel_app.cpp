@@ -744,10 +744,11 @@ bool PanelApp::initialize(const std::string& config_path) {
         live_timer_game_ = std::make_unique<games::LiveTimerGame>();
         live_timer_game_->apply_config(live_timer_game_->default_config());
 
-        // Derive timer save path alongside panel config
+        // Derive timer save path in %TEMP%\NisojeStudio\ (never leaks into releases)
         {
-            const std::filesystem::path cfg_path(config_path_);
-            timer_save_path_ = (cfg_path.parent_path() / "live_timer_save.json").string();
+            auto state_dir = std::filesystem::temp_directory_path() / "NisojeStudio";
+            std::filesystem::create_directories(state_dir);
+            timer_save_path_ = (state_dir / "live_timer_save.json").string();
         }
 
         // Restore saved timer config + state if available

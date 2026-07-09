@@ -887,12 +887,10 @@ std::string build_live_timer_config_json(const nlp3::games::LiveTimerGame* game)
     add("subtitle_glow_enabled"); out << ",";
     add("glow_color"); out << ",";
     add("glow_intensity_px"); out << ",";
-    add("wave_colors"); out << ",";
     add("pulse_speed_s"); out << ",";
-    add("shake_intensity"); out << ",";
-    add("particles_enabled"); out << ",";
-    add("particle_count"); out << ",";
-    add("particle_color");
+    add("digit_effect"); out << ",";
+    add("color_preset"); out << ",";
+    add("counter_font");
     out << "}";
     return out.str();
 }
@@ -1015,18 +1013,15 @@ std::string handle_timer_configure(PanelApp* app, std::string_view body) {
     if (maybe_str.has_value()) config.set("glow_color", *maybe_str);
     maybe_i64 = parse_json_uint64(body, "glow_intensity_px");
     if (maybe_i64.has_value()) config.set("glow_intensity_px", static_cast<std::int64_t>(std::clamp<uint64_t>(*maybe_i64, 1, 60)));
-    maybe_str = parse_json_string(body, "wave_colors");
-    if (maybe_str.has_value()) config.set("wave_colors", *maybe_str);
     maybe_d = parse_json_double(body, "pulse_speed_s");
     if (maybe_d.has_value()) config.set("pulse_speed_s", std::clamp(*maybe_d, 0.3, 5.0));
-    maybe_str = parse_json_string(body, "shake_intensity");
-    if (maybe_str.has_value()) config.set("shake_intensity", *maybe_str);
-    maybe_bool = parse_json_bool(body, "particles_enabled");
-    if (maybe_bool.has_value()) config.set("particles_enabled", *maybe_bool);
-    maybe_i64 = parse_json_uint64(body, "particle_count");
-    if (maybe_i64.has_value()) config.set("particle_count", static_cast<std::int64_t>(std::clamp<uint64_t>(*maybe_i64, 0, 60)));
-    maybe_str = parse_json_string(body, "particle_color");
-    if (maybe_str.has_value()) config.set("particle_color", *maybe_str);
+    // V3: digit transition + palette + font
+    maybe_str = parse_json_string(body, "digit_effect");
+    if (maybe_str.has_value()) config.set("digit_effect", *maybe_str);
+    maybe_str = parse_json_string(body, "color_preset");
+    if (maybe_str.has_value()) config.set("color_preset", *maybe_str);
+    maybe_str = parse_json_string(body, "counter_font");
+    if (maybe_str.has_value()) config.set("counter_font", *maybe_str);
 
     // T3.1: capture the requested config snapshot so we can compare against the
     // effective post-apply config and report normalization/clamps to the caller.

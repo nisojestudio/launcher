@@ -3,6 +3,7 @@
 <head>
 <meta charset="utf-8">
 <title>Live Timer</title>
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@700&family=Share+Tech+Mono&family=Space+Mono:wght@700&display=swap" rel="stylesheet">
 <style>
 * { margin: 0; padding: 0; box-sizing: border-box; }
 body {
@@ -25,57 +26,6 @@ body.preview-mode #counter   { font-size: 52px !important; }
 body.preview-mode #subtitle  { font-size: 14px !important; margin-top: 2px !important; }
 body.preview-mode #completed-banner { font-size: 20px !important; margin-top: 4px !important; }
 
-/* ---- Particle container ---- */
-#particle-container {
-  position: fixed;
-  top: 0; left: 0;
-  width: 100vw; height: 100vh;
-  pointer-events: none;
-  z-index: 1;
-  overflow: hidden;
-}
-.particle {
-  position: absolute;
-  border-radius: 50%;
-  opacity: 0;
-  pointer-events: none;
-}
-
-/* ---- Effect: Glow (dynamic text-shadow set via JS) ---- */
-
-/* ---- Effect: Wave Gradient ---- */
-.effect-wave {
-  background-clip: text !important;
-  -webkit-background-clip: text !important;
-  -webkit-text-fill-color: transparent;
-  background-size: 300% 300%;
-  animation: waveAnim 3s ease-in-out infinite;
-}
-/* Wave yields to danger/warning/completed states */
-#counter.effect-wave.danger {
-  -webkit-text-fill-color: #ff4444 !important;
-  background-clip: unset !important;
-  -webkit-background-clip: unset !important;
-  background: none !important;
-}
-#counter.effect-wave.warning {
-  -webkit-text-fill-color: #ff8c00 !important;
-  background-clip: unset !important;
-  -webkit-background-clip: unset !important;
-  background: none !important;
-}
-#counter.effect-wave.completed {
-  -webkit-text-fill-color: #ff4444 !important;
-  background-clip: unset !important;
-  -webkit-background-clip: unset !important;
-  background: none !important;
-}
-@keyframes waveAnim {
-  0%   { background-position: 0% 50%; }
-  50%  { background-position: 100% 50%; }
-  100% { background-position: 0% 50%; }
-}
-
 /* ---- Effect: Pulse ---- */
 .effect-pulse {
   animation: pulseEffect var(--pulse-speed, 1.5s) ease-in-out infinite;
@@ -85,61 +35,46 @@ body.preview-mode #completed-banner { font-size: 20px !important; margin-top: 4p
   50%      { transform: scale(1.06); }
 }
 
-/* ---- Effect: Shake ---- */
-.effect-shake-light {
-  animation: shakeLight var(--shake-speed, 0.3s) ease-in-out infinite;
-}
-.effect-shake-normal {
-  animation: shakeNormal var(--shake-speed, 0.2s) ease-in-out infinite;
-}
-.effect-shake-heavy {
-  animation: shakeHeavy var(--shake-speed, 0.12s) ease-in-out infinite;
-}
-@keyframes shakeLight {
-  0%, 100% { transform: translateX(0); }
-  25%      { transform: translateX(-3px); }
-  75%      { transform: translateX(3px); }
-}
-@keyframes shakeNormal {
-  0%, 100% { transform: translateX(0); }
-  20%      { transform: translateX(-5px) rotate(-0.5deg); }
-  40%      { transform: translateX(5px) rotate(0.5deg); }
-  60%      { transform: translateX(-4px); }
-  80%      { transform: translateX(4px); }
-}
-@keyframes shakeHeavy {
-  0%, 100% { transform: translateX(0); }
-  15%      { transform: translateX(-8px) rotate(-1deg); }
-  30%      { transform: translateX(8px) rotate(1deg); }
-  45%      { transform: translateX(-6px) rotate(-0.5deg); }
-  60%      { transform: translateX(6px) rotate(0.5deg); }
-  75%      { transform: translateX(-4px); }
-  90%      { transform: translateX(4px); }
+/* ---- V3: Digit transition effects ---- */
+#counter { perspective: 400px; }
+.digit-group { display: inline-block; white-space: nowrap; }
+.digit-sep { display: inline-block; }
+.digit {
+  display: inline-block;
+  transition: none;
 }
 
-/* ---- Confetti ---- */
-#confetti-container {
-  position: fixed;
-  top: 0; left: 0;
-  width: 100vw; height: 100vh;
-  pointer-events: none;
-  z-index: 5;
-  overflow: hidden;
+.digit-flip { animation: flipDigit 0.4s ease-in-out; }
+@keyframes flipDigit {
+  0%   { transform: rotateX(0deg); }
+  50%  { transform: rotateX(-90deg); }
+  100% { transform: rotateX(0deg); }
 }
-.confetti-piece {
-  position: absolute;
-  top: -10px;
-  width: 8px;
-  height: 8px;
-  border-radius: 2px;
-  opacity: 0;
-  animation: confettiFall var(--fall-dur, 3s) ease-in forwards;
+
+.digit-roll { animation: rollDigit 0.3s ease-out; }
+@keyframes rollDigit {
+  0%   { transform: translateY(-60%); opacity: 0; filter: blur(2px); }
+  100% { transform: translateY(0); opacity: 1; filter: blur(0); }
 }
-@keyframes confettiFall {
-  0%   { transform: translateY(0) rotate(0deg); opacity: 1; }
-  80%  { opacity: 0.8; }
-  100% { transform: translateY(100vh) rotate(720deg); opacity: 0; }
+
+.digit-pop { animation: popDigit 0.2s ease-out; }
+@keyframes popDigit {
+  0%   { transform: scale(1); }
+  50%  { transform: scale(1.15); }
+  100% { transform: scale(1); }
 }
+
+.digit-fade { animation: fadeDigit 0.3s ease; }
+@keyframes fadeDigit {
+  0%   { opacity: 0; }
+  100% { opacity: 1; }
+}
+
+/* ---- V3: Color presets via CSS vars ---- */
+.preset-neon-green  { --counter-color: #00FF88; --glow-color: #00FF8844; --warning-color: #FF8C00; --danger-color: #FF4444; }
+.preset-cyber-blue  { --counter-color: #00D4FF; --glow-color: #00D4FF33; --warning-color: #FFB800; --danger-color: #FF3366; }
+.preset-clean-white { --counter-color: #FFFFFF; --glow-color: #FFFFFF22; --warning-color: #FFCC00; --danger-color: #FF4444; }
+.preset-rose-gold   { --counter-color: #FF6B8A; --glow-color: #FF6B8A33; --warning-color: #FFB347; --danger-color: #CC1144; }
 
 /* ---- Base elements ---- */
 #title {
@@ -234,34 +169,23 @@ body.preview-mode #completed-banner { font-size: 20px !important; margin-top: 4p
 }
 #preview-badge.visible { display: block; }
 #subtitle.preview { opacity: 0.5; }
-
-/* V2: Progress bar — sutil, sin fondo, solo borde inferior */
-#progress-bar-container {
-  position: fixed;
-  bottom: 0;
-  left: 0;
-  width: 100vw;
-  height: 4px;
-  z-index: 20;
-  pointer-events: none;
-}
-#progress-bar {
-  height: 100%;
-  width: 0%;
-  background: #00FF88;
-  transition: width 0.5s ease-out, background 0.3s ease;
-}
-#progress-bar.warning { background: #ff8c00; }
-#progress-bar.danger  { background: #ff4444; }
 </style>
 </head>
 <body>
-<!-- aria-live="polite" announces time updates to assistive tech without
-     interrupting the user. The counter is wrapped in a role=region so
-     it is announced as a discrete unit rather than as part of the page
-     flow. -->
-<div id="particle-container" aria-hidden="true"></div>
-<div id="confetti-container" aria-hidden="true"></div>
+
+
+<!-- Panel-vended auto-triggered 4-message-label single-fade-fade-pop-pop-banner -->
+<div id="title" role="heading" aria-level="1"></div>
+<div id="counter" role="region" aria-live="polite" aria-atomic="true" aria-label="Tiempo restante del temporizador">
+  <span class="digit-group"><span class="digit" data-pos="0">0</span><span class="digit" data-pos="1">0</span></span>
+  <span class="digit-sep">:</span>
+  <span class="digit-group"><span class="digit" data-pos="2">0</span><span class="digit" data-pos="3">0</span></span>
+  <span class="digit-sep">:</span>
+  <span class="digit-group"><span class="digit" data-pos="4">0</span><span class="digit" data-pos="5">0</span></span>
+</div>
+<div id="subtitle"></div>
+<div id="completed-banner" role="alert" aria-live="assertive" aria-atomic="true"></div>
+<div id="event-container" role="log" aria-live="polite" aria-relevant="additions" aria-label="Eventos recientes del temporizador"></div>
 <h1 id="title"></h1>
 <div id="counter" role="region" aria-live="polite" aria-atomic="true" aria-label="Tiempo restante del temporizador">00:00:00</div>
 <p id="subtitle"></p>
@@ -289,15 +213,12 @@ let lastShownEventId = 0;
 // T1.3: sessionId cursor — when it changes (arm/activate/restore) we reset the
 // event cursor and clear cached effect state so the overlay re-syncs cleanly.
 let currentSessionId = 0;
-let effectState = null;      // { effects, glow, wave, pulse, shake, particles }
-let particleContainer = null;
-let particleColor_ = '#FFD700';
-let particleCount_ = 15;
-// T1.2: confetti is spawned at most once per completion cycle.
-var confettiSpawned = false;
-// T3.5: track particle removal timeouts so we can clear them before wiping DOM.
-let particleTimeouts = [];
-// T1.4: HTML5 audio refs owned by the overlay. C++ backend only ships config.
+let effectState = null;
+let lastDigits = [];
+let currentDigitEffect = 'none';
+let currentColorPreset = 'neon-green';
+let currentCounterFont = 'Space Mono';
+
 let tickAudio = null;
 let addAudio = null;
 let completeAudio = null;
@@ -315,9 +236,8 @@ function effectConfigChanged(data) {
   const cur = {
     te: data.title_effect, ce: data.counter_effect, se: data.subtitle_effect,
     tg: !!data.title_glow_enabled, cg: !!data.counter_glow_enabled, sg: !!data.subtitle_glow_enabled,
-    gc: data.glow_color, gi: data.glow_intensity_px,
-    wc: data.wave_colors, ps: data.pulse_speed_s, si: data.shake_intensity,
-    pe: !!data.particles_enabled, pc: data.particle_count, pcol: data.particle_color
+    gc: data.glow_color, gi: data.glow_intensity_px, ps: data.pulse_speed_s,
+    de: data.digit_effect, cp: data.color_preset, cf: data.counter_font
   };
   if (effectState === null) { effectState = cur; return true; }
   for (const k in cur) {
@@ -767,21 +687,19 @@ function updateOverlay() {
         setCounterState(counterEl, null, counterEffectName);
         bannerEl.classList.remove('visible');
       } else if (data.paused) {
-        counterEl.textContent = formatTime(data.remainingSeconds);
+        renderDigits(formatTime(data.remainingSeconds).replace(/:/g, ''), currentDigitEffect);
         setCounterState(counterEl, 'warning', counterEffectName);
         bannerEl.classList.remove('visible');
       } else if (data.completed) {
-        counterEl.textContent = '00:00:00';
+        renderDigits('000000', currentDigitEffect);
         setCounterState(counterEl, 'completed', counterEffectName);
         bannerEl.textContent = completedStyle.text;
         bannerEl.style.color = completedStyle.color;
         bannerEl.style.fontSize = completedStyle.size + 'px';
         bannerEl.classList.add('visible');
-        // T1.2: confetti celebration (only once per completion cycle).
-        if (!confettiSpawned) { spawnConfetti(); confettiSpawned = true; }
       } else {
         const formatted = data.format || formatTime(data.remainingSeconds);
-        counterEl.textContent = formatted;
+        renderDigits(formatted.replace(/:/g, ''), currentDigitEffect);
         if (data.remainingSeconds <= 10) {
           setCounterState(counterEl, 'danger', counterEffectName);
         } else if (data.remainingSeconds <= 60) {
@@ -792,8 +710,16 @@ function updateOverlay() {
         bannerEl.classList.remove('visible');
       }
 
-      // V2: actualizar barra de progreso
-      updateProgressBar(data.remainingSeconds, data.initial_seconds || 300, data.max_time_s || 0);
+      // V3: aplicar paleta de color y fuente desde el state
+      if (data.color_preset !== undefined && currentColorPreset !== data.color_preset) {
+        applyColorPreset(data.color_preset);
+      }
+      if (data.counter_font !== undefined && currentCounterFont !== data.counter_font) {
+        applyCounterFont(data.counter_font);
+      }
+      if (data.digit_effect !== undefined && currentDigitEffect !== data.digit_effect) {
+        currentDigitEffect = data.digit_effect;
+      }
 
       if (data.recentEvents) {
         data.recentEvents.forEach(ev => {
@@ -844,6 +770,43 @@ window.addEventListener('beforeunload', function() {
   if (addAudio) { try { addAudio.pause(); } catch (e) {} addAudio = null; }
   if (completeAudio) { try { completeAudio.pause(); } catch (e) {} completeAudio = null; }
 });
+
+// V3: render digits with transition effect
+function renderDigits(digitStr, effect) {
+  var groups = document.querySelectorAll('#counter .digit-group');
+  var digits = groups.length > 0 ? groups[0].parentElement.querySelectorAll('.digit') : [];
+  if (digits.length === 0) return;
+  var str = digitStr || '';
+  for (var i = 0; i < digits.length; i++) {
+    var newChar = i < str.length ? str[i] : '0';
+    if (lastDigits[i] !== newChar) {
+      digits[i].textContent = newChar;
+      if (effect && effect !== 'none') {
+        digits[i].classList.remove('digit-flip', 'digit-roll', 'digit-pop', 'digit-fade');
+        void digits[i].offsetWidth;
+        digits[i].classList.add('digit-' + effect);
+      }
+      lastDigits[i] = newChar;
+    }
+  }
+}
+
+// V3: apply color preset CSS class
+function applyColorPreset(preset) {
+  var counter = document.getElementById('counter');
+  if (!counter) return;
+  counter.className = counter.className.replace(/\bpreset-\S+/g, '');
+  if (preset && preset !== 'none') counter.classList.add('preset-' + preset);
+  currentColorPreset = preset;
+}
+
+// V3: apply counter font
+function applyCounterFont(font) {
+  var counter = document.getElementById('counter');
+  if (!counter) return;
+  counter.style.fontFamily = '"' + font + '", monospace';
+  currentCounterFont = font;
+}
 </script>
 </body>
 </html>
