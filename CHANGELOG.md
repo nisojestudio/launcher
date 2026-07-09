@@ -4,6 +4,38 @@ All notable Panel Live changes should be recorded here.
 
 Format follows a lightweight Keep a Changelog style. Versions use SemVer.
 
+## 0.2.16 - 2026-07-09
+
+### Fixed
+
+- **Timer overlay — IDs duplicados**: El refactor visual V3 agregó nuevos elementos HTML sin eliminar los antiguos. El overlay mostraba dos contadores superpuestos. Eliminados elementos duplicados y unificada la estructura de digitos.
+- **Timer overlay — `textContent` destruia estructura de digitos**: Al deshabilitar el timer, `counterEl.textContent = '--:--:--'` eliminaba los `<span class="digit">`. Al reactivar, `renderDigits` no encontraba elementos y el contador quedaba congelado. Ahora escribe `-` en cada digito individual.
+- **Timer overlay — conflicto `counter_font` vs `counterStyle.font_family`**: `applyCounterFont` ahora se ejecuta siempre despues de `applyStyles` para que la fuente del preset tenga prioridad.
+- **Timer overlay — `renderDigits` no soportaba formato con dias**: Strings mas largas que los 6 digitos disponibles (ej. tiempos >24h) ahora usan slice para tomar solo la parte HHMMSS.
+- **Timer overlay — `effectConfigChanged` falsos positivos**: Campos ausentes en el JSON (undefined) se comparaban con valores default causando re-render innecesario. Agregados defaults con `||`.
+- **Timer overlay — `glowColor` invalido causaba texto invisible en OBS**: Agregada validacion basica de color CSS antes de aplicar `drop-shadow`. Si el color es invalido, se mantiene el text-shadow default.
+- **Timer overlay — `triggerCounterBump` rompia transiciones CSS**: El bump guarda y restaura `el.style.transition` para no pisar permanentemente otras transiciones.
+- **Timer C++ — `apply_visual_style` con `get_string` inseguro**: Cambiado a `std::get_if<std::string>` para evitar `bad_variant_access` si el valor no es string.
+- **Timer — codigo muerto eliminado**: Funciones de particulas, confetti, wave y shake (~100 lineas) eliminadas del overlay. CSS de efectos obsoletos limpiado.
+
+### Changed
+
+- **Timer overlay — polling robusto**: `AbortController` para cancelar requests previos, backoff adaptativo con recuperacion gradual, `AbortError` ignorado.
+- **Timer overlay — presets de color funcionales**: `applyColorPreset` ahora aplica color inline al contador y `setCounterState` usa colores del preset para danger/warning/completed.
+- **Timer overlay — `styleEqual` y `applyStyles` genericos**: Usan `Object.keys` para no romperse si el struct `LiveTimerVisualStyle` crece.
+
+## 0.2.15 - 2026-07-08
+
+### Added
+
+- **Timer — refactor visual V3**: Efectos de digito individual (flip/roll/pop/fade), 4 paletas de color predefinidas, selectores de tipografia mono (Space Mono, JetBrains Mono, Share Tech Mono).
+- **Timer — `live_timer_save.json` en `%TEMP%/NisojeStudio/`**: La persistencia ya no se cuela en el directorio de releases.
+
+### Fixed
+
+- **Firebase**: `FIREBASE_API_KEY` agregado a variables del worker.
+- **Licencias**: `activation_email_sent_at` rastreado en licencia + `email_sent_count` en dashboard.
+
 ## 0.2.14 - 2026-07-08
 
 ### Fixed
