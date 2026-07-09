@@ -656,7 +656,8 @@ export default {
 
       if (url.pathname === "/api/admin/dashboard/users") {
         const query = trim(url.searchParams.get("q")).toLowerCase();
-        const users = await loadAdminUsersDashboard(env, query);
+        const licenseType = trim(url.searchParams.get("licenseType"));
+        const users = await loadAdminUsersDashboard(env, query, licenseType);
         return json({
           valid: true,
           admin: {
@@ -829,6 +830,12 @@ export default {
             preview: buildActivationEmailPayload({ user, license, installerUrl }).preview
           }, sendResult.status || 500);
         }
+
+        // Track that activation email was sent for this license
+        await env.DB
+          .prepare("UPDATE licenses SET activation_email_sent_at = CURRENT_TIMESTAMP WHERE id = ?")
+          .bind(licenseId)
+          .run();
 
         return json({
           valid: true,
@@ -1452,7 +1459,7 @@ function timingSafeEqual(left, right) {
   return diff === 0;
 }
 
-async function loadAdminUsersDashboard(env, query) {
+async function loadAdminUsersDashboard(env, query, licenseType) {
   const usersResult = await env.DB
     .prepare("SELECT id, firebase_uid, email, name, role FROM users ORDER BY id DESC")
     .all();
@@ -1463,6 +1470,10 @@ async function loadAdminUsersDashboard(env, query) {
     const devices = await loadUserDevices(env, user.id);
     const activeLicenses = licenses.filter((item) => isLicenseAccessValid(item));
     const latestLicense = licenses[0] || null;
+
+    // licenseType filter
+    if (licenseType === 'trial' && !(latestLicense?.is_trial)) continue;
+    if (licenseType === 'manual' && latestLicense?.is_trial) continue;
 
     const haystack = [
       user.name,
@@ -1478,6 +1489,9 @@ async function loadAdminUsersDashboard(env, query) {
       continue;
     }
 
+    const activeDeviceCount = devices.filter((item) => item.status === "active").length;
+    const emailSentCount = licenses.filter((item) => !!item.activation_email_sent_at).length;
+
     rows.push({
       id: user.id,
       firebase_uid: user.firebase_uid,
@@ -1486,10 +1500,13 @@ async function loadAdminUsersDashboard(env, query) {
       role: user.role || "user",
       licenses_total: licenses.length,
       active_licenses: activeLicenses.length,
-      active_devices: devices.filter((item) => item.status === "active").length,
+      active_devices: activeDeviceCount,
+      devices_total: devices.length,
+      email_sent_count: emailSentCount,
       latest_license_id: latestLicense?.id || null,
       latest_license_key: latestLicense?.license_key || null,
       latest_license_status: latestLicense?.status || null,
+      latest_license_is_trial: latestLicense?.is_trial || false,
       latest_license_expires_at: latestLicense?.expires_at || null,
       latest_license_days_remaining: latestLicense ? buildLicenseDurationDays(latestLicense.expires_at) : null
     });
@@ -1503,7 +1520,8 @@ function buildAdminDashboardMetrics(users) {
     total_users: users.length,
     users_with_active_license: 0,
     active_licenses: 0,
-    active_devices: 0
+    active_devices: 0,
+    devices_total: 0
   };
 
   users.forEach((user) => {
@@ -1513,6 +1531,7 @@ function buildAdminDashboardMetrics(users) {
     }
     metrics.active_licenses += activeLicenses;
     metrics.active_devices += Number(user.active_devices || 0);
+    metrics.devices_total += Number(user.devices_total || 0);
   });
 
   return metrics;
