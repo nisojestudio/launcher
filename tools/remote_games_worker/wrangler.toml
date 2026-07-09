@@ -3,6 +3,7 @@ main = "worker.js"
 compatibility_date = "2026-04-11"
 
 [vars]
+FIREBASE_API_KEY = "AIzaSyBWRMoHbPNkOw0zvflcPb_dv9G1Bgg1uLc"
 GAMES_CATALOG_OBJECT = "catalog/latest.json"
 GAME_DOWNLOAD_TTL_SECONDS = "300"
 ADMIN_EMAIL = "nisojestudio@gmail.com"
