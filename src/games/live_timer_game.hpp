@@ -67,7 +67,6 @@ struct LiveTimerGameState {
     std::string on_complete_sound_path;
     bool on_complete_repeat = false;
     double on_complete_volume = 1.0;
-    std::string on_complete_video_url;
     std::string on_complete_text = "TIEMPO CUMPLIDO";
     std::string on_complete_text_color = "#FFD700";
     int on_complete_text_size = 48;

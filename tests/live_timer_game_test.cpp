@@ -818,6 +818,121 @@ void test_state_json_round_trip() {
     std::cout << "PASS: state_json_round_trip\n";
 }
 
+// --- V3 feature tests ---
+void test_v3_digit_effect_validation() {
+    LiveTimerGame game;
+    auto config = game.default_config();
+
+    // Valid effects accepted
+    config.set("digit_effect", std::string("flip"));
+    game.apply_config(config);
+    assert(game.state().digit_effect == "flip");
+    assert(game.config().get_string("digit_effect") == "flip");
+
+    config.set("digit_effect", std::string("roll"));
+    game.apply_config(config);
+    assert(game.state().digit_effect == "roll");
+
+    config.set("digit_effect", std::string("pop"));
+    game.apply_config(config);
+    assert(game.state().digit_effect == "pop");
+
+    config.set("digit_effect", std::string("fade"));
+    game.apply_config(config);
+    assert(game.state().digit_effect == "fade");
+
+    // Invalid effects normalized to "none"
+    config.set("digit_effect", std::string("invalid_effect"));
+    game.apply_config(config);
+    assert(game.state().digit_effect == "none");
+    assert(game.config().get_string("digit_effect") == "none");
+
+    std::cout << "PASS: v3_digit_effect_validation\n";
+}
+
+void test_v3_color_preset_validation() {
+    LiveTimerGame game;
+    auto config = game.default_config();
+
+    // Valid presets accepted
+    config.set("color_preset", std::string("cyber-blue"));
+    game.apply_config(config);
+    assert(game.state().color_preset == "cyber-blue");
+    assert(game.config().get_string("color_preset") == "cyber-blue");
+
+    config.set("color_preset", std::string("clean-white"));
+    game.apply_config(config);
+    assert(game.state().color_preset == "clean-white");
+
+    config.set("color_preset", std::string("rose-gold"));
+    game.apply_config(config);
+    assert(game.state().color_preset == "rose-gold");
+
+    // Invalid preset normalized to "neon-green"
+    config.set("color_preset", std::string("invalid_preset"));
+    game.apply_config(config);
+    assert(game.state().color_preset == "neon-green");
+    assert(game.config().get_string("color_preset") == "neon-green");
+
+    std::cout << "PASS: v3_color_preset_validation\n";
+}
+
+void test_v3_counter_font_validation() {
+    LiveTimerGame game;
+    auto config = game.default_config();
+
+    // Valid fonts accepted
+    config.set("counter_font", std::string("JetBrains Mono"));
+    game.apply_config(config);
+    assert(game.state().counter_font == "JetBrains Mono");
+    assert(game.config().get_string("counter_font") == "JetBrains Mono");
+
+    config.set("counter_font", std::string("Share Tech Mono"));
+    game.apply_config(config);
+    assert(game.state().counter_font == "Share Tech Mono");
+
+    config.set("counter_font", std::string("Segoe UI"));
+    game.apply_config(config);
+    assert(game.state().counter_font == "Segoe UI");
+
+    // Invalid font normalized to "Space Mono"
+    config.set("counter_font", std::string("Comic Sans MS"));
+    game.apply_config(config);
+    assert(game.state().counter_font == "Space Mono");
+    assert(game.config().get_string("counter_font") == "Space Mono");
+
+    std::cout << "PASS: v3_counter_font_validation\n";
+}
+
+void test_v3_fields_round_trip() {
+    LiveTimerGame game;
+    auto config = game.default_config();
+    config.set("digit_effect", std::string("flip"));
+    config.set("color_preset", std::string("rose-gold"));
+    config.set("counter_font", std::string("JetBrains Mono"));
+    game.apply_config(config);
+    game.on_activated();
+
+    // Verify state
+    assert(game.state().digit_effect == "flip");
+    assert(game.state().color_preset == "rose-gold");
+    assert(game.state().counter_font == "JetBrains Mono");
+
+    // Verify JSON serialization includes V3 fields
+    const std::string json = nlp3::platform::build_live_timer_state_json(&game);
+    assert(json.find("\"digit_effect\":\"flip\"") != std::string::npos);
+    assert(json.find("\"color_preset\":\"rose-gold\"") != std::string::npos);
+    assert(json.find("\"counter_font\":\"JetBrains Mono\"") != std::string::npos);
+
+    // Reset to defaults
+    game.reset_config_to_defaults();
+    assert(game.state().digit_effect == "none");
+    assert(game.state().color_preset == "neon-green");
+    assert(game.state().counter_font == "Space Mono");
+
+    std::cout << "PASS: v3_fields_round_trip\n";
+}
+
 } // namespace
 
 int main() {
@@ -858,6 +973,10 @@ int main() {
     test_event_exhausts_timer_skips_popup();
     test_non_finite_input_is_sanitized();
     test_state_json_round_trip();
+    test_v3_digit_effect_validation();
+    test_v3_color_preset_validation();
+    test_v3_counter_font_validation();
+    test_v3_fields_round_trip();
 
     std::cout << "\nAll tests passed!\n";
     return 0;

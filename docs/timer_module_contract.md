@@ -167,3 +167,57 @@ operation.
   loses in-flight effect deltas until the next server poll.
 - The `panel_http_ui_test` integration test is environment-dependent
   (requires free port 18881). Not a regression of the timer module.
+
+## 10. V3 Visual Enhancements (digit effects, palettes, fonts)
+
+Added post-audit 2026-07-09. These fields are fully validated at every layer.
+
+### 10.1 `digit_effect`
+
+Per-digit transition animation when the counter changes.
+
+| Value | Effect |
+|-------|--------|
+| `none` | No transition |
+| `flip` | 3D flip animation (rotateX, 0.4s) |
+| `roll` | Slot-machine roll (translateY + blur, 0.3s) |
+| `pop` | Scale bounce (scale 1→1.15→1, 0.2s) |
+| `fade` | Opacity fade (0→1, 0.3s) |
+
+**Validation:** Backend normalizes invalid values to `none`. Overlay has defensive CSS class check.
+**Config key:** `digit_effect` (string)
+**JSON field:** `digit_effect`
+**Default:** `"none"`
+
+### 10.2 `color_preset`
+
+Predefined color palette for the counter digits.
+
+| Value | Counter | Warning | Danger |
+|-------|---------|---------|--------|
+| `neon-green` | `#00FF88` | `#FF8C00` | `#FF4444` |
+| `cyber-blue` | `#00D4FF` | `#FFB800` | `#FF3366` |
+| `clean-white` | `#FFFFFF` | `#FFCC00` | `#FF4444` |
+| `rose-gold` | `#FF6B8A` | `#FFB347` | `#CC1144` |
+
+**Validation:** Backend normalizes invalid values to `neon-green`. Overlay has defensive fallback.
+**Config key:** `color_preset` (string)
+**JSON field:** `color_preset`
+**Default:** `"neon-green"`
+
+### 10.3 `counter_font`
+
+Monospace font family for the counter digits. Fonts are loaded from Google Fonts.
+
+| Value | Source |
+|-------|--------|
+| `Space Mono` | Google Fonts (wght@700) |
+| `JetBrains Mono` | Google Fonts (wght@700) |
+| `Share Tech Mono` | Google Fonts |
+| `Segoe UI` | System font |
+
+**Validation:** Backend normalizes invalid values to `Space Mono`. Overlay has defensive fallback.
+**Config key:** `counter_font` (string)
+**JSON field:** `counter_font`
+**Default:** `"Space Mono"`
+**Note:** Applied via `applyCounterFont()` in the overlay JS, which sets `fontFamily` on the `#counter` element. This takes priority over `counterStyle.font_family`.

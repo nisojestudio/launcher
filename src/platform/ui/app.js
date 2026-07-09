@@ -298,7 +298,6 @@
     timerPerChat: $("#timer-per-chat"),
     timerTitleText: $("#timer-title-text"),
     timerSubtitleText: $("#timer-subtitle-text"),
-    timerAllowNegatives: $("#timer-allow-negatives"),
     timerPopupAddColor: $("#timer-popup-add-color"),
     timerPopupSubtractColor: $("#timer-popup-subtract-color"),
     timerCompleteText: $("#timer-complete-text"),
@@ -307,7 +306,6 @@
     timerSoundPath: $("#timer-sound-path"),
     timerSoundRepeat: $("#timer-sound-repeat"),
     timerSoundVolume: $("#timer-sound-volume"),
-    timerSoundBrowse: $("#timer-sound-browse"),
     timerApplyConfig: $("#timer-apply-config"),
     timerExportConfig: $("#timer-export-config"),
     timerImportConfig: $("#timer-import-config"),
@@ -349,12 +347,11 @@
     timerGlowColor: $("#timer-glow-color"),
     timerGlowIntensity: $("#timer-glow-intensity"),
 
-    timerWaveColors: $("#timer-wave-colors"),
     timerPulseSpeed: $("#timer-pulse-speed"),
-    timerShakeIntensity: $("#timer-shake-intensity"),
-    timerParticlesEnabled: $("#timer-particles-enabled"),
-    timerParticleCount: $("#timer-particle-count"),
-    timerParticleColor: $("#timer-particle-color"),
+    // V3: digit effects, palette, counter font
+    timerDigitEffect: $("#timer-digit-effect"),
+    timerColorPreset: $("#timer-color-preset"),
+    timerCounterFont: $("#timer-counter-font"),
   };
 
   const SAMPLE_AVATAR_DATA_URL =
@@ -3127,16 +3124,6 @@
     });
 
     // --- Live Timer handlers ---
-    function applyTimerNegativeAllowed() {
-      const allowNeg = !!els.timerAllowNegatives?.checked;
-      const minVal = allowNeg ? -10 : 0;
-      ["timerPerLike", "timerPerShare", "timerPerFollow", "timerPerGiftCoin", "timerPerChat"].forEach((id) => {
-        if (els[id]) els[id].min = minVal;
-      });
-    }
-    els.timerAllowNegatives?.addEventListener("change", applyTimerNegativeAllowed);
-    applyTimerNegativeAllowed();
-
     function updateSubtitlePreview() {
       const previewEl = document.getElementById('timer-subtitle-preview');
       if (!previewEl) return;
@@ -3191,7 +3178,6 @@
             setVal('timerMaxTime', '0');
             break;
           case 'punitivo':
-            setCheck('timerAllowNegatives', true);
             setVal('timerInitialTime', '05:00');
             setVal('timerPerLike', '-1.5');
             setVal('timerPerShare', '-3');
@@ -3199,7 +3185,6 @@
             setVal('timerPerGiftCoin', '0.3');
             setVal('timerPerChat', '-1');
             setVal('timerMaxTime', '0');
-            applyTimerNegativeAllowed();
             break;
           case 'solo-regalo':
             setVal('timerInitialTime', '00:10');
@@ -3354,7 +3339,7 @@
       }
       const hexRe = /^#[0-9A-Fa-f]{3,8}$/;
       for (const key of ['popup_add_color','popup_subtract_color','on_complete_text_color',
-                         'title_font_color','counter_font_color','subtitle_font_color','glow_color','particle_color']) {
+                         'title_font_color','counter_font_color','subtitle_font_color','glow_color']) {
         if (cfg[key] !== undefined && cfg[key] !== '' && !hexRe.test(cfg[key])) {
           issues.push(key + " debe ser un color hex (#RRGGBB)");
         }
@@ -3365,9 +3350,6 @@
         if (cfg[key] !== undefined && !validEffects.has(cfg[key])) {
           issues.push(key + " debe ser uno de: none, glow, pulse");
         }
-      }
-      if (cfg.shake_intensity !== undefined && !['light','normal','heavy'].includes(cfg.shake_intensity)) {
-        issues.push("shake_intensity debe ser light, normal o heavy");
       }
       return issues;
     }
@@ -3548,15 +3530,6 @@
       }
     });
 
-    // Update preview URL when overlay URL changes
-    const origTimerUpdate = state.onPayloadUpdate;
-    state.onPayloadUpdate = function(payload) {
-      if (origTimerUpdate) origTimerUpdate(payload);
-      if (payload && payload.timer && payload.timer.overlayTunnelUrl) {
-        _timerOverlayUrl = payload.timer.overlayTunnelUrl;
-      }
-    };
-
     // --- Timer config export/import ---
     els.timerExportConfig?.addEventListener("click", async () => {
       try {
@@ -3635,9 +3608,9 @@
           }
         }
         // V3: digit effect, palette, font
-        if (config.digit_effect !== undefined) els.timerDigitEffect.value = config.digit_effect;
-        if (config.color_preset !== undefined) els.timerColorPreset.value = config.color_preset;
-        if (config.counter_font !== undefined) els.timerCounterFont.value = config.counter_font;
+        if (config.digit_effect !== undefined && els.timerDigitEffect) els.timerDigitEffect.value = config.digit_effect;
+        if (config.color_preset !== undefined && els.timerColorPreset) els.timerColorPreset.value = config.color_preset;
+        if (config.counter_font !== undefined && els.timerCounterFont) els.timerCounterFont.value = config.counter_font;
         // Sync +Resplandor toggles
         if (typeof updateGlowToggles === 'function') updateGlowToggles();
         // Trigger preview update
@@ -3690,18 +3663,8 @@
       }
     });
 
-    // --- Timer sound file picker ---
-    els.timerSoundBrowse?.addEventListener("click", () => {
-      const input = document.createElement("input");
-      input.type = "file";
-      input.accept = ".wav,.mp3,.ogg";
-      input.addEventListener("change", () => {
-        if (input.files && input.files[0]) {
-          els.timerSoundPath.value = input.files[0].name;
-        }
-      });
-      input.click();
-    });
+    // --- Timer sound file picker (path must be typed manually; browser security
+    //     prevents reading full file paths from a file dialog) ---
 
     // Disable "+Resplandor" checkbox when effect is "Brillo neón" (redundant)
     function updateGlowToggles() {
@@ -3757,12 +3720,11 @@
           subtitle_glow_enabled: !!els.timerSubtitleGlow?.checked,
           glow_color: els.timerGlowColor?.value || "#FFD700",
           glow_intensity_px: parseInt(els.timerGlowIntensity?.value, 10) || 8,
-          wave_colors: els.timerWaveColors?.value || "#FF6B6B,#4ECDC4,#FFE66D",
           pulse_speed_s: parseFloat(els.timerPulseSpeed?.value) || 1.5,
-          shake_intensity: els.timerShakeIntensity?.value || "normal",
-          particles_enabled: !!els.timerParticlesEnabled?.checked,
-          particle_count: parseInt(els.timerParticleCount?.value, 10) || 15,
-          particle_color: els.timerParticleColor?.value || "#FFD700",
+          // V3: digit effect, palette, font
+          digit_effect: els.timerDigitEffect?.value || "none",
+          color_preset: els.timerColorPreset?.value || "neon-green",
+          counter_font: els.timerCounterFont?.value || "Space Mono",
         };
         try {
           await apiPostJson("/api/timer/configure", config);
@@ -3780,12 +3742,12 @@
     const hotControls = [
       'timerTitleEffect', 'timerCounterEffect', 'timerSubtitleEffect',
       'timerTitleGlow', 'timerCounterGlow', 'timerSubtitleGlow',
-      'timerGlowColor', 'timerGlowIntensity', 'timerWaveColors',
-      'timerPulseSpeed', 'timerShakeIntensity',
-      'timerParticlesEnabled', 'timerParticleCount', 'timerParticleColor',
+      'timerGlowColor', 'timerGlowIntensity',
+      'timerPulseSpeed',
       'timerTitleFontSize', 'timerTitleFontColor', 'timerTitleFontFamily', 'timerTitleBold',
       'timerCounterFontSize', 'timerCounterFontColor', 'timerCounterFontFamily', 'timerCounterBold',
       'timerSubtitleFontSize', 'timerSubtitleFontColor', 'timerSubtitleFontFamily', 'timerSubtitleBold',
+      'timerDigitEffect', 'timerColorPreset', 'timerCounterFont',
       'timerCompleteText', 'timerCompleteTextColor', 'timerCompleteTextSize',
       'timerPopupAddColor', 'timerPopupSubtractColor',
       'timerTitleText', 'timerSubtitleText'
@@ -3807,13 +3769,11 @@
     function applyEffectPreset(preset) {
       const presets = {
         elegant:   { title:'pulse', counter:'pulse', subtitle:'none', titleGlow:true, counterGlow:true,
-                     glowIntensity:'8', particles:true, particleCount:'15', particleColor:'#FFD700' },
-        energy:    { title:'shake', counter:'shake', subtitle:'none', titleGlow:true, counterGlow:true,
-                     shakeIntensity:'heavy', glowIntensity:'16', particles:true, particleCount:'30', particleColor:'#FF4444' },
-        rainbow:   { title:'wave', counter:'wave', subtitle:'none', titleGlow:false, counterGlow:false,
-                     waveColors:'#FF6B6B,#4ECDC4,#FFE66D', particles:false },
-        minimal:   { title:'none', counter:'none', subtitle:'none', titleGlow:false, counterGlow:false,
-                     particles:false }
+                     glowIntensity:'8' },
+        energy:    { title:'pulse', counter:'pulse', subtitle:'none', titleGlow:true, counterGlow:true,
+                     glowIntensity:'16' },
+        rainbow:   { title:'pulse', counter:'pulse', subtitle:'none', titleGlow:false, counterGlow:false },
+        minimal:   { title:'none', counter:'none', subtitle:'none', titleGlow:false, counterGlow:false }
       };
       const p = presets[preset];
       if (!p) return;
@@ -3824,11 +3784,6 @@
       if (els.timerCounterGlow) els.timerCounterGlow.checked = !!p.counterGlow;
       if (els.timerSubtitleGlow) els.timerSubtitleGlow.checked = false;
       if (p.glowIntensity && els.timerGlowIntensity) els.timerGlowIntensity.value = p.glowIntensity;
-      if (p.shakeIntensity && els.timerShakeIntensity) els.timerShakeIntensity.value = p.shakeIntensity;
-      if (p.waveColors && els.timerWaveColors) els.timerWaveColors.value = p.waveColors;
-      if (p.particles !== undefined && els.timerParticlesEnabled) els.timerParticlesEnabled.checked = p.particles;
-      if (p.particleCount && els.timerParticleCount) els.timerParticleCount.value = p.particleCount;
-      if (p.particleColor && els.timerParticleColor) els.timerParticleColor.value = p.particleColor;
       updateGlowToggles();
       sendTimerConfigHot();
     }

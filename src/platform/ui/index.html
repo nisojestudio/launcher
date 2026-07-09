@@ -231,10 +231,6 @@
                       <span class="tv-label">M&aacute;x</span>
                       <input class="timer-input tv-num" id="timer-max-time" type="number" step="1" min="0" max="31536000" value="0" title="0 = sin l&iacute;mite">
                     </div>
-                    <label class="tv-chip">
-                      <input id="timer-allow-negatives" type="checkbox">
-                      <span>Permitir negativos</span>
-                    </label>
                   </div>
                   <div class="tv-row">
                     <div class="tv-group">
@@ -330,7 +326,7 @@
                       <div class="tv-group tv-group-grow">
                         <span class="tv-label">Fuente</span>
                         <select class="timer-input tv-select" id="timer-counter-font-family">
-                          <option value="Segoe UI, sans-serif">Segoe UI</option>
+                          <option value="Segoe UI, monospace" selected>Segoe UI</option>
                           <option value="Arial, sans-serif">Arial</option>
                           <option value="Helvetica, sans-serif">Helvetica</option>
                           <option value="Verdana, sans-serif">Verdana</option>
@@ -479,51 +475,12 @@
 
                   <div class="tv-row">
                     <div class="tv-group">
-                      <span class="tv-label">Wave</span>
-                      <select class="timer-input tv-select" id="timer-wave-colors">
-                        <option value="#FF6B6B,#4ECDC4,#FFE66D">Arco&iacute;ris</option>
-                        <option value="#FF4500,#FF8C00,#FFD700">Puesta de sol</option>
-                        <option value="#00FF88,#00DDFF,#8844FF">Ne&oacute;n</option>
-                        <option value="#66CCFF,#99EEFF,#FFFFFF">Hielo</option>
-                        <option value="#FF0000,#FF4400,#FF8800">Fuego</option>
-                        <option value="#FF69B4,#FF1493,#8B008B">Rosa</option>
-                      </select>
-                    </div>
-                    <div class="tv-group">
                       <span class="tv-label">Pulse</span>
                       <select class="timer-input tv-select" id="timer-pulse-speed">
                         <option value="3">Lento</option>
                         <option value="1.5" selected>Normal</option>
                         <option value="0.5">R&aacute;pido</option>
                       </select>
-                    </div>
-                    <div class="tv-group">
-                      <span class="tv-label">Shake</span>
-                      <select class="timer-input tv-select" id="timer-shake-intensity">
-                        <option value="light">Suave</option>
-                        <option value="normal" selected>Normal</option>
-                        <option value="heavy">Fuerte</option>
-                      </select>
-                    </div>
-                  </div>
-
-                  <div class="tv-row">
-                    <label class="tv-chip">
-                      <input id="timer-particles-enabled" type="checkbox">
-                      <span>Part&iacute;culas</span>
-                    </label>
-                    <div class="tv-group">
-                      <span class="tv-label">Cantidad</span>
-                      <select class="timer-input tv-select" id="timer-particle-count">
-                        <option value="5">Pocas (5)</option>
-                        <option value="15" selected>Normales (15)</option>
-                        <option value="30">Muchas (30)</option>
-                        <option value="50">Lluvia (50)</option>
-                      </select>
-                    </div>
-                    <div class="tv-group">
-                      <span class="tv-label">Color</span>
-                      <input class="timer-input tv-color" id="timer-particle-color" type="color" value="#FFD700">
                     </div>
                   </div>
 
@@ -553,9 +510,8 @@
                   <div class="tv-row">
                     <div class="tv-group tv-group-grow">
                       <span class="tv-label">Sonido</span>
-                      <input class="timer-input" id="timer-sound-path" type="text" value="" placeholder="Ruta o vac&iacute;o = beep">
+                      <input class="timer-input" id="timer-sound-path" type="text" value="" placeholder="Ruta relativa al panel (ej: sounds/bell.wav) o vac&iacute;o = silencio">
                     </div>
-                    <button class="secondary-button" id="timer-sound-browse" type="button" style="padding:2px 8px;font-size:11px">Examinar</button>
                     <label class="tv-chip">
                       <input id="timer-sound-repeat" type="checkbox">
                       <span>Repetir</span>

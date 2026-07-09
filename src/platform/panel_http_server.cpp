@@ -856,7 +856,6 @@ std::string build_live_timer_config_json(const nlp3::games::LiveTimerGame* game)
     add("on_complete_sound_path"); out << ",";
     add("on_complete_repeat"); out << ",";
     add("on_complete_volume"); out << ",";
-    add("on_complete_video_url"); out << ",";
     add("title_font_size"); out << ",";
     add("title_font_color"); out << ",";
     add("title_font_family"); out << ",";
@@ -940,13 +939,11 @@ std::string handle_timer_configure(PanelApp* app, std::string_view body) {
     if (maybe_d.has_value()) config.set("on_complete_volume", std::clamp(*maybe_d, 0.0, 2.0));
 
     auto maybe_str = parse_json_string(body, "title_text");
-    if (maybe_str.has_value()) config.set("title_text", *maybe_str);
+    if (maybe_str.has_value()) config.set("title_text", maybe_str->substr(0, 256));
     maybe_str = parse_json_string(body, "subtitle_text");
-    if (maybe_str.has_value()) config.set("subtitle_text", *maybe_str);
+    if (maybe_str.has_value()) config.set("subtitle_text", maybe_str->substr(0, 512));
     maybe_str = parse_json_string(body, "on_complete_sound_path");
     if (maybe_str.has_value()) config.set("on_complete_sound_path", *maybe_str);
-    maybe_str = parse_json_string(body, "on_complete_video_url");
-    if (maybe_str.has_value()) config.set("on_complete_video_url", *maybe_str);
     maybe_str = parse_json_string(body, "title_font_color");
     if (maybe_str.has_value()) config.set("title_font_color", *maybe_str);
     maybe_str = parse_json_string(body, "title_font_family");
@@ -979,7 +976,7 @@ std::string handle_timer_configure(PanelApp* app, std::string_view body) {
     maybe_str = parse_json_string(body, "popup_subtract_color");
     if (maybe_str.has_value()) config.set("popup_subtract_color", *maybe_str);
     maybe_str = parse_json_string(body, "on_complete_text");
-    if (maybe_str.has_value()) config.set("on_complete_text", *maybe_str);
+    if (maybe_str.has_value()) config.set("on_complete_text", maybe_str->substr(0, 128));
     maybe_str = parse_json_string(body, "on_complete_text_color");
     if (maybe_str.has_value()) config.set("on_complete_text_color", *maybe_str);
     maybe_i64 = parse_json_uint64(body, "on_complete_text_size");

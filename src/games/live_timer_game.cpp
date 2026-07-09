@@ -41,7 +41,6 @@ constexpr std::string_view kSubtitleBold = "subtitle_bold";
 constexpr std::string_view kSoundPath = "on_complete_sound_path";
 constexpr std::string_view kSoundRepeat = "on_complete_repeat";
 constexpr std::string_view kSoundVolume = "on_complete_volume";
-constexpr std::string_view kVideoUrl = "on_complete_video_url";
 constexpr std::string_view kMaxTimeS = "max_time_s";
 
 constexpr std::string_view kPopupAddColor = "popup_add_color";
@@ -225,7 +224,6 @@ gamesdk::GameConfig LiveTimerGame::default_config() const {
     config.set(std::string(kSoundPath), std::string(""));
     config.set(std::string(kSoundRepeat), false);
     config.set(std::string(kSoundVolume), 1.0);
-    config.set(std::string(kVideoUrl), std::string(""));
     config.set(std::string(kMaxTimeS), 0.0);
 
     config.set(std::string(kPopupAddColor), std::string("#00AAFF"));
@@ -342,7 +340,6 @@ void LiveTimerGame::apply_config(const gamesdk::GameConfig& config) {
     apply_string(kSoundPath);
     apply_bool(kSoundRepeat);
     apply_double(kSoundVolume);
-    apply_string(kVideoUrl);
     apply_string(kPopupAddColor);
     apply_string(kPopupSubtractColor);
     apply_string(kOnCompleteText);
@@ -396,7 +393,6 @@ void LiveTimerGame::apply_config(const gamesdk::GameConfig& config) {
     state_.on_complete_sound_path = config_.get_string(kSoundPath, "");
     state_.on_complete_repeat = config_.get_bool(kSoundRepeat, false);
     state_.on_complete_volume = config_.get_double(kSoundVolume, 1.0);
-    state_.on_complete_video_url = config_.get_string(kVideoUrl, "");
     state_.popup_style.add_color = config_.get_string(kPopupAddColor, "#00AAFF");
     state_.popup_style.subtract_color = config_.get_string(kPopupSubtractColor, "#FF4444");
     state_.on_complete_text = config_.get_string(kOnCompleteText, "TIEMPO CUMPLIDO");
@@ -434,8 +430,22 @@ void LiveTimerGame::apply_config(const gamesdk::GameConfig& config) {
         }
         state_.digit_effect = raw;
     }
-    state_.color_preset = config_.get_string(kColorPreset, "neon-green");
-    state_.counter_font = config_.get_string(kCounterFont, "Space Mono");
+    {
+        auto raw = config_.get_string(kColorPreset, "neon-green");
+        if (raw != "neon-green" && raw != "cyber-blue" && raw != "clean-white" && raw != "rose-gold") {
+            raw = "neon-green";
+            config_.set(std::string(kColorPreset), raw);
+        }
+        state_.color_preset = raw;
+    }
+    {
+        auto raw = config_.get_string(kCounterFont, "Space Mono");
+        if (raw != "Space Mono" && raw != "JetBrains Mono" && raw != "Share Tech Mono" && raw != "Segoe UI") {
+            raw = "Space Mono";
+            config_.set(std::string(kCounterFont), raw);
+        }
+        state_.counter_font = raw;
+    }
 
     apply_visual_style(config_, state_.title_style,
         kTitleFontSize, kTitleFontColor, kTitleFontFamily, kTitleBold,

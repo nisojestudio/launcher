@@ -4,6 +4,43 @@ All notable Panel Live changes should be recorded here.
 
 Format follows a lightweight Keep a Changelog style. Versions use SemVer.
 
+## 0.2.17 - 2026-07-09
+
+### Fixed
+
+- **Timer V3 — digital effects, color presets, and fonts were non-functional**: The three V3 UI controls (digit effect, color palette, counter font) appeared in the panel HTML but their JavaScript DOM bindings were never created. The `els` object was missing `timerDigitEffect`, `timerColorPreset`, and `timerCounterFont`. Any user selection was silently lost and defaults were always sent. **Fixed** by adding the missing bindings, wiring them into `hotControls` for auto-save, including them in `sendTimerConfigHot()`, and adding crash guards to the config import function.
+
+- **Timer — ghost features removed**: Wave, Shake, and Particles controls existed in the panel UI but had zero backend or overlay implementation. Completely removed from HTML and JavaScript (~50 lines). The "Examinar" file browser for sound paths was also broken (browsers only return filename, not full path) — replaced with a manual text input with improved placeholder.
+
+- **Timer — `timerAllowNegatives` checkbox was misleading**: The checkbox only controlled the HTML `min` attribute locally. The backend always accepted negative values (±3600s). Removed the checkbox; all time-per-* inputs now have `min="-10"` permanently, matching the backend's actual behavior.
+
+- **Timer — presets used invalid effects**: The "Energy" preset sent `shake` and "Rainbow" preset sent `wave` — effects that don't exist in the backend validation whitelist. Fixed to use `pulse` instead.
+
+- **Timer — `counter_font_family` default mismatch**: The C++ default was `"Segoe UI, monospace"` but the HTML select default was `"Segoe UI, sans-serif"`. First config apply would silently change the counter font. Fixed.
+
+- **Timer — `onPayloadUpdate` dead code removed**: The function was assigned but never called anywhere. Removed.
+
+- **Timer — `bgColor` removed from overlay JSON**: The field was always `"transparent"` and never consumed by the overlay. Removed from both null and real state JSON to save bandwidth.
+
+- **Timer — `on_complete_video_url` purged**: The field was stored in C++ state and exported via HTTP but had no UI, no overlay playback, and was never serialized to the overlay JSON. Completely removed from header, implementation, and HTTP server.
+
+### Added
+
+- **Timer — V3 field server-side validation**: `color_preset` and `counter_font` now have the same whitelist validation as `digit_effect` in `apply_config()`. Invalid values are normalized to safe defaults with the correction recorded in config warnings.
+
+- **Timer — CSP header on overlay**: Added `Content-Security-Policy` meta tag to the overlay HTML, restricting resources to self and Google Fonts origins.
+
+- **Timer — string length limits**: `title_text` (256 chars), `subtitle_text` (512 chars), and `on_complete_text` (128 chars) now have max length enforcement at the HTTP layer.
+
+- **Timer — V3 contract documentation**: Section 10 added to `timer_module_contract.md` documenting `digit_effect`, `color_preset`, and `counter_font` with allowed values, defaults, and behavior.
+
+- **Timer — V3 unit tests**: 4 new test functions (16 assertions) covering digit effect validation, color preset validation, counter font validation, and full V3 round-trip through JSON serialization.
+
+### Security
+
+- **Timer overlay CSP**: `default-src 'self' https://fonts.googleapis.com https://fonts.gstatic.com; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; media-src 'self' blob:;`
+- **Input length limits**: Prevents unbounded string storage for title (256), subtitle (512), and completion text (128).
+
 ## 0.2.16 - 2026-07-09
 
 ### Fixed
