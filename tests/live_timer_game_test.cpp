@@ -877,58 +877,27 @@ void test_v3_color_preset_validation() {
     std::cout << "PASS: v3_color_preset_validation\n";
 }
 
-void test_v3_counter_font_validation() {
-    LiveTimerGame game;
-    auto config = game.default_config();
-
-    // Valid fonts accepted
-    config.set("counter_font", std::string("JetBrains Mono"));
-    game.apply_config(config);
-    assert(game.state().counter_font == "JetBrains Mono");
-    assert(game.config().get_string("counter_font") == "JetBrains Mono");
-
-    config.set("counter_font", std::string("Share Tech Mono"));
-    game.apply_config(config);
-    assert(game.state().counter_font == "Share Tech Mono");
-
-    config.set("counter_font", std::string("Segoe UI"));
-    game.apply_config(config);
-    assert(game.state().counter_font == "Segoe UI");
-
-    // Invalid font normalized to "Space Mono"
-    config.set("counter_font", std::string("Comic Sans MS"));
-    game.apply_config(config);
-    assert(game.state().counter_font == "Space Mono");
-    assert(game.config().get_string("counter_font") == "Space Mono");
-
-    std::cout << "PASS: v3_counter_font_validation\n";
-}
-
 void test_v3_fields_round_trip() {
     LiveTimerGame game;
     auto config = game.default_config();
     config.set("digit_effect", std::string("flip"));
     config.set("color_preset", std::string("rose-gold"));
-    config.set("counter_font", std::string("JetBrains Mono"));
     game.apply_config(config);
     game.on_activated();
 
     // Verify state
     assert(game.state().digit_effect == "flip");
     assert(game.state().color_preset == "rose-gold");
-    assert(game.state().counter_font == "JetBrains Mono");
 
     // Verify JSON serialization includes V3 fields
     const std::string json = nlp3::platform::build_live_timer_state_json(&game);
     assert(json.find("\"digit_effect\":\"flip\"") != std::string::npos);
     assert(json.find("\"color_preset\":\"rose-gold\"") != std::string::npos);
-    assert(json.find("\"counter_font\":\"JetBrains Mono\"") != std::string::npos);
 
     // Reset to defaults
     game.reset_config_to_defaults();
     assert(game.state().digit_effect == "none");
     assert(game.state().color_preset == "neon-green");
-    assert(game.state().counter_font == "Space Mono");
 
     std::cout << "PASS: v3_fields_round_trip\n";
 }
@@ -975,7 +944,6 @@ int main() {
     test_state_json_round_trip();
     test_v3_digit_effect_validation();
     test_v3_color_preset_validation();
-    test_v3_counter_font_validation();
     test_v3_fields_round_trip();
 
     std::cout << "\nAll tests passed!\n";

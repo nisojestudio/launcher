@@ -134,6 +134,7 @@ Top-level fields (relevant subset):
 | `tick_sound_path`, `tick_sound_volume` | string/number | See section 3. |
 | `add_sound_path`, `add_sound_volume` | string/number | See section 3. |
 | `on_complete_sound_path`, `on_complete_volume`, `on_complete_repeat` | string/number/bool | See section 3. |
+| ~~`counter_font`~~ | ~~string~~ | **Removed** — merged into `counterStyle.font_family`. The panel sends the chosen font via `counter_font_family`. |
 
 ## 7. Threading
 
@@ -205,19 +206,25 @@ Predefined color palette for the counter digits.
 **JSON field:** `color_preset`
 **Default:** `"neon-green"`
 
-### 10.3 `counter_font`
+### 10.3 Counter font (merged into `counter_font_family`)
 
-Monospace font family for the counter digits. Fonts are loaded from Google Fonts.
+The `counter_font` selector was removed and its 4 mono font options merged into the
+existing `counter_font_family` (the "Fuente" dropdown for the counter). The dropdown
+now includes these mono fonts alongside the standard options:
 
-| Value | Source |
-|-------|--------|
-| `Space Mono` | Google Fonts (wght@700) |
-| `JetBrains Mono` | Google Fonts (wght@700) |
-| `Share Tech Mono` | Google Fonts |
-| `Segoe UI` | System font |
+| Value | CSS value | Source |
+|-------|-----------|--------|
+| `"Space Mono", monospace` | `"Space Mono", monospace` | Google Fonts (wght@400;700) |
+| `"JetBrains Mono", monospace` | `"JetBrains Mono", monospace` | Google Fonts (wght@400;700) |
+| `"Share Tech Mono", monospace` | `"Share Tech Mono", monospace` | Google Fonts |
+| `Segoe UI, monospace` (selected) | `Segoe UI, monospace` | System font |
 
-**Validation:** Backend normalizes invalid values to `Space Mono`. Overlay has defensive fallback.
-**Config key:** `counter_font` (string)
-**JSON field:** `counter_font`
-**Default:** `"Space Mono"`
-**Note:** Applied via `applyCounterFont()` in the overlay JS, which sets `fontFamily` on the `#counter` element. This takes priority over `counterStyle.font_family`.
+**Behavior:** The "Tipografía" separate dropdown (`#timer-counter-font`) no longer
+exists. All font selection for the counter is done via `counter_font_family`.
+Google Fonts link loads all mono families for use in both title and subtitle dropdowns.
+The backend removed the `counter_font` config key entirely; any old JSON payloads
+containing `counter_font` are ignored (not read, not persisted).
+
+**Config key:** N/A (removed). Use `counter_font_family` instead.
+**JSON field:** N/A (removed).
+**Default:** `"Segoe UI, monospace"` (from `counter_family` default).

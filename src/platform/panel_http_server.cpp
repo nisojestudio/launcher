@@ -888,8 +888,7 @@ std::string build_live_timer_config_json(const nlp3::games::LiveTimerGame* game)
     add("glow_intensity_px"); out << ",";
     add("pulse_speed_s"); out << ",";
     add("digit_effect"); out << ",";
-    add("color_preset"); out << ",";
-    add("counter_font");
+    add("color_preset");
     out << "}";
     return out.str();
 }
@@ -1012,13 +1011,11 @@ std::string handle_timer_configure(PanelApp* app, std::string_view body) {
     if (maybe_i64.has_value()) config.set("glow_intensity_px", static_cast<std::int64_t>(std::clamp<uint64_t>(*maybe_i64, 1, 60)));
     maybe_d = parse_json_double(body, "pulse_speed_s");
     if (maybe_d.has_value()) config.set("pulse_speed_s", std::clamp(*maybe_d, 0.3, 5.0));
-    // V3: digit transition + palette + font
+    // V3: digit transition + palette
     maybe_str = parse_json_string(body, "digit_effect");
     if (maybe_str.has_value()) config.set("digit_effect", *maybe_str);
     maybe_str = parse_json_string(body, "color_preset");
     if (maybe_str.has_value()) config.set("color_preset", *maybe_str);
-    maybe_str = parse_json_string(body, "counter_font");
-    if (maybe_str.has_value()) config.set("counter_font", *maybe_str);
 
     // T3.1: capture the requested config snapshot so we can compare against the
     // effective post-apply config and report normalization/clamps to the caller.

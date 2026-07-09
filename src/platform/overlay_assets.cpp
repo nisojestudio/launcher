@@ -40,6 +40,8 @@ std::string build_live_timer_state_json(const games::LiveTimerGame* game) {
             "\"titleStyle\":{},"
             "\"counterStyle\":{},"
             "\"subtitleStyle\":{},"
+            "\"popupAddColor\":\"#00AAFF\","
+            "\"popupSubtractColor\":\"#FF4444\","
             "\"completedText\":\"TIEMPO CUMPLIDO\","
             "\"completedTextColor\":\"#FFD700\","
             "\"completedTextSize\":48,"
@@ -54,7 +56,6 @@ std::string build_live_timer_state_json(const games::LiveTimerGame* game) {
             "\"pulse_speed_s\":1.5,"
             "\"digit_effect\":\"none\","
             "\"color_preset\":\"neon-green\","
-            "\"counter_font\":\"Space Mono\","
             "\"tick_sound_path\":\"\","
             "\"tick_sound_volume\":1.0,"
             "\"add_sound_path\":\"\","
@@ -146,7 +147,6 @@ std::string build_live_timer_state_json(const games::LiveTimerGame* game) {
         << "\"pulse_speed_s\":" << s.pulse_speed_s << ","
         << "\"digit_effect\":" << json_quote(s.digit_effect) << ","
         << "\"color_preset\":" << json_quote(s.color_preset) << ","
-        << "\"counter_font\":" << json_quote(s.counter_font) << ","
         // T1.4: overlay HTML5 audio reads these fields and plays via new Audio().
         // Empty path = total silence. Backend never plays sounds itself.
         << "\"tick_sound_path\":" << json_quote(s.tick_sound_path) << ","

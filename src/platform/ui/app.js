@@ -348,10 +348,9 @@
     timerGlowIntensity: $("#timer-glow-intensity"),
 
     timerPulseSpeed: $("#timer-pulse-speed"),
-    // V3: digit effects, palette, counter font
+    // V3: digit effects, palette
     timerDigitEffect: $("#timer-digit-effect"),
     timerColorPreset: $("#timer-color-preset"),
-    timerCounterFont: $("#timer-counter-font"),
   };
 
   const SAMPLE_AVATAR_DATA_URL =
@@ -3249,6 +3248,13 @@
       if (pollTimerEventsTimerId) clearTimeout(pollTimerEventsTimerId);
     });
 
+    // Helper: parse a timer config number, preserving 0 as a valid value.
+    // Falls back to defaultVal when the input is missing, empty, or NaN.
+    function parseTimerNum(val, defaultVal) {
+      const n = parseFloat(val);
+      return (n === 0 || Number.isFinite(n)) ? n : defaultVal;
+    }
+
     // Read the form into a plain config object. Each field is read with a
     // type-appropriate default; bad inputs (NaN, empty strings) are
     // sanitized so the panel never sends the server garbage.
@@ -3256,13 +3262,13 @@
       const cfg = {
         initial_time_s: parseTimeString(els.timerInitialTime?.value) || 300,
         max_time_s: parseFloat(els.timerMaxTime?.value) || 0,
-        time_per_like_s: parseFloat(els.timerPerLike?.value) || 2.0,
-        time_per_share_s: parseFloat(els.timerPerShare?.value) || 5.0,
-        time_per_follow_s: parseFloat(els.timerPerFollow?.value) || 10.0,
-        time_per_gift_coin_s: parseFloat(els.timerPerGiftCoin?.value) || 0.5,
-        time_per_chat_s: parseFloat(els.timerPerChat?.value) || 0.0,
-        title_text: els.timerTitleText?.value || "🎯 Extiende el Live",
-        subtitle_text: els.timerSubtitleText?.value || "📌 Cada coin suma {time_per_gift_coin}s",
+        time_per_like_s: parseTimerNum(els.timerPerLike?.value, 2.0),
+        time_per_share_s: parseTimerNum(els.timerPerShare?.value, 5.0),
+        time_per_follow_s: parseTimerNum(els.timerPerFollow?.value, 10.0),
+        time_per_gift_coin_s: parseTimerNum(els.timerPerGiftCoin?.value, 0.5),
+        time_per_chat_s: parseTimerNum(els.timerPerChat?.value, 0.0),
+        title_text: els.timerTitleText?.value ?? "🎯 Extiende el Live",
+        subtitle_text: els.timerSubtitleText?.value ?? "📌 Cada coin suma {time_per_gift_coin}s",
         popup_add_color: els.timerPopupAddColor?.value || "#00AAFF",
         popup_subtract_color: els.timerPopupSubtractColor?.value || "#FF4444",
         on_complete_text: els.timerCompleteText?.value || "TIEMPO CUMPLIDO",
@@ -3270,7 +3276,7 @@
         on_complete_text_size: parseInt(els.timerCompleteTextSize?.value, 10) || 48,
         on_complete_sound_path: els.timerSoundPath?.value || "",
         on_complete_repeat: !!els.timerSoundRepeat?.checked,
-        on_complete_volume: parseFloat(els.timerSoundVolume?.value) || 1.0,
+        on_complete_volume: parseTimerNum(els.timerSoundVolume?.value, 1.0),
         title_font_size: parseInt(els.timerTitleFontSize?.value, 10) || 48,
         title_font_color: els.timerTitleFontColor?.value || "#FFFFFF",
         title_font_family: els.timerTitleFontFamily?.value || "Segoe UI, sans-serif",
@@ -3284,9 +3290,9 @@
         subtitle_font_family: els.timerSubtitleFontFamily?.value || "Segoe UI, sans-serif",
         subtitle_bold: !!els.timerSubtitleBold?.checked,
         tick_sound_path: els.timerTickSoundPath?.value || "",
-        tick_sound_volume: parseFloat(els.timerTickSoundVolume?.value) || 1.0,
+        tick_sound_volume: parseTimerNum(els.timerTickSoundVolume?.value, 1.0),
         add_sound_path: els.timerAddSoundPath?.value || "",
-        add_sound_volume: parseFloat(els.timerAddSoundVolume?.value) || 1.0,
+        add_sound_volume: parseTimerNum(els.timerAddSoundVolume?.value, 1.0),
         // Effects
         title_effect: els.timerTitleEffect?.value || "none",
         counter_effect: els.timerCounterEffect?.value || "none",
@@ -3297,10 +3303,9 @@
         glow_color: els.timerGlowColor?.value || "#FFD700",
         glow_intensity_px: parseInt(els.timerGlowIntensity?.value, 10) || 8,
         pulse_speed_s: parseFloat(els.timerPulseSpeed?.value) || 1.5,
-        // V3: digit effect, palette, font
+        // V3: digit effect, palette
         digit_effect: els.timerDigitEffect?.value || "none",
         color_preset: els.timerColorPreset?.value || "neon-green",
-        counter_font: els.timerCounterFont?.value || "Space Mono",
       };
       // Sanitize any NaN that the parser may have produced on bad input.
       for (const k of Object.keys(cfg)) {
@@ -3607,10 +3612,9 @@
             if (opt) ps.value = config.pulse_speed_s;
           }
         }
-        // V3: digit effect, palette, font
+        // V3: digit effect, palette
         if (config.digit_effect !== undefined && els.timerDigitEffect) els.timerDigitEffect.value = config.digit_effect;
         if (config.color_preset !== undefined && els.timerColorPreset) els.timerColorPreset.value = config.color_preset;
-        if (config.counter_font !== undefined && els.timerCounterFont) els.timerCounterFont.value = config.counter_font;
         // Sync +Resplandor toggles
         if (typeof updateGlowToggles === 'function') updateGlowToggles();
         // Trigger preview update
@@ -3693,8 +3697,8 @@
       hotConfigTimer = setTimeout(async () => {
         hotConfigTimer = null;
         const config = {
-          title_text: els.timerTitleText?.value || "🎯 Extiende el Live",
-          subtitle_text: els.timerSubtitleText?.value || "📌 Cada coin suma {time_per_gift_coin}s",
+          title_text: els.timerTitleText?.value ?? "🎯 Extiende el Live",
+          subtitle_text: els.timerSubtitleText?.value ?? "📌 Cada coin suma {time_per_gift_coin}s",
           popup_add_color: els.timerPopupAddColor?.value || "#00AAFF",
           popup_subtract_color: els.timerPopupSubtractColor?.value || "#FF4444",
           on_complete_text: els.timerCompleteText?.value || "TIEMPO CUMPLIDO",
@@ -3721,10 +3725,9 @@
           glow_color: els.timerGlowColor?.value || "#FFD700",
           glow_intensity_px: parseInt(els.timerGlowIntensity?.value, 10) || 8,
           pulse_speed_s: parseFloat(els.timerPulseSpeed?.value) || 1.5,
-          // V3: digit effect, palette, font
+          // V3: digit effect, palette
           digit_effect: els.timerDigitEffect?.value || "none",
           color_preset: els.timerColorPreset?.value || "neon-green",
-          counter_font: els.timerCounterFont?.value || "Space Mono",
         };
         try {
           await apiPostJson("/api/timer/configure", config);
@@ -3747,7 +3750,7 @@
       'timerTitleFontSize', 'timerTitleFontColor', 'timerTitleFontFamily', 'timerTitleBold',
       'timerCounterFontSize', 'timerCounterFontColor', 'timerCounterFontFamily', 'timerCounterBold',
       'timerSubtitleFontSize', 'timerSubtitleFontColor', 'timerSubtitleFontFamily', 'timerSubtitleBold',
-      'timerDigitEffect', 'timerColorPreset', 'timerCounterFont',
+      'timerDigitEffect', 'timerColorPreset',
       'timerCompleteText', 'timerCompleteTextColor', 'timerCompleteTextSize',
       'timerPopupAddColor', 'timerPopupSubtractColor',
       'timerTitleText', 'timerSubtitleText'

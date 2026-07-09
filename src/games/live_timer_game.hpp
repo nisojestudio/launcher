@@ -94,8 +94,9 @@ struct LiveTimerGameState {
     std::string digit_effect = "none";
     // V3: color preset ("neon-green" | "cyber-blue" | "clean-white" | "rose-gold")
     std::string color_preset = "neon-green";
-    // V3: counter font family
-    std::string counter_font = "Space Mono";
+    // V3: counter font family — merged into counter_style.font_family. The panel's
+    // "Fuente" dropdown now includes mono fonts (Space Mono, JetBrains Mono, Share Tech Mono)
+    // alongside standard fonts. No separate counter_font field exists.
 
     std::vector<LiveTimerRecentEvent> recent_events;
 };

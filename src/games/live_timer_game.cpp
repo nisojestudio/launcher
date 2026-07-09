@@ -67,7 +67,6 @@ constexpr std::string_view kGlowIntensity = "glow_intensity_px";
 constexpr std::string_view kPulseSpeed = "pulse_speed_s";
 constexpr std::string_view kDigitEffect = "digit_effect";
 constexpr std::string_view kColorPreset = "color_preset";
-constexpr std::string_view kCounterFont = "counter_font";
 
 constexpr double kMaxRecentEventsAgeS = 4.0;
 constexpr std::size_t kMaxRecentEvents = 6;
@@ -77,12 +76,6 @@ constexpr std::string_view kIconShare = "\xf0\x9f\x94\x84"; // 🔄
 constexpr std::string_view kIconFollow = "\xe2\x9c\xa8";    // ✨
 constexpr std::string_view kIconGift = "\xf0\x9f\x8e\x81"; // 🎁
 constexpr std::string_view kIconChat = "\xf0\x9f\x92\xac"; // 💬
-
-std::string resolve_actor_name(const gamesdk::GameInputActor& actor) {
-    if (!actor.display_name.empty()) return actor.display_name;
-    if (!actor.username.empty()) return actor.username;
-    return "unknown";
-}
 
 // T1.3: monotonic session id derived from the wall clock so save/restore and
 // arm() flows can reset the overlay's lastShownEventId deterministically.
@@ -248,10 +241,9 @@ gamesdk::GameConfig LiveTimerGame::default_config() const {
     config.set(std::string(kGlowColor), std::string("#FFD700"));
     config.set(std::string(kGlowIntensity), std::int64_t{8});
     config.set(std::string(kPulseSpeed), 1.5);
-    // V3: digit transition + palette + font
+    // V3: digit transition + palette
     config.set(std::string(kDigitEffect), std::string("none"));
     config.set(std::string(kColorPreset), std::string("neon-green"));
-    config.set(std::string(kCounterFont), std::string("Space Mono"));
 
     return config;
 }
@@ -363,7 +355,6 @@ void LiveTimerGame::apply_config(const gamesdk::GameConfig& config) {
     // V3: new visual fields
     apply_string(kDigitEffect);
     apply_string(kColorPreset);
-    apply_string(kCounterFont);
 
     config_ = std::move(effective);
 
@@ -421,7 +412,7 @@ void LiveTimerGame::apply_config(const gamesdk::GameConfig& config) {
     state_.glow_color = config_.get_string(kGlowColor, "#FFD700");
     state_.glow_intensity_px = static_cast<int>(config_.get_double(kGlowIntensity, 8.0));
     state_.pulse_speed_s = config_.get_double(kPulseSpeed, 1.5);
-    // V3: validate digit_effect, color_preset, counter_font
+    // V3: validate digit_effect, color_preset
     {
         auto raw = config_.get_string(kDigitEffect, "none");
         if (raw != "none" && raw != "flip" && raw != "roll" && raw != "pop" && raw != "fade") {
@@ -437,14 +428,6 @@ void LiveTimerGame::apply_config(const gamesdk::GameConfig& config) {
             config_.set(std::string(kColorPreset), raw);
         }
         state_.color_preset = raw;
-    }
-    {
-        auto raw = config_.get_string(kCounterFont, "Space Mono");
-        if (raw != "Space Mono" && raw != "JetBrains Mono" && raw != "Share Tech Mono" && raw != "Segoe UI") {
-            raw = "Space Mono";
-            config_.set(std::string(kCounterFont), raw);
-        }
-        state_.counter_font = raw;
     }
 
     apply_visual_style(config_, state_.title_style,
