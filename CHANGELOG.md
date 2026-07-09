@@ -4,6 +4,40 @@ All notable Panel Live changes should be recorded here.
 
 Format follows a lightweight Keep a Changelog style. Versions use SemVer.
 
+## 0.2.19 - 2026-07-09
+
+### Fixed
+
+- **Timer overlay — `clampVolume` límite incorrecto**: El overlay limitaba el volumen a 1.0, pero el backend acepta hasta 2.0. Valores entre 1.0 y 2.0 se silenciaban sin aviso. Ahora `clampVolume()` admite hasta 2.0, consistente con el backend.
+
+- **Timer panel — `||` falsy reemplazaba 0 por default**: `parseFloat("0") || 2.0` evaluaba a `2.0`, haciendo imposible configurar `time_per_*` en 0 desde el panel. Añadida función `parseTimerNum()` que preserva 0 como valor válido. También cambiados `title_text` y `subtitle_text` de `||` a `??` para permitir strings vacíos.
+
+- **Timer overlay — preset de color sobrescribía estados danger/warning**: `applyColorPreset()` seteaba `counter.style.color` como inline DESPUÉS de `setCounterState()`, anulando los colores de estado (danger/warning/completed). Eliminado el inline color — ahora se usan exclusivamente CSS classes + variables (`#counter.danger { color: var(--danger-color) }`).
+
+- **Timer overlay — `lastDigits` no sincronizado en disabled/completed**: Al salir de disabled o completed, `renderDigits()` comparaba contra `lastDigits` stale, disparando animaciones no deseadas en todos los dígitos. Ahora `lastDigits[]` se sincroniza inmediatamente después de escribir los guiones (`-`) o ceros (`000000`).
+
+- **Timer overlay — validación de glow color débil**: La regex `/^(#|rgb|hsl|[a-z])/` aceptaba colores inválidos como `#GGGGGG`, causando texto invisible en OBS. Ahora valida estrictamente `#RGB/#RRGGBB`, `rgb()`, `hsl()`, o nombres CSS.
+
+- **Timer overlay — null JSON faltaban campos**: `build_live_timer_state_json` con `game == nullptr` no incluía `popupAddColor` ni `popupSubtractColor`. Añadidos con valores default.
+
+- **Timer overlay — stale response race condition**: El polling usaba `abortController.abort()` que no protege contra callbacks de fetch ya completados. Añadido `pollGeneration` counter — respuestas stale se descartan.
+
+- **Timer overlay — overflow en textos**: Title, subtitle, days-label y counter sin protección de desbordamiento. Añadidos `overflow: hidden; text-overflow: ellipsis; max-width: 90vw`.
+
+- **Timer overlay — accesibilidad**: Faltaban `aria-live="polite"` en `#days-label` y `#subtitle`. Añadidos.
+
+### Removed
+
+- **Timer C++ — `resolve_actor_name` eliminado**: Función definida pero nunca llamada dentro del módulo timer. Eliminada.
+
+- **Timer test — `test_v3_counter_font_validation` eliminado**: El campo `counter_font` fue fusionado a `counter_style.font_family`. El test referenciaba `state().counter_font` que ya no existe. Eliminado junto con referencias en `test_v3_fields_round_trip`.
+
+## 0.2.18 - 2026-07-09
+
+### Fixed
+
+- **Timer overlay — CSP bloqueaba scripts inline**: `Content-Security-Policy` no incluía `'unsafe-inline'` para `script-src`. Añadido.
+
 ## 0.2.17 - 2026-07-09
 
 ### Fixed
