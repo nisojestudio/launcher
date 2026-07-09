@@ -4,6 +4,17 @@ All notable Panel Live changes should be recorded here.
 
 Format follows a lightweight Keep a Changelog style. Versions use SemVer.
 
+## 0.2.14 - 2026-07-08
+
+### Fixed
+
+- **STATUS_STACK_BUFFER_OVERRUN (0xC0000409) en Release**: `/Ob2` (inline agresivo) combinado con `/GS` causaba falso positivo del stack guard en `PanelApp::initialize()` y `CloudflareTunnelService`. Cambio a `/Ob1` en `CMAKE_CXX_FLAGS_RELEASE`. Mantiene `/O2` para velocidad.
+- **Túneles cloudflared zombies**: Limpieza de procesos `cloudflared.exe` residuales en los launchers `.bat` y `.ps1`.
+
+### Added
+
+- **Script externo de túnel**: `scripts/start_cloudflared_tunnel.ps1` como alternativa para gestionar el túnel cloudflared como proceso independiente.
+
 ## 0.2.13 - 2026-07-06
 
 ### Fixed
