@@ -157,13 +157,19 @@ void apply_visual_style(const gamesdk::GameConfig& config, LiveTimerVisualStyle&
         }
     }
     if (const auto* v = config.find(color_key); v != nullptr) {
-        style.font_color = config.get_string(color_key, std::string(default_color));
+        if (const auto* s = std::get_if<std::string>(v)) {
+            style.font_color = *s;
+        }
     }
     if (const auto* v = config.find(font_key); v != nullptr) {
-        style.font_family = config.get_string(font_key, std::string(default_font));
+        if (const auto* s = std::get_if<std::string>(v)) {
+            style.font_family = *s;
+        }
     }
     if (const auto* v = config.find(bold_key); v != nullptr) {
-        style.bold = config.get_bool(bold_key, default_bold);
+        if (const auto* b = std::get_if<bool>(v)) {
+            style.bold = *b;
+        }
     }
 }
 
@@ -672,9 +678,12 @@ bool LiveTimerGame::poll_completion_sound() noexcept {
     return false;
 }
 
-// T1.4: sounds moved to overlay HTML5 audio. Backend keeps these signatures
-// (called by poll loops and arm/stop) as empty stubs so includes stay clean and
-// the overlay owns all audio playback driven by JSON state fields.
+// T1.4: sound playback is intentionally delegated to the overlay HTML5 audio
+// (applySounds / playAddSound in live-timer.html). The backend keeps these
+// signatures as empty stubs for interface compatibility with poll loops and
+// arm/stop callers. These are NOT unfinished — they are complete by design.
+// The overlay owns all audio playback driven by JSON state fields
+// (tick_sound_path, add_sound_path, on_complete_sound_path).
 void LiveTimerGame::play_completion_sound() const {
     (void)state_;
 }

@@ -36,12 +36,21 @@ body.preview-mode #completed-banner { font-size: 20px !important; margin-top: 4p
 }
 
 /* ---- V3: Digit transition effects ---- */
-#counter { perspective: 400px; }
 .digit-group { display: inline-block; white-space: nowrap; }
-.digit-sep { display: inline-block; }
+.digit-sep {
+  display: inline-block;
+  font-size: inherit;
+  font-family: inherit;
+  color: inherit;
+  vertical-align: middle;
+  margin: 0 2px;
+}
 .digit {
   display: inline-block;
+  min-width: 0.6em;
+  text-align: center;
   transition: none;
+  font-variant-numeric: tabular-nums;
 }
 
 .digit-flip { animation: flipDigit 0.4s ease-in-out; }
@@ -90,18 +99,18 @@ body.preview-mode #completed-banner { font-size: 20px !important; margin-top: 4p
   font-family: 'Segoe UI', monospace;
   text-align: center;
   line-height: 1.1;
-  transition: color 0.3s ease;
   position: relative;
   z-index: 10;
+  perspective: 400px;
+  backface-visibility: hidden;
+  /* color se setea via JS (applyColorPreset o applyStyles). CSS var como fallback. */
+  color: var(--counter-color, #00FF88);
 }
-/* A1: warning/danger/completed no longer force a hardcoded color with
-   !important. The operator's counter_font_color is now respected at all
-   times; the state classes only attach an opt-in pulse animation when no
-   effect is active. To color the last 10s in red, set counter_font_color
-   to #ff4444 from the panel instead. */
-#counter.warning { }
-#counter.danger { }
-#counter.completed { }
+/* Estados danger/warning/completed usan vars del preset activo.
+   Si no hay preset activo, heredan el color base del #counter. */
+#counter.warning   { color: var(--warning-color, inherit); }
+#counter.danger    { color: var(--danger-color, inherit); }
+#counter.completed { color: var(--danger-color, inherit); }
 /* T2.5: danger/completed pulse is opt-in via .counter-danger-pulse and only
    applied by JS when no other counter_effect is active. Color is kept above. */
 @keyframes pulseDanger {
@@ -173,8 +182,6 @@ body.preview-mode #completed-banner { font-size: 20px !important; margin-top: 4p
 </head>
 <body>
 
-
-<!-- Panel-vended auto-triggered 4-message-label single-fade-fade-pop-pop-banner -->
 <div id="title" role="heading" aria-level="1"></div>
 <div id="counter" role="region" aria-live="polite" aria-atomic="true" aria-label="Tiempo restante del temporizador">
   <span class="digit-group"><span class="digit" data-pos="0">0</span><span class="digit" data-pos="1">0</span></span>
@@ -186,15 +193,8 @@ body.preview-mode #completed-banner { font-size: 20px !important; margin-top: 4p
 <div id="subtitle"></div>
 <div id="completed-banner" role="alert" aria-live="assertive" aria-atomic="true"></div>
 <div id="event-container" role="log" aria-live="polite" aria-relevant="additions" aria-label="Eventos recientes del temporizador"></div>
-<h1 id="title"></h1>
-<div id="counter" role="region" aria-live="polite" aria-atomic="true" aria-label="Tiempo restante del temporizador">00:00:00</div>
-<p id="subtitle"></p>
-<div id="completed-banner" role="status" aria-live="assertive"></div>
 <div id="connection-error" role="alert" style="display:none;position:fixed;top:10px;left:50%;transform:translateX(-50%);background:rgba(255,0,0,0.7);color:#fff;padding:6px 16px;border-radius:8px;font-size:16px;font-weight:bold;z-index:999;">Desconectado del panel</div>
 <div id="preview-badge" aria-hidden="true">PREVIEW</div>
-<div id="event-container" role="log" aria-live="polite" aria-relevant="additions" aria-label="Eventos recientes del temporizador"></div>
-<!-- V2: barra de progreso sutil en el borde inferior -->
-<div id="progress-bar-container" aria-hidden="true"><div id="progress-bar"></div></div>
 
 <script>
 // Detect preview mode (shown in panel iframe)
@@ -214,7 +214,7 @@ let lastShownEventId = 0;
 // event cursor and clear cached effect state so the overlay re-syncs cleanly.
 let currentSessionId = 0;
 let effectState = null;
-let lastDigits = [];
+let lastDigits = ['0','0','0','0','0','0'];
 let currentDigitEffect = 'none';
 let currentColorPreset = 'neon-green';
 let currentCounterFont = 'Space Mono';
@@ -233,14 +233,22 @@ function clampVolume(v) {
 
 /* ---- Compare two effect config objects ---- */
 function effectConfigChanged(data) {
-  const cur = {
-    te: data.title_effect, ce: data.counter_effect, se: data.subtitle_effect,
-    tg: !!data.title_glow_enabled, cg: !!data.counter_glow_enabled, sg: !!data.subtitle_glow_enabled,
-    gc: data.glow_color, gi: data.glow_intensity_px, ps: data.pulse_speed_s,
-    de: data.digit_effect, cp: data.color_preset, cf: data.counter_font
+  var cur = {
+    te: data.title_effect || 'none',
+    ce: data.counter_effect || 'none',
+    se: data.subtitle_effect || 'none',
+    tg: !!data.title_glow_enabled,
+    cg: !!data.counter_glow_enabled,
+    sg: !!data.subtitle_glow_enabled,
+    gc: data.glow_color || '#FFD700',
+    gi: data.glow_intensity_px || 8,
+    ps: data.pulse_speed_s || 1.5,
+    de: data.digit_effect || 'none',
+    cp: data.color_preset || 'neon-green',
+    cf: data.counter_font || 'Space Mono'
   };
   if (effectState === null) { effectState = cur; return true; }
-  for (const k in cur) {
+  for (var k in cur) {
     if (effectState[k] !== cur[k]) { effectState = cur; return true; }
   }
   return false;
@@ -248,58 +256,37 @@ function effectConfigChanged(data) {
 
 /* ---- Effect: Clear effect classes from an element (keep base classes) ---- */
 function clearEffectClasses(el) {
-  el.classList.remove('effect-wave', 'effect-pulse',
-    'effect-shake-light', 'effect-shake-normal', 'effect-shake-heavy');
+  el.classList.remove('effect-pulse');
   el.style.removeProperty('--pulse-speed');
-  el.style.removeProperty('--shake-speed');
   el.style.textShadow = '';
-  // T2.5: drop-shadow filter is set for glow; clear it so it doesn't leak.
   el.style.filter = '';
-  el.style.background = '';
-  el.style.webkitBackgroundClip = '';
-  el.style.backgroundClip = '';
-  el.style.webkitTextFillColor = '';
 }
 
 /* ---- Effect: Apply visual effects to an element ---- */
 function applyEffects(el, effectName, glowEnabled, glowColor, glowIntensity,
-                       waveColors, pulseSpeed, shakeIntensity) {
+                       pulseSpeed) {
   clearEffectClasses(el);
 
-  // T2.5: glow uses drop-shadow() on the whole element (filter) instead of
-  // text-shadow so it renders on transparent-filled wave text correctly.
-  // When glow is OFF we restore the default text-shadow halo for readability
-  // and clear any leftover filter (already cleared by clearEffectClasses).
-  if (glowEnabled && glowColor) {
+  // Clamp glow intensity to sane range (1–60 px)
+  var gi = Math.max(1, Math.min(60, parseInt(glowIntensity, 10) || 8));
+
+  // Validar que glowColor sea un color CSS valido (hex, rgb, o nombre).
+  // Si no lo es, desactivar glow para evitar texto invisible en OBS.
+  var validColor = glowColor && /^(#|rgb|hsl|[a-z])/.test(glowColor);
+  if (glowEnabled && validColor) {
     el.style.textShadow = '';
     el.style.filter =
-      'drop-shadow(0 0 ' + glowIntensity + 'px ' + glowColor + ') ' +
-      'drop-shadow(0 0 ' + (glowIntensity * 2) + 'px ' + glowColor + ')';
+      'drop-shadow(0 0 ' + gi + 'px ' + glowColor + ') ' +
+      'drop-shadow(0 0 ' + (gi * 2) + 'px ' + glowColor + ')';
   } else {
     el.style.textShadow = '0 0 20px rgba(0,0,0,0.8), 0 0 40px rgba(0,0,0,0.6)';
   }
 
   // Main effect
   switch (effectName) {
-    case 'wave':
-      el.classList.add('effect-wave');
-      if (waveColors) {
-        el.style.background = 'linear-gradient(135deg, ' + waveColors.split(',').join(', ') + ')';
-      }
-      el.style.backgroundClip = 'text';
-      el.style.webkitBackgroundClip = 'text';
-      el.style.webkitTextFillColor = 'transparent';
-      break;
-
     case 'pulse':
       el.classList.add('effect-pulse');
       el.style.setProperty('--pulse-speed', (pulseSpeed || 1.5) + 's');
-      break;
-
-    case 'shake':
-      if (shakeIntensity === 'light') el.classList.add('effect-shake-light');
-      else if (shakeIntensity === 'heavy') el.classList.add('effect-shake-heavy');
-      else el.classList.add('effect-shake-normal');
       break;
 
     case 'glow':
@@ -311,150 +298,42 @@ function applyEffects(el, effectName, glowEnabled, glowColor, glowIntensity,
   }
 }
 
-/* ---- Particle system (continuous, no reset) ---- */
-(function injectParticleKeyframes() {
-  const s = document.createElement('style');
-  s.textContent =
-    '@keyframes particleRise {\n' +
-    '  0%   { transform: translateY(100vh) translateX(0); opacity: 0; }\n' +
-    '  10%  { opacity: 0.7; }\n' +
-    '  90%  { opacity: 0.2; }\n' +
-    '  100% { transform: translateY(-10vh) translateX(var(--drift, 0px)); opacity: 0; }\n' +
-    '}\n';
-  document.head.appendChild(s);
-})();
-
-function spawnParticle(container, color) {
-  const p = document.createElement('div');
-  p.className = 'particle';
-  const size = 2 + Math.random() * 5;
-  p.style.width = size + 'px';
-  p.style.height = size + 'px';
-  p.style.background = color || '#FFD700';
-  p.style.left = Math.random() * 100 + '%';
-  p.style.bottom = '-5%';
-  p.style.boxShadow = '0 0 ' + (size * 2) + 'px ' + (color || '#FFD700');
-  const duration = 6 + Math.random() * 8;
-  const delay = Math.random() * 4;
-  const drift = (Math.random() - 0.5) * 60;
-  p.style.animation = 'particleRise ' + duration + 's ease-in ' + delay + 's forwards';
-  p.style.setProperty('--drift', drift + 'px');
-  container.appendChild(p);
-  // T3.5: track the timeout so updateParticles can cancel pending removals
-  // before wiping the container DOM, preventing late removeChild() on a node
-  // that no longer belongs to the live document.
-  const tid = setTimeout(function() {
-    if (p.parentNode) p.parentNode.removeChild(p);
-    const idx = particleTimeouts.indexOf(tid);
-    if (idx >= 0) particleTimeouts.splice(idx, 1);
-  }, (duration + delay) * 1000 + 100);
-  particleTimeouts.push(tid);
-}
-
-/* ---- Confetti celebration ---- */
-var _confettiTimeout = null;
-function spawnConfetti() {
-  var container = document.getElementById('confetti-container');
-  if (!container) return;
-  // Clear previous confetti
-  container.innerHTML = '';
-  if (_confettiTimeout) { clearTimeout(_confettiTimeout); _confettiTimeout = null; }
-  var colors = ['#FF6B6B','#4ECDC4','#FFE66D','#FF4444','#00FF88','#FFD700','#FF69B4','#66CCFF','#AA66FF'];
-  for (var i = 0; i < 60; i++) {
-    var piece = document.createElement('div');
-    piece.className = 'confetti-piece';
-    var size = 4 + Math.random() * 8;
-    piece.style.width = size + 'px';
-    piece.style.height = (size * (0.4 + Math.random() * 0.8)) + 'px';
-    piece.style.background = colors[Math.floor(Math.random() * colors.length)];
-    piece.style.left = (Math.random() * 100) + '%';
-    piece.style.setProperty('--fall-dur', (2 + Math.random() * 3) + 's');
-    piece.style.animationDelay = (Math.random() * 2) + 's';
-    piece.style.borderRadius = Math.random() > 0.5 ? '50%' : '2px';
-    container.appendChild(piece);
-  }
-  // Auto-cleanup after animation
-  _confettiTimeout = setTimeout(function() {
-    if (container) container.innerHTML = '';
-    _confettiTimeout = null;
-  }, 6000);
-}
-
-function updateParticles(enabled, count, color) {
-  particleColor_ = color || '#FFD700';
-  particleCount_ = (count > 0 ? count : 15);
-  if (!particleContainer) particleContainer = document.getElementById('particle-container');
-  if (!particleContainer) return;
-
-  // Clear existing interval if any
-  if (particleContainer._timer) {
-    clearInterval(particleContainer._timer);
-    particleContainer._timer = null;
-  }
-  // T3.5: cancel pending particle removal timeouts so they don't fire after we
-  // wipe the container innerHTML (which would otherwise throw on removeChild).
-  particleTimeouts.forEach(clearTimeout);
-  particleTimeouts = [];
-  // Remove existing particles
-  particleContainer.innerHTML = '';
-
-  if (enabled && particleCount_ > 0) {
-    // Initial burst — A4: tracked in particleTimeouts so updateParticles(false)
-    // can cancel pending burst spawns before they fire on a cleared container.
-    for (let i = 0; i < Math.min(particleCount_, 10); i++) {
-      const tid = setTimeout(function() { spawnParticle(particleContainer, particleColor_); }, i * 200);
-      particleTimeouts.push(tid);
-    }
-    // Continuous spawn
-    particleContainer._timer = setInterval(function() {
-      spawnParticle(particleContainer, particleColor_);
-    }, Math.max(600, 3000 / particleCount_));
-  }
-}
-
 function updateEffects(data) {
-  if (!effectConfigChanged(data)) return; // skip if same config
+  if (!effectConfigChanged(data)) return;
 
-  const titleEl = document.getElementById('title');
-  const counterEl = document.getElementById('counter');
-  const subtitleEl = document.getElementById('subtitle');
+  var titleEl = document.getElementById('title');
+  var counterEl = document.getElementById('counter');
+  var subtitleEl = document.getElementById('subtitle');
 
-  applyEffects(titleEl,
+  if (titleEl) applyEffects(titleEl,
     data.title_effect || 'none',
     data.title_glow_enabled,
     data.glow_color,
     data.glow_intensity_px || 8,
-    data.wave_colors,
-    data.pulse_speed_s,
-    data.shake_intensity);
+    data.pulse_speed_s);
 
-  applyEffects(counterEl,
+  if (counterEl) applyEffects(counterEl,
     data.counter_effect || 'none',
     data.counter_glow_enabled,
     data.glow_color,
     data.glow_intensity_px || 8,
-    data.wave_colors,
-    data.pulse_speed_s,
-    data.shake_intensity);
+    data.pulse_speed_s);
 
-  applyEffects(subtitleEl,
+  if (subtitleEl) applyEffects(subtitleEl,
     data.subtitle_effect || 'none',
     data.subtitle_glow_enabled,
     data.glow_color,
     data.glow_intensity_px || 8,
-    data.wave_colors,
-    data.pulse_speed_s,
-    data.shake_intensity);
-
-  // Particles (global)
-  updateParticles(data.particles_enabled, data.particle_count || 15, data.particle_color);
+    data.pulse_speed_s);
 }
 
 function applyStyles(el, styleObj) {
-  el.style.fontSize = (styleObj.font_size_px || 48) + 'px';
-  el.style.color = styleObj.font_color || '#FFFFFF';
-  el.style.fontFamily = styleObj.font_family || 'Segoe UI, sans-serif';
-  el.style.fontWeight = styleObj.bold ? 'bold' : 'normal';
+  // Aplicar cada campo del struct de estilo a su propiedad CSS.
+  // Usar !== undefined para permitir valores falsy como 0 o ''.
+  if (styleObj.font_size_px !== undefined) el.style.fontSize = styleObj.font_size_px + 'px';
+  if (styleObj.font_color !== undefined) el.style.color = styleObj.font_color;
+  if (styleObj.font_family !== undefined) el.style.fontFamily = styleObj.font_family;
+  if (styleObj.bold !== undefined) el.style.fontWeight = styleObj.bold ? 'bold' : 'normal';
 }
 
 function formatTime(seconds) {
@@ -511,44 +390,48 @@ function showPopup(icon, label, delta) {
 function styleEqual(a, b) {
   if (a === b) return true;
   if (!a || !b) return false;
-  return a.font_size_px === b.font_size_px
-    && a.font_color === b.font_color
-    && a.font_family === b.font_family
-    && a.bold === b.bold;
+  // Comparar todas las keys — no se rompe si el struct crece.
+  var keysA = Object.keys(a);
+  var keysB = Object.keys(b);
+  if (keysA.length !== keysB.length) return false;
+  for (var i = 0; i < keysA.length; i++) {
+    if (a[keysA[i]] !== b[keysA[i]]) return false;
+  }
+  return true;
 }
 
 // O5: moved to module scope so it isn't redefined on every poll.
 function setCounterState(counterEl, state, effectName) {
   counterEl.classList.remove('danger', 'warning', 'completed', 'paused-state');
-  const noEffect = !effectName || effectName === 'none';
-  const wantPulse = (state === 'danger' || state === 'completed') && noEffect;
+  var noEffect = !effectName || effectName === 'none';
+  var wantPulse = (state === 'danger' || state === 'completed') && noEffect;
   if (state) counterEl.classList.add(state);
   if (wantPulse) counterEl.classList.add('counter-danger-pulse');
   else counterEl.classList.remove('counter-danger-pulse');
-}
-
-// V2: barra de progreso sutil (sin fondo, solo borde inferior)
-function updateProgressBar(remainingSeconds, initialSeconds, maxTimeS) {
-  const bar = document.getElementById('progress-bar');
-  if (!bar) return;
-  const total = maxTimeS > 0 ? maxTimeS : initialSeconds;
-  if (total <= 0) { bar.style.width = '0%'; return; }
-  const pct = Math.min(100, Math.max(0, (remainingSeconds / total) * 100));
-  bar.style.width = pct + '%';
-  // danger < 10%, warning < 30%
-  bar.className = pct <= 10 ? 'danger' : pct <= 30 ? 'warning' : '';
+  // Aplicar color del preset para estados danger/warning/completed
+  var presetColors = PRESET_COLORS[currentColorPreset] || PRESET_COLORS['neon-green'];
+  if (state === 'danger' || state === 'completed') {
+    counterEl.style.color = presetColors.danger;
+  } else if (state === 'warning') {
+    counterEl.style.color = presetColors.warning;
+  }
+  // Si no hay estado especial, el color lo maneja applyColorPreset o applyStyles
 }
 
 // V5: bump animation en el contador cuando se agrega tiempo
-let bumpTimer = null;
+var bumpTimer = null;
 function triggerCounterBump() {
-  const el = document.getElementById('counter');
+  var el = document.getElementById('counter');
   if (!el) return;
-  if (bumpTimer) { clearTimeout(bumpTimer); el.style.transform = ''; }
+  if (bumpTimer) { clearTimeout(bumpTimer); bumpTimer = null; }
+  // Guardar transition original y restaurar despues del bump
+  var savedTransition = el.style.transition;
   el.style.transition = 'transform 0.15s ease-out';
   el.style.transform = 'scale(1.08)';
   bumpTimer = setTimeout(function() {
     el.style.transform = 'scale(1)';
+    // Restaurar transition original (o limpiar si no habia)
+    el.style.transition = savedTransition;
     bumpTimer = null;
   }, 150);
 }
@@ -614,10 +497,20 @@ function playAddSound(data) {
   } catch (e) {}
 }
 
+var pollDelay = 500;
+var abortController = null;
+
 function updateOverlay() {
-  fetch(API_STATE)
-    .then(r => r.json())
-    .then(data => {
+  // Cancelar request anterior si aun esta en vuelo
+  if (abortController) { abortController.abort(); }
+  abortController = new AbortController();
+
+  fetch(API_STATE, { signal: abortController.signal })
+    .then(function(r) {
+      if (!r.ok) throw new Error('HTTP ' + r.status);
+      return r.json();
+    })
+    .then(function(data) {
       const titleEl = document.getElementById('title');
       const counterEl = document.getElementById('counter');
       const subtitleEl = document.getElementById('subtitle');
@@ -631,13 +524,9 @@ function updateOverlay() {
       if (data.sessionId !== undefined && data.sessionId !== currentSessionId) {
         currentSessionId = data.sessionId;
         lastShownEventId = 0;
-        confettiSpawned = false;
         effectState = null;
       }
-      // T1.2: confetti must not spawn again on a completion that just un-set.
-      if (!data.completed) confettiSpawned = false;
       if (data.enabled === false) {
-        confettiSpawned = false;
         effectState = null;
       }
 
@@ -683,7 +572,13 @@ function updateOverlay() {
       const counterEffectName = data.counter_effect || 'none';
 
       if (data.enabled === false) {
-        counterEl.textContent = '--:--:--';
+        // V3-fix: no usar textContent (destruye los <span class="digit">).
+        // Escribir '--' en cada grupo de digitos manteniendo la estructura.
+        var digitsDisabled = document.querySelectorAll('#counter .digit');
+        for (var di = 0; di < digitsDisabled.length; di++) {
+          digitsDisabled[di].textContent = '-';
+          digitsDisabled[di].classList.remove('digit-flip', 'digit-roll', 'digit-pop', 'digit-fade');
+        }
         setCounterState(counterEl, null, counterEffectName);
         bannerEl.classList.remove('visible');
       } else if (data.paused) {
@@ -710,11 +605,12 @@ function updateOverlay() {
         bannerEl.classList.remove('visible');
       }
 
-      // V3: aplicar paleta de color y fuente desde el state
-      if (data.color_preset !== undefined && currentColorPreset !== data.color_preset) {
+      // V3: aplicar paleta de color y fuente desde el state (siempre despues de applyStyles
+      // para que counter_font tenga prioridad sobre counterStyle.font_family)
+      if (data.color_preset !== undefined) {
         applyColorPreset(data.color_preset);
       }
-      if (data.counter_font !== undefined && currentCounterFont !== data.counter_font) {
+      if (data.counter_font !== undefined) {
         applyCounterFont(data.counter_font);
       }
       if (data.digit_effect !== undefined && currentDigitEffect !== data.digit_effect) {
@@ -735,37 +631,28 @@ function updateOverlay() {
       // T1.4: completion + tick audio driven by JSON state from the backend.
       applySounds(data);
 
-      // T3.3: success resets the backoff; the next poll is scheduled below.
-      pollDelay = 500;
+      // T3.3: success — reducir backoff gradualmente hasta el minimo.
+      pollDelay = Math.max(500, pollDelay * 0.75);
     })
-    .catch(() => {
-      const errorEl = document.getElementById('connection-error');
+    .catch(function(err) {
+      // AbortError: request cancelado por el siguiente poll (normal, ignorar).
+      if (err && err.name === 'AbortError') return;
+      var errorEl = document.getElementById('connection-error');
       if (errorEl) errorEl.style.display = 'block';
-      // T3.3: exponential backoff capped at 5s when the panel is unreachable.
+      // Exponential backoff capped at 5s when the panel is unreachable.
       pollDelay = Math.min(5000, pollDelay * 2);
     });
-  // T3.3: chain the next poll regardless of success/failure (replaces setInterval).
   schedulePoll();
 }
 
-// T3.3: poll scheduling with adaptive backoff — never use setInterval.
-let pollDelay = 500;
+// T3.3: poll scheduling with adaptive backoff + recovery.
 function schedulePoll() { setTimeout(updateOverlay, pollDelay); }
 
 schedulePoll();
 
-// A12: cancel pending timeouts and audio on unload so popups and ticks
-// don't fire against a torn-down DOM / Audio element. Browsers throttle or
-// ignore setTimeout after the page is being torn down, but cancelTimeout is
-// cheap and keeps behaviour deterministic during hot reloads.
+// A12: cancel audio on unload so ticks and completion sounds don't fire
+// against a torn-down DOM / Audio element.
 window.addEventListener('beforeunload', function() {
-  particleTimeouts.forEach(clearTimeout);
-  particleTimeouts = [];
-  if (_confettiTimeout) { clearTimeout(_confettiTimeout); _confettiTimeout = null; }
-  if (particleContainer && particleContainer._timer) {
-    clearInterval(particleContainer._timer);
-    particleContainer._timer = null;
-  }
   if (tickAudio) { try { tickAudio.pause(); } catch (e) {} tickAudio = null; }
   if (addAudio) { try { addAudio.pause(); } catch (e) {} addAudio = null; }
   if (completeAudio) { try { completeAudio.pause(); } catch (e) {} completeAudio = null; }
@@ -777,6 +664,11 @@ function renderDigits(digitStr, effect) {
   var digits = groups.length > 0 ? groups[0].parentElement.querySelectorAll('.digit') : [];
   if (digits.length === 0) return;
   var str = digitStr || '';
+  // Si la cadena es mas larga que los digitos disponibles (ej. "1 dia 010203"),
+  // tomar solo los ultimos N caracteres (la parte HHMMSS).
+  if (str.length > digits.length) {
+    str = str.slice(str.length - digits.length);
+  }
   for (var i = 0; i < digits.length; i++) {
     var newChar = i < str.length ? str[i] : '0';
     if (lastDigits[i] !== newChar) {
@@ -791,19 +683,35 @@ function renderDigits(digitStr, effect) {
   }
 }
 
-// V3: apply color preset CSS class
+// V3: apply color preset — sets CSS class AND inline counter color
+// para que el preset tenga efecto visual real (no solo CSS vars sin consumir).
+var PRESET_COLORS = {
+  'neon-green':  { counter: '#00FF88', warning: '#FF8C00', danger: '#FF4444' },
+  'cyber-blue':  { counter: '#00D4FF', warning: '#FFB800', danger: '#FF3366' },
+  'clean-white': { counter: '#FFFFFF', warning: '#FFCC00', danger: '#FF4444' },
+  'rose-gold':   { counter: '#FF6B8A', warning: '#FFB347', danger: '#CC1144' }
+};
+var VALID_PRESETS = Object.keys(PRESET_COLORS);
 function applyColorPreset(preset) {
   var counter = document.getElementById('counter');
   if (!counter) return;
+  if (!preset || VALID_PRESETS.indexOf(preset) === -1) preset = 'neon-green';
+  // Actualizar clase CSS (para vars que puedan usar otros elementos)
   counter.className = counter.className.replace(/\bpreset-\S+/g, '');
-  if (preset && preset !== 'none') counter.classList.add('preset-' + preset);
+  counter.classList.add('preset-' + preset);
+  // Aplicar color del preset como inline (vence a counter_font_color del panel)
+  var colors = PRESET_COLORS[preset];
+  counter.style.color = colors.counter;
   currentColorPreset = preset;
 }
 
 // V3: apply counter font
+// La validacion primaria ocurre en el backend. Capa defensiva en el overlay.
+var VALID_FONTS = ['Space Mono', 'JetBrains Mono', 'Share Tech Mono', 'Segoe UI'];
 function applyCounterFont(font) {
   var counter = document.getElementById('counter');
   if (!counter) return;
+  if (!font || VALID_FONTS.indexOf(font) === -1) font = 'Space Mono';
   counter.style.fontFamily = '"' + font + '", monospace';
   currentCounterFont = font;
 }
