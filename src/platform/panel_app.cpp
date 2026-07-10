@@ -825,7 +825,7 @@ bool PanelApp::save_timer_state() {
     try {
         using nlohmann::ordered_json;
         ordered_json root;
-        root["version"] = 1;
+        root["version"] = 2;
 
         // Serialize GameConfig
         ordered_json config_json = ordered_json::object();
@@ -932,6 +932,12 @@ bool PanelApp::load_timer_state() {
             const auto root = nlohmann::json::parse(buffer.str(), nullptr, false);
             if (root.is_discarded() || !root.is_object()) return false;
 
+            // B8: migracion de version de save.
+            // Version 1->2: mergear config pero resetear state runtime
+            // (timer fresco post-update).
+            const int save_version = root.value("version", 0);
+            const bool needs_state_reset = save_version < 2;
+
             // 1. Restore config
             gamesdk::GameConfig saved_config = live_timer_game_->default_config();
             const auto it_cfg = root.find("config");
@@ -949,6 +955,13 @@ bool PanelApp::load_timer_state() {
                 }
             }
             live_timer_game_->apply_config(saved_config);
+
+            // B8: si el save es pre-migracion, reseteamos state runtime
+            // en vez de restaurarlo — el timer arranca fresco post-update.
+            if (needs_state_reset) {
+                live_timer_game_->arm();
+                return true;
+            }
 
             // 2. Restore saved runtime state
             const auto it_st = root.find("state");

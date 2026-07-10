@@ -118,7 +118,9 @@ PanelDiagnosticsReport PanelDiagnosticsBuilder::build(const PanelSnapshot& snaps
     }
 
     if (snapshot.external_bridge.external_mode) {
-        if (snapshot.external_bridge.runtime_checked) {
+        // En auto-demo (sin target_user) no hay bridge TikTok activo;
+        // el check de runtime no debe reportarse como error.
+        if (snapshot.external_bridge.runtime_checked && !snapshot.external_bridge.target_user.empty()) {
             if (snapshot.external_bridge.runtime_ready) {
                 report.entries.push_back(make_entry(
                     PanelDiagnosticLevel::info,

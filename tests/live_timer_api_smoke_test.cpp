@@ -9,7 +9,19 @@
 #include "test_require.hpp"
 #include "test_support.hpp"
 
+static void cleanup_stale_timer_save() {
+    // ctest ejecuta tests en orden alfabetico y comparte %TEMP%.
+    // Un save stale de otro test (o ejecucion anterior) puede
+    // contaminar el estado del timer al cargarlo.
+    const char* tmp = std::getenv("TEMP");
+    if (!tmp) tmp = "C:\\Windows\\Temp";
+    auto save_path = std::filesystem::path(tmp) / "NisojeStudio" / "live_timer_save.json";
+    std::error_code ec;
+    std::filesystem::remove(save_path, ec);
+}
+
 int main() {
+    cleanup_stale_timer_save();
     std::puts("live_timer_api_smoke cp1: standalone timer works");
     std::fflush(stdout);
 

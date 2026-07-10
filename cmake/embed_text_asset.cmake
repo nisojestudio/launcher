@@ -8,8 +8,15 @@ endif()
 
 # Verify the input file is not binary (contains null bytes)
 file(READ "${INPUT}" FILE_HEX HEX)
-string(FIND "${FILE_HEX}" "00" NULL_BYTE_POS)
-if(NOT ${NULL_BYTE_POS} EQUAL -1)
+string(REGEX MATCHALL ".." BYTE_PAIRS "${FILE_HEX}")
+set(HAS_NULL_BYTE FALSE)
+foreach(BYTE_PAIR ${BYTE_PAIRS})
+    if(BYTE_PAIR STREQUAL "00")
+        set(HAS_NULL_BYTE TRUE)
+        break()
+    endif()
+endforeach()
+if(HAS_NULL_BYTE)
     message(WARNING
         "embed_text_asset: input '${INPUT}' contains null bytes; "
         "the embedded string_view will be truncated at the first null byte. "
