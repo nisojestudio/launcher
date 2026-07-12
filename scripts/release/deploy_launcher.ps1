@@ -14,6 +14,8 @@ param(
 
     [switch]$SkipSitioUpdate,
 
+    [switch]$AllowDirty,
+
     [switch]$DryRun
 )
 
