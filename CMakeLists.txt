@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.27)
-project(NisojeLivePanelV3 VERSION 0.2.19 LANGUAGES CXX)
+project(NisojeLivePanelV3 VERSION 0.2.22 LANGUAGES CXX)
 
 set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
