@@ -4,6 +4,26 @@ All notable Panel Live changes should be recorded here.
 
 Format follows a lightweight Keep a Changelog style. Versions use SemVer.
 
+## 0.2.23 - 2026-07-12
+
+### Fixed
+
+- **Overlay timer se congelaba durante streaming**: El mecanismo de polling del overlay (`live-timer.html`) llamaba `schedulePoll()` sincrónicamente antes de que el `fetch` completara. Si el servidor tardaba >500ms en responder, cada petición era abortada por la siguiente, creando un congelamiento permanente del contador. Corregido moviendo `schedulePoll()` al `.finally()` de la promesa.
+
+- **Contador sin fluidez sub-segundo**: El overlay dependía 100% del polling HTTP para actualizar el display. Cualquier latencia de red se traducía en saltos visuales. Agregado reloj local con `requestAnimationFrame` que descuenta suavemente (~60fps) desacoplado de la red. El servidor solo se consulta cada ~3s para resincronizar.
+
+### Changed
+
+- **Poll interval relajado a 3s cuando el reloj local está activo**: Reduce carga del servidor sin afectar la fluidez visual.
+- **Backoff adaptativo diferenciado**: Cuando el reloj local corre, los errores de red no penalizan el intervalo de polling (máximo 5s con factor 1.5x en vez de 2x).
+
+### Verified
+
+- Overlay timer fluido segundo a segundo con red desconectada (reloj local mantiene el tic).
+- Resincronización correcta al recuperar conexión.
+- Sonidos tick/add/completion usan tiempo local preciso.
+- Estados paused/completed/disabled detienen el reloj local correctamente.
+
 ## 0.2.22 - 2026-07-12
 
 ### Fixed

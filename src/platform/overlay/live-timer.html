@@ -249,6 +249,14 @@ let addAudio = null;
 let completeAudio = null;
 let lastTickSecondPlayed = -1;
 
+// Local clock — mantiene el contador fluido segundo a segundo
+// desacoplado de la latencia del polling HTTP.
+let localRemainingSeconds = 0;
+let localLastSyncMs = 0;
+let localRunning = false;
+let localRafId = null;
+let localCounterEffectName = 'none';
+
 function clampVolume(v) {
   v = Number(v) || 0;
   if (v < 0) return 0;
@@ -475,6 +483,57 @@ function triggerCounterBump() {
   }, 150);
 }
 
+/* ---- Local clock: contador fluido desacoplado del polling ---- */
+function startLocalClock(remainingSeconds) {
+  localRemainingSeconds = remainingSeconds;
+  localLastSyncMs = performance.now();
+  if (!localRunning) {
+    localRunning = true;
+    localRafId = requestAnimationFrame(tickLocalClock);
+  }
+}
+
+function stopLocalClock() {
+  localRunning = false;
+  if (localRafId !== null) {
+    cancelAnimationFrame(localRafId);
+    localRafId = null;
+  }
+}
+
+function tickLocalClock(timestamp) {
+  if (!localRunning) return;
+  var elapsedMs = timestamp - localLastSyncMs;
+  localRemainingSeconds -= elapsedMs / 1000;
+  if (localRemainingSeconds < 0) localRemainingSeconds = 0;
+
+  // Renderizar digitos con el tiempo local
+  var formatted = formatTime(localRemainingSeconds);
+  var parsed = splitDaysFromTime(formatted);
+  showDaysLabel(parsed.days);
+  renderDigits(parsed.time.replace(/:/g, ''), currentDigitEffect);
+
+  // Danger / warning segun el tiempo local
+  var counterEl = document.getElementById('counter');
+  if (counterEl) {
+    if (localRemainingSeconds <= 10) {
+      setCounterState(counterEl, 'danger', localCounterEffectName);
+    } else if (localRemainingSeconds <= 60) {
+      setCounterState(counterEl, 'warning', localCounterEffectName);
+    } else {
+      setCounterState(counterEl, null, localCounterEffectName);
+    }
+  }
+
+  if (localRemainingSeconds > 0) {
+    localRafId = requestAnimationFrame(tickLocalClock);
+  } else {
+    // Llegó a cero — detener reloj; el proximo poll confirmara completed
+    stopLocalClock();
+  }
+}
+/* ---- Fin local clock ---- */
+
 // T1.4: completion audio driven by JSON state. Empty path = silence (never a
 // fallback beep). The backend ships only configuration; playback lives here.
 function applySounds(data) {
@@ -536,12 +595,18 @@ function playAddSound(data) {
   } catch (e) {}
 }
 
-var pollDelay = 500;
+var pollDelay = 1000;
 var abortController = null;
 var pollGeneration = 0;
 
+// F3.1: schedulePoll se llama SOLO dentro de finally() para evitar el bug
+// autodestructivo donde cada fetch es abortado por el siguiente antes de
+// completarse. El backoff adaptativo asi toma efecto real en el siguiente poll.
+function schedulePoll() { setTimeout(updateOverlay, pollDelay); }
+
+schedulePoll();
+
 function updateOverlay() {
-  // Cancelar request anterior si aun esta en vuelo
   if (abortController) { abortController.abort(); }
   abortController = new AbortController();
   var gen = ++pollGeneration;
@@ -552,7 +617,6 @@ function updateOverlay() {
       return r.json();
     })
     .then(function(data) {
-      // Ignorar respuesta si ya se lanzó un nuevo poll (stale response guard)
       if (gen !== pollGeneration) return;
       const titleEl = document.getElementById('title');
       const counterEl = document.getElementById('counter');
@@ -562,31 +626,26 @@ function updateOverlay() {
       const errorEl = document.getElementById('connection-error');
       if (errorEl) errorEl.style.display = 'none';
 
-      // T1.3: detect session switches (arm/activate/restore) and reset the
-      // event cursor + cached effect/glow state so the overlay re-syncs.
+      // Session switch
       if (data.sessionId !== undefined && data.sessionId !== currentSessionId) {
         currentSessionId = data.sessionId;
         lastShownEventId = 0;
         effectState = null;
+        stopLocalClock();
       }
       if (data.enabled === false) {
         effectState = null;
       }
 
-      // Show preview badge when idle (not running, not completed, enabled)
+      // Preview badge
       const isLive = data.running && !data.paused && !data.completed;
       const showPreview = !isLive && data.enabled !== false && !data.completed;
-      if (previewBadge) {
-        previewBadge.classList.toggle('visible', showPreview);
-      }
+      if (previewBadge) previewBadge.classList.toggle('visible', showPreview);
       subtitleEl.classList.toggle('preview', showPreview);
 
-      if (data.title !== undefined && titleEl.textContent !== data.title) {
-        titleEl.textContent = data.title;
-      }
-      if (data.subtitle !== undefined && subtitleEl.textContent !== data.subtitle) {
-        subtitleEl.textContent = data.subtitle;
-      }
+      // Textos y estilos (siempre se actualizan)
+      if (data.title !== undefined && titleEl.textContent !== data.title) titleEl.textContent = data.title;
+      if (data.subtitle !== undefined && subtitleEl.textContent !== data.subtitle) subtitleEl.textContent = data.subtitle;
 
       if (!styleEqual(styles.title, data.titleStyle)) {
         applyStyles(titleEl, data.titleStyle || {font_size_px: 48, font_color: '#FFFFFF', font_family: 'Segoe UI, sans-serif', bold: true});
@@ -603,103 +662,97 @@ function updateOverlay() {
 
       if (data.popupAddColor) popupColors.add = data.popupAddColor;
       if (data.popupSubtractColor) popupColors.subtract = data.popupSubtractColor;
-
       if (data.completedText !== undefined) completedStyle.text = data.completedText;
       if (data.completedTextColor !== undefined) completedStyle.color = data.completedTextColor;
       if (data.completedTextSize !== undefined) completedStyle.size = data.completedTextSize;
 
-      // Apply visual effects (sets effect classes only)
+      // Efectos visuales
       updateEffects(data);
 
-      // Set counter state class (preserves effect classes).
-      const counterEffectName = data.counter_effect || 'none';
+      // Cachear el nombre del efecto para el reloj local
+      localCounterEffectName = data.counter_effect || 'none';
 
-      if (data.enabled === false) {
-        showDaysLabel('');
-        // V3-fix: no usar textContent (destruye los <span class="digit">).
-        // Escribir '--' en cada grupo de digitos manteniendo la estructura.
-        var digitsDisabled = document.querySelectorAll('#counter .digit');
-        for (var di = 0; di < digitsDisabled.length; di++) {
-          digitsDisabled[di].textContent = '-';
-          digitsDisabled[di].classList.remove('digit-flip', 'digit-roll', 'digit-pop', 'digit-fade');
-          lastDigits[di] = '-';
-        }
-        setCounterState(counterEl, null, counterEffectName);
-        bannerEl.classList.remove('visible');
-      } else if (data.paused) {
-        var parsedPaused = splitDaysFromTime(data.format || formatTime(data.remainingSeconds));
-        showDaysLabel(parsedPaused.days);
-        renderDigits(parsedPaused.time.replace(/:/g, ''), currentDigitEffect);
-        setCounterState(counterEl, 'warning', counterEffectName);
-        bannerEl.classList.remove('visible');
-      } else if (data.completed) {
-        showDaysLabel('');
-        renderDigits('000000', currentDigitEffect);
-        // Sincronizar lastDigits para evitar animaciones no deseadas al salir de completed
-        for (var ci = 0; ci < lastDigits.length; ci++) lastDigits[ci] = '0';
-        setCounterState(counterEl, 'completed', counterEffectName);
-        bannerEl.textContent = completedStyle.text;
-        bannerEl.style.color = completedStyle.color;
-        bannerEl.style.fontSize = completedStyle.size + 'px';
-        bannerEl.classList.add('visible');
-      } else {
-        const formattedRunning = data.format || formatTime(data.remainingSeconds);
-        var parsedRunning = splitDaysFromTime(formattedRunning);
-        showDaysLabel(parsedRunning.days);
-        renderDigits(parsedRunning.time.replace(/:/g, ''), currentDigitEffect);
-        if (data.remainingSeconds <= 10) {
-          setCounterState(counterEl, 'danger', counterEffectName);
-        } else if (data.remainingSeconds <= 60) {
-          setCounterState(counterEl, 'warning', counterEffectName);
-        } else {
-          setCounterState(counterEl, null, counterEffectName);
-        }
-        bannerEl.classList.remove('visible');
-      }
-
-      // V3: aplicar paleta de color desde el state (despues de applyStyles)
-      if (data.color_preset !== undefined) {
-        applyColorPreset(data.color_preset);
-      }
-      // V3: font-family for the counter is handled by counterStyle.font_family from the panel.
-      // The merged "Fuente" dropdown supplies mono font options (Space Mono, JetBrains Mono,
-      // Share Tech Mono) alongside standard fonts.
+      // V3: paleta + digit effect
+      if (data.color_preset !== undefined) applyColorPreset(data.color_preset);
       if (data.digit_effect !== undefined && currentDigitEffect !== data.digit_effect) {
         currentDigitEffect = data.digit_effect;
       }
 
+      // F3.2: decidir estado del display y del reloj local
+      if (data.enabled === false) {
+        stopLocalClock();
+        showDaysLabel('');
+        var digitsDis = document.querySelectorAll('#counter .digit');
+        for (var di = 0; di < digitsDis.length; di++) {
+          digitsDis[di].textContent = '-';
+          digitsDis[di].classList.remove('digit-flip', 'digit-roll', 'digit-pop', 'digit-fade');
+          lastDigits[di] = '-';
+        }
+        setCounterState(counterEl, null, localCounterEffectName);
+        bannerEl.classList.remove('visible');
+        pollDelay = Math.max(1000, pollDelay * 0.5);
+      } else if (data.paused) {
+        stopLocalClock();
+        var parsedPaused = splitDaysFromTime(data.format || formatTime(data.remainingSeconds));
+        showDaysLabel(parsedPaused.days);
+        renderDigits(parsedPaused.time.replace(/:/g, ''), currentDigitEffect);
+        setCounterState(counterEl, 'warning', localCounterEffectName);
+        bannerEl.classList.remove('visible');
+        pollDelay = Math.max(1000, pollDelay * 0.5);
+      } else if (data.completed) {
+        stopLocalClock();
+        showDaysLabel('');
+        renderDigits('000000', currentDigitEffect);
+        for (var cci = 0; cci < lastDigits.length; cci++) lastDigits[cci] = '0';
+        setCounterState(counterEl, 'completed', localCounterEffectName);
+        bannerEl.textContent = completedStyle.text;
+        bannerEl.style.color = completedStyle.color;
+        bannerEl.style.fontSize = completedStyle.size + 'px';
+        bannerEl.classList.add('visible');
+        pollDelay = Math.max(1000, pollDelay * 0.5);
+      } else {
+        // Running — iniciar o resincronizar reloj local
+        startLocalClock(data.remainingSeconds);
+        // F3.3: polling relajado a 3s cuando el reloj local mantiene la fluidez
+        pollDelay = Math.max(3000, pollDelay * 0.75);
+        // No renderizar digitos aqui — el reloj local lo hace via RAF
+        bannerEl.classList.remove('visible');
+      }
+
+      // Eventos recientes (popups)
       if (data.recentEvents) {
-        data.recentEvents.forEach(ev => {
+        data.recentEvents.forEach(function(ev) {
           if (!ev.id || ev.id > lastShownEventId) {
             showPopup(ev.icon, ev.label, ev.delta);
             if (ev.id) lastShownEventId = ev.id;
-            // T1.4: play the add chime for genuine time gains only.
             if (ev.isAddition && ev.delta > 0) { playAddSound(data); triggerCounterBump(); }
           }
         });
       }
 
-      // T1.4: completion + tick audio driven by JSON state from the backend.
+      // F3.4: sonidos con tiempo local si el reloj esta activo
+      if (localRunning) {
+        data.remainingSeconds = localRemainingSeconds;
+        data.format = formatTime(localRemainingSeconds);
+      }
       applySounds(data);
-
-      // T3.3: success — reducir backoff gradualmente hasta el minimo.
-      pollDelay = Math.max(500, pollDelay * 0.75);
     })
     .catch(function(err) {
-      // AbortError: request cancelado por el siguiente poll (normal, ignorar).
       if (err && err.name === 'AbortError') return;
       var errorEl = document.getElementById('connection-error');
       if (errorEl) errorEl.style.display = 'block';
-      // Exponential backoff capped at 5s when the panel is unreachable.
-      pollDelay = Math.min(5000, pollDelay * 2);
+      // F3.5: backoff adaptativo — si el reloj local corre, no urgente recuperar rapido
+      if (localRunning) {
+        pollDelay = Math.min(5000, pollDelay * 1.5);
+      } else {
+        pollDelay = Math.min(5000, pollDelay * 2);
+      }
+    })
+    .finally(function() {
+      // F3.1: el proximo poll se programa SOLO cuando este termina
+      schedulePoll();
     });
-  schedulePoll();
 }
-
-// T3.3: poll scheduling with adaptive backoff + recovery.
-function schedulePoll() { setTimeout(updateOverlay, pollDelay); }
-
-schedulePoll();
 
 // A12: cancel audio on unload so ticks and completion sounds don't fire
 // against a torn-down DOM / Audio element.

@@ -107,12 +107,16 @@ Write-Host ""
 # === STEP 1: Prepare release (build + tests + backup + installer + manifest) ===
 Write-Host "[1/6] Preparing release (build, tests, installer, backup)..."
 $prepareScript = Join-Path $projectRoot "scripts\release\prepare_release.ps1"
-Invoke-Checked -FilePath "powershell" -Arguments @(
+$prepareArgs = @(
     "-ExecutionPolicy", "Bypass",
     "-File", $prepareScript,
     "-Version", $Version,
     "-BackupMode", "code"
 )
+if ($AllowDirty) {
+    $prepareArgs += "-AllowDirty"
+}
+Invoke-Checked -FilePath "powershell" -Arguments $prepareArgs
 
 # === STEP 2: GitHub Release ===
 Write-Host "[2/6] Publishing GitHub Release..."
