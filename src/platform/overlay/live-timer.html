@@ -506,6 +506,7 @@ function tickLocalClock(timestamp) {
   var elapsedMs = timestamp - localLastSyncMs;
   localRemainingSeconds -= elapsedMs / 1000;
   if (localRemainingSeconds < 0) localRemainingSeconds = 0;
+  localLastSyncMs = timestamp;
 
   // Renderizar digitos con el tiempo local
   var formatted = formatTime(localRemainingSeconds);
@@ -603,6 +604,66 @@ var pollGeneration = 0;
 // autodestructivo donde cada fetch es abortado por el siguiente antes de
 // completarse. El backoff adaptativo asi toma efecto real en el siguiente poll.
 function schedulePoll() { setTimeout(updateOverlay, pollDelay); }
+
+// === SELF-TEST: ?test=1 ===
+// Verifica que tickLocalClock descuente exactamente 1s por cada segundo real,
+// sin deriva ni aceleracion. Corre 60+ frames de RAF real y compara el
+// remaining contra el tiempo transcurrido en pared.
+(function() {
+  if (!window.location.search.includes('test=1')) return;
+
+  // Prevenir polling normal y efectos visuales durante el test
+  schedulePoll = function() {};
+  var _rd = renderDigits, _sd = showDaysLabel, _sc = setCounterState;
+  var _ae = applyEffects, _ue = updateEffects;
+  renderDigits = function(){};
+  showDaysLabel = function(){};
+  setCounterState = function(){};
+  applyEffects = function(){};
+  updateEffects = function(){};
+
+  var startWall = performance.now();
+  localRemainingSeconds = 60;
+  localLastSyncMs = startWall;
+  localRunning = true;
+  localCounterEffectName = 'none';
+  var frames = 0, testDone = false;
+
+  function testLoop(ts) {
+    if (testDone) return;
+    tickLocalClock(ts);
+    frames++;
+    var wallElapsed = (performance.now() - startWall) / 1000;
+    if (wallElapsed >= 1.0 || frames >= 120 || localRemainingSeconds <= 0) {
+      testDone = true;
+      stopLocalClock();
+      var expected = Math.max(0, 60 - wallElapsed);
+      var diff = Math.abs(localRemainingSeconds - expected);
+      var passed = diff < 0.1; // 100ms tolerance for real-world RAF jitter
+
+      renderDigits = _rd; showDaysLabel = _sd; setCounterState = _sc;
+      applyEffects = _ae; updateEffects = _ue;
+
+      var el = document.createElement('div');
+      el.style.cssText = 'position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);font-size:42px;font-weight:bold;z-index:9999;font-family:monospace;text-align:center;padding:30px 50px;border-radius:16px;';
+      el.style.background = passed ? 'rgba(0,180,0,0.25)' : 'rgba(180,0,0,0.35)';
+      el.style.color = passed ? '#00FF88' : '#FF4444';
+      el.innerHTML = (passed ? 'SELF-TEST PASS' : 'SELF-TEST FAIL') +
+        '<br><span style="font-size:16px;color:#aaa;margin-top:8px;display:block">' +
+        'remaining=' + localRemainingSeconds.toFixed(3) + 's ' +
+        'expected=' + expected.toFixed(3) + 's ' +
+        'diff=' + diff.toFixed(4) + 's ' +
+        'frames=' + frames + ' ' +
+        'wall=' + wallElapsed.toFixed(3) + 's' +
+        '</span>';
+      document.body.innerHTML = '';
+      document.body.appendChild(el);
+      return;
+    }
+    requestAnimationFrame(testLoop);
+  }
+  requestAnimationFrame(testLoop);
+})();
 
 schedulePoll();
 

@@ -4,6 +4,16 @@ All notable Panel Live changes should be recorded here.
 
 Format follows a lightweight Keep a Changelog style. Versions use SemVer.
 
+## 0.2.24 - 2026-07-12
+
+### Fixed
+
+- **Reloj local del overlay acelerado por bug en tickLocalClock**: `tickLocalClock()` no actualizaba `localLastSyncMs` después de cada frame, causando que `elapsedMs` acumulara el tiempo total desde el inicio en vez del delta entre frames. El contador descendía ~30x más rápido y cada resync (cada 3s) lo hacía "saltar hacia atrás". Corregido agregando `localLastSyncMs = timestamp` al final del tick.
+
+### Added
+
+- **Self-test mode (`?test=1`)**: Verifica automáticamente que el reloj local descuente exactamente 1s por cada segundo real, sin deriva. Corre 60+ frames de `requestAnimationFrame` y reporta PASS/FAIL con métricas.
+
 ## 0.2.23 - 2026-07-12
 
 ### Fixed
