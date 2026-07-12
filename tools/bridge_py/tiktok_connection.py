@@ -283,6 +283,8 @@ class TikTokConnection:
             return
         try:
             await self._client.disconnect()
+        except asyncio.CancelledError:
+            pass
         except Exception:
             pass
 

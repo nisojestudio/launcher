@@ -132,14 +132,20 @@ class AsyncEventDispatcher:
 
     async def emit_status(self, status: SessionStatus) -> None:
         if self._panel_ws_sink is not None:
-            await self._panel_ws_sink.send_json(status.to_panel_payload())
+            try:
+                await self._panel_ws_sink.send_json(status.to_panel_payload())
+            except Exception:
+                self._metrics.increment("panel_ws_send_failures_total")
         if self._broadcast_callback is not None:
-            await self._broadcast_callback(
-                {
-                    "message_type": "session_status",
-                    **status.to_panel_payload(),
-                }
-            )
+            try:
+                await self._broadcast_callback(
+                    {
+                        "message_type": "session_status",
+                        **status.to_panel_payload(),
+                    }
+                )
+            except Exception:
+                self._metrics.increment("broadcast_send_failures_total")
 
     async def _worker_loop(self) -> None:
         while self._running:

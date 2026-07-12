@@ -32,6 +32,7 @@
 #include "platform/panel_console.hpp"
 #include "platform/panel_http_json.hpp"
 #include "platform/wall_clock.h"
+#include "platform/port_zombie_detector.hpp"
 #include "platform/overlay_assets.hpp"
 #include "platform/panel_ui_assets.hpp"
 #include "platform/server_license_service.hpp"
@@ -1292,6 +1293,187 @@ std::string handle_support_export(
     return make_support_export_result(nlp3::platform::export_support_bundle(*app, status, reason));
 }
 
+// Normalize TikTok username: @user, https://tiktok.com/@user, etc. -> "user"
+std::string normalize_tiktok_user(std::string_view raw) {
+    std::string s(raw);
+    // Remove @ prefix
+    if (!s.empty() && s[0] == '@') {
+        s.erase(0, 1);
+    }
+    // Remove URL prefix
+    const std::string prefixes[] = {
+        "https://www.tiktok.com/@",
+        "https://tiktok.com/@",
+        "http://www.tiktok.com/@",
+        "http://tiktok.com/@",
+        "www.tiktok.com/@",
+        "tiktok.com/@"
+    };
+    for (const auto& prefix : prefixes) {
+        if (s.rfind(prefix, 0) == 0) {
+            s = s.substr(prefix.size());
+            break;
+        }
+    }
+    // Remove trailing path/query
+    const auto slash = s.find('/');
+    if (slash != std::string::npos) {
+        s = s.substr(0, slash);
+    }
+    const auto query = s.find('?');
+    if (query != std::string::npos) {
+        s = s.substr(0, query);
+    }
+    // Lowercase
+    std::transform(s.begin(), s.end(), s.begin(),
+        [](unsigned char c) { return static_cast<char>(std::tolower(c)); });
+    return s;
+}
+
+bool is_valid_tiktok_user(std::string_view user) {
+    if (user.empty() || user.size() > 24) return false;
+    // TikTok username: alphanumeric + underscore + period, no consecutive periods
+    bool prev_dot = false;
+    for (char c : user) {
+        if ((c >= 'a' && c <= 'z') || (c >= '0' && c <= '9') || c == '_' || c == '.') {
+            if (c == '.') {
+                if (prev_dot) return false;
+                prev_dot = true;
+            } else {
+                prev_dot = false;
+            }
+        } else {
+            return false;
+        }
+    }
+    return !user.empty() && user.front() != '.' && user.back() != '.';
+}
+
+std::string handle_bridge_connect(PanelApp* app, std::string_view body) {
+    if (app == nullptr) {
+        return nlp3::platform::build_panel_http_error_json("panel unavailable");
+    }
+    if (!app->is_external_bridge_mode()) {
+        return make_simple_result(false, "bridge_not_external_mode");
+    }
+
+    auto target_user = parse_json_string(body, "target_user").value_or("");
+    target_user = normalize_tiktok_user(target_user);
+
+    if (!is_valid_tiktok_user(target_user)) {
+        return make_simple_result(false, "invalid_tiktok_user");
+    }
+
+    // 1. Guardar en config persistente
+    app->config().external_target_user = target_user;
+    app->save_config();
+
+    // 2. Iniciar WS server (puerto 8765 exclusivo)
+    const auto port = app->config().external_ws_port == 0 ? static_cast<std::uint16_t>(8765)
+                                                          : app->config().external_ws_port;
+    if (!app->start_external_ws(port)) {
+        return make_simple_result(false, "ws_start_failed");
+    }
+
+    // 3. Iniciar runner (lanza Python bridge)
+    if (!app->start_external_runner(target_user, 0)) {
+        app->stop_external_ws();  // Rollback
+        return make_simple_result(false, "runner_start_failed");
+    }
+
+    return make_simple_result(true, "bridge_connected");
+}
+
+std::string handle_bridge_disconnect(PanelApp* app) {
+    if (app == nullptr) {
+        return nlp3::platform::build_panel_http_error_json("panel unavailable");
+    }
+    if (!app->is_external_bridge_mode()) {
+        return make_simple_result(false, "bridge_not_external_mode");
+    }
+
+    app->stop_external_runner();
+    app->stop_external_ws();
+    app->config().external_target_user.clear();
+    app->save_config();
+
+    return make_simple_result(true, "bridge_disconnected");
+}
+
+std::string handle_bridge_status(PanelApp* app) {
+    if (app == nullptr) {
+        return nlp3::platform::build_panel_http_error_json("panel unavailable");
+    }
+
+    auto ws = app->external_ws_status();
+    auto runner = app->external_runner_status();
+    const auto& cfg = app->config();
+
+    // Build JSON manually for bridge status
+    std::ostringstream out;
+    out << "{"
+        << "\"configured\":" << (cfg.external_target_user.empty() ? "false" : "true") << ","
+        << "\"target_user\":" << json_quote(cfg.external_target_user) << ","
+        << "\"ws_port\":" << (cfg.external_ws_port == 0 ? 8765 : cfg.external_ws_port) << ","
+        << "\"ws_running\":" << (ws.running ? "true" : "false") << ","
+        << "\"ws_port_actual\":" << ws.port << ","
+        << "\"ws_accepted_messages\":" << ws.accepted_messages << ","
+        << "\"ws_rejected_messages\":" << ws.rejected_messages << ","
+        << "\"runner_running\":" << (runner.running ? "true" : "false") << ","
+        << "\"runner_pid\":" << runner.process_id << ","
+        << "\"runner_ws_url\":" << json_quote(runner.ws_url) << ","
+        << "\"runner_error\":" << json_quote(runner.last_error) << ","
+        << "\"runtime_ready\":" << (runner.runtime_ready ? "true" : "false") << ","
+        << "\"runtime_checked\":" << (runner.runtime_checked ? "true" : "false") << ","
+        << "\"runtime_summary\":" << json_quote(runner.runtime_summary) << ","
+        << "\"connection_state\":" << json_quote(app->external_bridge_manifest().connection_state)
+        << "}";
+    return out.str();
+}
+
+std::string handle_diagnostics_ports(PanelApp* app) {
+    if (app == nullptr) {
+        return nlp3::platform::build_panel_http_error_json("panel unavailable");
+    }
+
+    // Usar PortZombieDetector real
+    auto owned = nlp3::platform::PortZombieDetector::scan_owned_ports();
+    auto zombies = nlp3::platform::PortZombieDetector::detect_zombies();
+
+    std::ostringstream out;
+    out << "{"
+        << "\"timestamp_ms\":" << now_wall_clock_ms() << ","
+        << "\"owned_ports\":[";
+    for (size_t i = 0; i < owned.size(); ++i) {
+        if (i > 0) out << ",";
+        out << "{"
+            << "\"port\":" << owned[i].port << ","
+            << "\"in_use\":" << (owned[i].in_use ? "true" : "false") << ","
+            << "\"pid\":" << owned[i].pid << ","
+            << "\"process_name\":" << json_quote(owned[i].process_name) << ","
+            << "\"state\":" << json_quote(owned[i].state) << ","
+            << "\"is_zombie\":" << (owned[i].is_zombie ? "true" : "false")
+            << "}";
+    }
+    out << "],"
+        << "\"zombies\":[";
+    for (size_t i = 0; i < zombies.size(); ++i) {
+        if (i > 0) out << ",";
+        out << "{"
+            << "\"port\":" << zombies[i].port << ","
+            << "\"pid\":" << zombies[i].pid << ","
+            << "\"process_name\":" << json_quote(zombies[i].process_name) << ","
+            << "\"state\":" << json_quote(zombies[i].state)
+            << "}";
+    }
+    out << "],"
+        << "\"clean\":" << (zombies.empty() ? "true" : "false") << ","
+        << "\"bridge_ws_port_free\":" << (nlp3::platform::PortZombieDetector::is_port_free(nlp3::platform::PortZombieDetector::BRIDGE_WS_PORT) ? "true" : "false") << ","
+        << "\"overlay_http_port_free\":" << (nlp3::platform::PortZombieDetector::is_port_free(nlp3::platform::PortZombieDetector::OVERLAY_HTTP_PORT) ? "true" : "false")
+        << "}";
+    return out.str();
+}
+
 std::string build_route_response(
     PanelApp* app,
     const ParsedRequest& request,
@@ -1464,6 +1646,20 @@ std::string build_route_response(
     }
     if (request.method == "POST" && request.path == "/api/update/trigger") {
         return make_http_response("200 OK", "application/json; charset=utf-8", handle_update_trigger(app));
+    }
+    // Bridge API
+    if (request.method == "POST" && request.path == "/api/bridge/connect") {
+        return make_http_response("200 OK", "application/json; charset=utf-8", handle_bridge_connect(app, request.body));
+    }
+    if (request.method == "POST" && request.path == "/api/bridge/disconnect") {
+        return make_http_response("200 OK", "application/json; charset=utf-8", handle_bridge_disconnect(app));
+    }
+    if (request.method == "GET" && request.path == "/api/bridge/status") {
+        return make_http_response("200 OK", "application/json; charset=utf-8", handle_bridge_status(app));
+    }
+    // Diagnostics
+    if (request.method == "GET" && request.path == "/api/diagnostics/ports") {
+        return make_http_response("200 OK", "application/json; charset=utf-8", handle_diagnostics_ports(app));
     }
 
     return make_http_response(

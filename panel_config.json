@@ -1,13 +1,13 @@
 {
   "panel_name": "Nisoje Studio",
-  "default_game_id": "push_esferas",
+  "default_game_id": "arena_live",
   "bridge_mode": "external",
-  "external_target_user": "fs.records",
+  "external_target_user": "senpaii.fb",
   "external_ws_port": 8765,
   "embedded_ui_enabled": true,
   "embedded_ui_fallback_to_browser": true,
   "embedded_ui_devtools": false,
-  "embedded_ui_url": "http://127.0.0.1:18913/",
+  "embedded_ui_url": "https://bee-editors-update-harper.trycloudflare.com/overlay/live-timer",
   "embedded_ui_startup_timeout_ms": 8000,
   "host_energy_level": "balanced",
   "host_tone_style": "warm",
@@ -50,7 +50,7 @@
     "frequency": "normal"
   },
   "tts": {
-    "allow_chat_messages": true,
+    "allow_chat_messages": false,
     "allow_scheduled_messages": true,
     "allow_manual_messages": true,
     "include_actor_name_for_chat": false,
@@ -72,15 +72,13 @@
     "share_thanks_cooldown_ms": 4000,
     "gift_thanks_template": "Gracias por tu apoyo al canal.",
     "follow_thanks_template": "Bienvenido a la comunidad.",
-    "like_thanks_template": "Gracias {user} por enviar {count} likes",
+    "like_thanks_template": "",
     "subscriber_thanks_template": "",
     "share_thanks_template": ""
   },
   "periodic_tts": {
-    "enabled": true,
-    "interval_ms": 120000,
-    "messages": [
-      "Con taptap haces crecer tu avatar y con regalitos comienzas con los ataques, unete a la batalla!"
-    ]
+    "enabled": false,
+    "interval_ms": 60000,
+    "messages": []
   }
 }

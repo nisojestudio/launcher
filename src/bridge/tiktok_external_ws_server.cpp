@@ -6,8 +6,6 @@
 #include <optional>
 #include <string>
 #include <string_view>
-#include <vector>
-
 #include "bridge/tiktok_external_event_codec.hpp"
 #include "bridge/tiktok_external_session_status_codec.hpp"
 #include "platform/panel_app.hpp"
@@ -21,8 +19,6 @@
 #endif
 #include <winsock2.h>
 #include <ws2tcpip.h>
-#include <iphlpapi.h>
-#pragma comment(lib, "iphlpapi.lib")
 #endif
 
 namespace {
@@ -357,73 +353,6 @@ std::string build_server_frame(unsigned char opcode, std::string_view payload) {
     return frame;
 }
 
-void try_cleanup_stale_port_listeners(std::uint16_t target_port) {
-    // Enumerate all TCP listeners to find stale entries on our target port.
-    // Stale listeners are from processes that have crashed or been killed
-    // but whose TCP socket remained in the kernel table (common with
-    // SO_REUSEADDR + TerminateProcess).
-    //
-    // Strategy:
-    //   1. Terminate any living process still holding the port.
-    //   2. Use SetTcpEntry with DELETE_TCB to forcibly remove any remaining
-    //      zombie TCP entries from dead processes. This requires admin
-    //      elevation; if it fails we fall back to SO_REUSEADDR.
-    ULONG buffer_size = 0;
-    ULONG result = GetExtendedTcpTable(
-        nullptr, &buffer_size, FALSE, AF_INET, TCP_TABLE_OWNER_PID_LISTENER, 0);
-    if (result != ERROR_INSUFFICIENT_BUFFER || buffer_size == 0) {
-        return;
-    }
-
-    std::vector<std::uint8_t> buffer(buffer_size);
-    auto* table = reinterpret_cast<MIB_TCPTABLE_OWNER_PID*>(buffer.data());
-    result = GetExtendedTcpTable(
-        table, &buffer_size, FALSE, AF_INET, TCP_TABLE_OWNER_PID_LISTENER, 0);
-    if (result != NO_ERROR) {
-        return;
-    }
-
-    const auto port_network = htons(target_port);
-    for (DWORD index = 0; index < table->dwNumEntries; ++index) {
-        const auto& row = table->table[index];
-        if (row.dwLocalPort != port_network) {
-            continue;
-        }
-        if (row.dwOwningPid == 0) {
-            continue;
-        }
-        if (row.dwOwningPid == GetCurrentProcessId()) {
-            continue;
-        }
-
-        // Check if the owning process is still alive.
-        const auto process_handle = OpenProcess(
-            PROCESS_QUERY_INFORMATION | PROCESS_TERMINATE, FALSE, row.dwOwningPid);
-        if (process_handle != nullptr) {
-            DWORD exit_code = STILL_ACTIVE;
-            if (GetExitCodeProcess(process_handle, &exit_code) && exit_code == STILL_ACTIVE) {
-                // Process is alive — it might be another panel instance.
-                // Try to terminate it so we can claim the port.
-                TerminateProcess(process_handle, 1);
-                WaitForSingleObject(process_handle, 2000);
-            }
-            CloseHandle(process_handle);
-        }
-
-        // Forcibly remove the TCP listener entry from the kernel table.
-        // This handles zombie entries from already-dead processes and any
-        // entries left behind by the termination above.
-        // Requires admin elevation — silently ignored if it fails.
-        MIB_TCPROW delete_row{};
-        delete_row.dwState = MIB_TCP_STATE_DELETE_TCB;  // 12
-        delete_row.dwLocalAddr = row.dwLocalAddr;
-        delete_row.dwLocalPort = row.dwLocalPort;
-        delete_row.dwRemoteAddr = 0;   // listener: no remote
-        delete_row.dwRemotePort = 0;   // listener: no remote
-        SetTcpEntry(&delete_row);
-    }
-}
-
 #endif
 
 } // namespace
@@ -444,6 +373,8 @@ TikTokExternalWsServer::TikTokExternalWsServer(platform::PanelApp* app) noexcept
       impl_(std::make_unique<Impl>()) {
 }
 
+bool TikTokExternalWsServer::test_mode_ = false;
+
 TikTokExternalWsServer::~TikTokExternalWsServer() = default;
 
 bool TikTokExternalWsServer::start(std::uint16_t port) {
@@ -461,14 +392,14 @@ bool TikTokExternalWsServer::start(std::uint16_t port) {
         return false;
     }
 
-    const auto resolved_port = port == 0 ? static_cast<std::uint16_t>(8765) : port;
+    constexpr std::uint16_t kDefaultExclusiveBridgePort = 8765;
+    constexpr std::uint16_t kMinExclusiveBridgePort = 8765;
+    constexpr std::uint16_t kMaxExclusiveBridgePort = 8765;
+    const auto resolved_port = port == 0 ? kDefaultExclusiveBridgePort : port;
 
-    // Clean up any stale listeners from crashed/killed panel instances
-    // that might have left zombie sockets on this port.
-    try_cleanup_stale_port_listeners(resolved_port);
-    // Give the OS a moment to finalize any TCP state cleanup
-    // after terminating stale processes above.
-    Sleep(200);
+    if (resolved_port < kMinExclusiveBridgePort || resolved_port > kMaxExclusiveBridgePort) {
+        return false;
+    }
 
     auto listen_socket = socket(AF_INET, SOCK_STREAM, IPPROTO_TCP);
     if (listen_socket == INVALID_SOCKET) {
@@ -478,59 +409,49 @@ bool TikTokExternalWsServer::start(std::uint16_t port) {
     u_long nonblocking = 1;
     ioctlsocket(listen_socket, FIONBIO, &nonblocking);
 
-    // Use SO_EXCLUSIVEADDRUSE to prevent other processes (including stale
-    // zombie sockets) from sharing this port. This avoids the problem where
-    // crashed panel instances leave ghost listeners that intercept bridge
-    // WebSocket connections, causing handshake timeouts.
-    const BOOL exclusive_address = TRUE;
+    // SO_EXCLUSIVEADDRUSE: solo el dueño puede bindear (evita SO_REUSEADDR + TIME_WAIT hijack)
+    // Requiere Windows, evita conflictos de puerto con procesos previos
+    // Test mode uses SO_REUSEADDR for test isolation (port reuse after crashes)
+    if (!test_mode()) {
+        const BOOL exclusive_addr = TRUE;
+        setsockopt(
+            listen_socket,
+            SOL_SOCKET,
+            SO_EXCLUSIVEADDRUSE,
+            reinterpret_cast<const char*>(&exclusive_addr),
+            sizeof(exclusive_addr));
+    } else {
+        const BOOL reuse_addr = TRUE;
+        setsockopt(
+            listen_socket,
+            SOL_SOCKET,
+            SO_REUSEADDR,
+            reinterpret_cast<const char*>(&reuse_addr),
+            sizeof(reuse_addr));
+    }
+
+    // SO_LINGER {on=1, timeout=0}: RST inmediato al cerrar, sin TIME_WAIT residual
+    struct linger ling{};
+    ling.l_onoff = 1;
+    ling.l_linger = 0;
     setsockopt(
         listen_socket,
         SOL_SOCKET,
-        SO_EXCLUSIVEADDRUSE,
-        reinterpret_cast<const char*>(&exclusive_address),
-        sizeof(exclusive_address));
+        SO_LINGER,
+        reinterpret_cast<const char*>(&ling),
+        sizeof(ling));
 
     sockaddr_in address{};
     address.sin_family = AF_INET;
     address.sin_port = htons(resolved_port);
-    address.sin_addr.s_addr = htonl(INADDR_LOOPBACK);
+    address.sin_addr.s_addr = htonl(INADDR_LOOPBACK);  // Solo loopback
 
     if (bind(
             listen_socket,
             reinterpret_cast<const sockaddr*>(&address),
             sizeof(address)) == SOCKET_ERROR) {
-        const auto bind_error = WSAGetLastError();
         close_socket(listen_socket);
-
-        // If the port is still in use after cleanup, attempt emergency
-        // fallback with SO_REUSEADDR to coexist with any remaining zombies
-        // until the next system reboot clears them.
-        if (bind_error == WSAEADDRINUSE) {
-            auto fallback_socket = socket(AF_INET, SOCK_STREAM, IPPROTO_TCP);
-            if (fallback_socket != INVALID_SOCKET) {
-                ioctlsocket(fallback_socket, FIONBIO, &nonblocking);
-                const BOOL reuse_fallback = TRUE;
-                setsockopt(
-                    fallback_socket,
-                    SOL_SOCKET,
-                    SO_REUSEADDR,
-                    reinterpret_cast<const char*>(&reuse_fallback),
-                    sizeof(reuse_fallback));
-                if (bind(
-                        fallback_socket,
-                        reinterpret_cast<const sockaddr*>(&address),
-                        sizeof(address)) != SOCKET_ERROR) {
-                    listen_socket = fallback_socket;
-                } else {
-                    closesocket(fallback_socket);
-                    return false;
-                }
-            } else {
-                return false;
-            }
-        } else {
-            return false;
-        }
+        return false;
     }
 
     if (listen(listen_socket, SOMAXCONN) == SOCKET_ERROR) {
@@ -552,8 +473,15 @@ bool TikTokExternalWsServer::start(std::uint16_t port) {
 void TikTokExternalWsServer::stop() {
 #ifdef _WIN32
     if (impl_ != nullptr) {
-        close_socket(impl_->client_socket);
-        close_socket(impl_->listen_socket);
+        // shutdown + SO_LINGER(0) -> RST inmediato, sin TIME_WAIT
+        if (impl_->listen_socket != INVALID_SOCKET) {
+            shutdown(impl_->listen_socket, SD_BOTH);
+            close_socket(impl_->listen_socket);
+        }
+        if (impl_->client_socket != INVALID_SOCKET) {
+            shutdown(impl_->client_socket, SD_BOTH);
+            close_socket(impl_->client_socket);
+        }
         impl_->handshake_complete = false;
         impl_->receive_buffer.clear();
     }
@@ -611,6 +539,7 @@ std::size_t TikTokExternalWsServer::poll() {
     if (received > 0) {
         impl_->receive_buffer.append(buffer, static_cast<std::size_t>(received));
     } else if (received == 0) {
+        // Client closed connection - clean up
         close_socket(impl_->client_socket);
         impl_->handshake_complete = false;
         impl_->receive_buffer.clear();
@@ -639,11 +568,12 @@ std::size_t TikTokExternalWsServer::poll() {
             return 0;
         }
 
-        const auto origin = extract_header_value(request, "origin");
+const auto origin = extract_header_value(request, "origin");
         if (origin.has_value() && !origin->empty() && !is_allowed_loopback_origin(*origin)) {
             const auto forbidden_response =
                 make_http_error_response("403 Forbidden", "origin_not_allowed");
             send_all(impl_->client_socket, forbidden_response);
+            // Close socket completely (like backup) so client receives 403 and connection closes
             close_socket(impl_->client_socket);
             impl_->handshake_complete = false;
             impl_->receive_buffer.clear();

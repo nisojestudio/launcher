@@ -22,6 +22,15 @@ struct TikTokExternalWsStatus {
 
 class TikTokExternalWsServer {
 public:
+    // Test-only: allow SO_REUSEADDR for test isolation (port reuse after crashes)
+    // Production code should NOT use this - bridge MUST use SO_EXCLUSIVEADDRUSE
+    static void set_test_mode(bool enabled) noexcept {
+        test_mode_ = enabled;
+    }
+    static bool test_mode() noexcept {
+        return test_mode_;
+    }
+
     explicit TikTokExternalWsServer(platform::PanelApp* app) noexcept;
     ~TikTokExternalWsServer();
 
@@ -45,6 +54,8 @@ private:
     std::uint16_t port_ = 0;
     std::size_t accepted_messages_ = 0;
     std::size_t rejected_messages_ = 0;
+
+    static bool test_mode_;
 };
 
 } // namespace nlp3::bridge

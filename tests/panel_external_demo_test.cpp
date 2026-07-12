@@ -10,8 +10,10 @@
 #include "test_support.hpp"
 
 int main() {
+    nlp3::bridge::TikTokExternalWsServer::set_test_mode(true);
     nlp3::platform::PanelConfig config{};
     config.bridge_mode = "external";
+    config.external_ws_port = 8765;
     const auto config_path = nlp3::testsupport::write_temp_panel_config(
         "nlp3_panel_external_demo_test_config.json",
         config);
@@ -28,10 +30,10 @@ int main() {
         &console_output,
     };
 
-    NLP3_TEST_REQUIRE(panel_console.execute_line("bridge demo live 18765"));
+    NLP3_TEST_REQUIRE(panel_console.execute_line("bridge demo live 8765"));
     const auto ws_status = panel_app.external_ws_status();
     NLP3_TEST_REQUIRE(ws_status.running);
-    NLP3_TEST_REQUIRE(ws_status.port == 18765);
+    NLP3_TEST_REQUIRE(ws_status.port == 8765);
 
     const nlp3::bridge::TikTokExternalEventCodec codec{};
     const auto valid_payload = codec.encode_json(nlp3::testsupport::make_chat_event(
@@ -51,10 +53,10 @@ int main() {
     NLP3_TEST_REQUIRE(snapshot_after_payload.external_ws.rejected_messages == 0);
 
     NLP3_TEST_REQUIRE(panel_console.execute_line("bridge demo ready"));
-    NLP3_TEST_REQUIRE(panel_console.execute_line("bridge demo observe 1 1 0 18765"));
+    NLP3_TEST_REQUIRE(panel_console.execute_line("bridge demo observe 1 1 0 8765"));
 
     const auto output = console_output.str();
-    NLP3_TEST_REQUIRE(output.find("bridge live demo ready on port 18765") != std::string::npos);
+    NLP3_TEST_REQUIRE(output.find("bridge live demo ready on port 8765") != std::string::npos);
     NLP3_TEST_REQUIRE(output.find("Demo ready: yes") != std::string::npos);
     NLP3_TEST_REQUIRE(output.find("bridge demo observe: ticks=") != std::string::npos);
     NLP3_TEST_REQUIRE(output.find("diagnostics=ok") != std::string::npos);

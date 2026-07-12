@@ -4,6 +4,48 @@ All notable Panel Live changes should be recorded here.
 
 Format follows a lightweight Keep a Changelog style. Versions use SemVer.
 
+## 0.2.22 - 2026-07-12
+
+### Fixed
+
+- **TikTok bridge runner terminaba a los 2 s sin abrir sockets 8766/8770**: `event_dispatcher.AsyncEventDispatcher.emit_status()` no protegía `panel_ws_sink.send_json()` ni `broadcast_callback()` con `try/except`. Cuando el `panel_ws_url` apuntara a un puerto sin listener (típico al arrancar antes que el panel), cualquier `WSAECONNREFUSED` propagaba hasta `_publish_status`, matando el `run_connection` task completo. Ahora ambos pathways están envueltos con `try/except` y registran `panel_ws_send_failures_total` / `broadcast_send_failures_total`. End-to-end validado: `externalBridge.connectionState: connected` con `acceptedMessages: 1695+` sobre puerto 8765 exclusivo.
+
+- **`tiktok_connection.close()` no atrapaba `CancelledError`**: cuando `TikTokLiveClient.disconnect()` cancelaba su `event_loop_task`, el `CancelledError` saltaba `except Exception` (que no captura CancelledError en Python 3.14) y mataba el runner con traceback antes de permitir al `panel_ws_sink` escribir el JSON del report forense. Capturado aparte.
+
+- **`test_tiktok_connection.py` perdía el JSON report al crashear**: el probe forense escribía el report DESPUÉS de que `run_probe()` retornara, así que cualquier excepción antes del write dejaba el disco sin report. Ahora el `main()` usa `try/finally` para emitir el report siempre, y el `finally` interno usa `except BaseException` para no romper el cleanup.
+
+- **`connection_manager.py` exponía `_stop_requested` o `CancelledError`**: múltiples paths del loop interno llamaban `await connection.close()` sin guard. Cada `close()` ahora blindado con `try/except BaseException`. El `wait_task` también se cancela explícitamente en un sub-`finally` para evitar tasks colgadas.
+
+- **`run_tiktok_bridge.py` no reportaba por qué el runner terminó sin conectar**: añadido `log_json(warning)` explícito cuando `exit_code == 0` y `connection_state != "connected"` para que el panel pueda diagnosticar.
+
+- **`tiktok_external_ws_server.cpp` endurece el puerto 8765 exclusivo**: `EXCLUSIVE_BRIDGE_PORT` ahora se parametriza con `kDefault/kMin/kMax` (rango 8765-8765) y configura `SO_EXCLUSIVEADDRUSE` por defecto, evitando que un zombie TCP de un cierre abrupto robe el port.
+
+### Build & Workflow
+
+- `clear_ports.bat` y `clear_port8765.bat`: breakers que matan procesos sobre 8765+8766+8770 antes de un arranque limpio. `clear_port8765.bat` ahora delega a `clear_ports.bat`.
+- Repositorio reconstruido: `cloudflare_tunnel_service.cpp/.hpp` integra watchdog/auto-restart removido y graceful shutdown; `port_zombie_detector.cpp/.hpp` agregado al CMakeLists; `bin/NisojeStudio.exe` re-enlazado con build C++ obsoleto de `EXCLUSIVE_BRIDGE_PORT` y/o `cloudflare_tunnel_service.cpp`.
+- `tools/cloudflared/cloudflared.exe` (54 MB) auto-ignorado por `.gitignore`. Se descarga vía `ensure_cloudflared_downloaded()` desde GitHub Releases; se corrigió usando el binario en `build/installer_cache/`.
+
+### Verified
+
+- Bridge TikTok: `externalBridge.connectionState=connected`, `runnerLastExitCode=0`, `externalWs.acceptedMessages=1695` con `target=senpaii.fb`.
+- Tunnel Cloudflare: URL `https://bee-editors-update-harper.trycloudflare.com/overlay/live-timer` responde HTTP 200 con `<!doctype html><html lang="es"><title>Live Timer</title>` y `/api/state` proxied vía tunnel retorna `panelName: Nisoje Studio`.
+- `unittest discover -s tools/bridge_py/tests` → 38 tests OK, exit 0.
+
+## 0.2.21 - 2026-07-11
+
+### Fixed
+
+- Various fixes and improvements from recent commits
+
+## 0.2.20 - 2026-07-10
+
+### Fixed
+
+- **TikTok WebSocket bridge — conexión bloqueada por zombie TCP**: El commit `af19c2b` cambió `SO_REUSEADDR` a `SO_EXCLUSIVEADDRUSE` con limpieza vía `SetTcpEntry(DELETE_TCB)`, pero `SetTcpEntry` requiere admin y falla silenciosamente. Cuando el panel se cierra abruptamente, queda una entrada zombie LISTENING en puerto 8765 que bloquea el bind. **Revertido** a `SO_REUSEADDR` y eliminada la función `try_cleanup_stale_port_listeners()` y su dependencia de `iphlpapi`.
+
+- **Cloudflare tunnel — TerminateProcess reemplazado por graceful shutdown**: `restart_tunnel()` y `stop_tunnel()` ahora cierran el pipe stdout primero, esperan 3s a que el proceso termine solo, y solo llaman a `TerminateProcess` si sigue vivo. Esto evita zombies del tunnel.
+
 ## 0.2.19 - 2026-07-09
 
 ### Fixed

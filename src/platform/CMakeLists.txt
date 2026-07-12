@@ -77,6 +77,7 @@ add_library(nlp3_platform
     panel_ui_assets.cpp
     panel_updater_service.cpp
     panel_view_model_builder.cpp
+    port_zombie_detector.cpp
     remote_game_distribution_service.cpp
     server_license_service.cpp
     device_identifier.cpp

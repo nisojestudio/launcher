@@ -166,6 +166,20 @@ async def run() -> int:
                 last_message = str(status.get("last_status_message") or "")
                 if "No se encontro ese usuario" in last_message:
                     print_user_not_found_help()
+            else:
+                status = service.status_payload()
+                last_session = status.get("last_session_status") or {}
+                connection_state = str(last_session.get("connection_state") or "unknown")
+                if connection_state != "connected":
+                    log_json(
+                        logger,
+                        "warning",
+                        "runner",
+                        "TikTok connection ended without reaching connected state",
+                        connection_state=connection_state,
+                        last_status_message=status.get("last_status_message"),
+                        last_session_status=last_session,
+                    )
     except KeyboardInterrupt:
         exit_code = 0
     finally:

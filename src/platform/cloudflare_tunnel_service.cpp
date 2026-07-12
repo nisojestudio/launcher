@@ -77,7 +77,6 @@ static std::filesystem::path ensure_cloudflared_downloaded() {
         "https://github.com/cloudflare/cloudflared/releases/latest/download/"
         "cloudflared-windows-amd64.exe";
 
-    // Use WinInet for a synchronous download with no external dependencies
     HINTERNET hOpen = InternetOpenW(
         L"NisojeStudio/1.0",
         INTERNET_OPEN_TYPE_PRECONFIG,
@@ -137,104 +136,29 @@ bool CloudflareTunnelService::is_process_alive() const noexcept {
     return exit_code == STILL_ACTIVE;
 }
 
-void CloudflareTunnelService::restart_tunnel(std::uint16_t port, TunnelUrlCallback on_url) {
-    // Kill old process if still around
-    if (process_handle_ != nullptr) {
-        HANDLE h = static_cast<HANDLE>(process_handle_);
-        TerminateProcess(h, 1);
-        WaitForSingleObject(h, 2000);
-        CloseHandle(h);
-        process_handle_ = nullptr;
-    }
-    if (stdout_read_ != nullptr) {
-        CloseHandle(static_cast<HANDLE>(stdout_read_));
-        stdout_read_ = nullptr;
+bool CloudflareTunnelService::start_tunnel(std::uint16_t overlay_port, TunnelUrlCallback on_url) {
+    if (running_) {
+        last_error_ = "Tunnel already running";
+        return false;
     }
 
-    // Clear URL so the new reader thread will set it fresh
-    {
-        std::lock_guard<std::mutex> lock(mutex_);
-        tunnel_url_.clear();
-    }
+    stop_tunnel(); // Cleanup preventivo
 
-    // Start fresh process
-    auto cloudflared_path = ensure_cloudflared_downloaded();
-    if (cloudflared_path.empty()) {
-        last_error_ = "cloudflared.exe not found on restart";
-        return;
-    }
-
-    SECURITY_ATTRIBUTES sa{};
-    sa.nLength = sizeof(sa);
-    sa.bInheritHandle = TRUE;
-    sa.lpSecurityDescriptor = nullptr;
-
-    HANDLE stdout_read = nullptr;
-    HANDLE stdout_write = nullptr;
-    if (!CreatePipe(&stdout_read, &stdout_write, &sa, 0)) {
-        last_error_ = "Failed to create stdout pipe on restart";
-        return;
-    }
-    if (!SetHandleInformation(stdout_read, HANDLE_FLAG_INHERIT, 0)) {
-        CloseHandle(stdout_read); CloseHandle(stdout_write);
-        return;
-    }
-
-    std::wstring args = L"tunnel --url http://localhost:" + std::to_wstring(port);
-    std::wstring cmd = L"\"" + cloudflared_path.wstring() + L"\" " + args;
-
-    STARTUPINFOW si{};
-    si.cb = sizeof(si);
-    si.dwFlags = STARTF_USESTDHANDLES;
-    si.hStdOutput = stdout_write;
-    si.hStdError = stdout_write;
-    si.hStdInput = GetStdHandle(STD_INPUT_HANDLE);
-
-    PROCESS_INFORMATION pi{};
-    if (!CreateProcessW(
-            cloudflared_path.wstring().c_str(), cmd.data(),
-            nullptr, nullptr, TRUE, CREATE_NO_WINDOW,
-            nullptr, nullptr, &si, &pi)) {
-        CloseHandle(stdout_read); CloseHandle(stdout_write);
-        last_error_ = "Failed to restart cloudflared process";
-        return;
-    }
-
-    CloseHandle(stdout_write);
-    CloseHandle(pi.hThread);
-
-    process_handle_ = pi.hProcess;
-    stdout_read_ = stdout_read;
-
-    // Start a new reader thread that will parse the new URL
-    reader_thread_ = std::make_unique<std::thread>([this, port, on_url]() {
-        reader_thread(port);
-        std::string url;
-        {
-            std::lock_guard<std::mutex> lock(mutex_);
-            url = tunnel_url_;
-        }
-        if (on_url && !url.empty()) {
-            on_url(url);
-        }
-    });
-}
-
-bool CloudflareTunnelService::start_tunnel(std::uint16_t port, TunnelUrlCallback on_url) {
-    stop_tunnel();
     {
         std::lock_guard<std::mutex> lock(mutex_);
         tunnel_url_.clear();
         last_error_.clear();
     }
-    port_ = port;
+    overlay_port_ = overlay_port;
     on_url_callback_ = on_url;
+    running_ = true;
 
     // Auto-download cloudflared if missing
     auto cloudflared_path = ensure_cloudflared_downloaded();
     if (cloudflared_path.empty()) {
         last_error_ = "cloudflared.exe not found and could not be downloaded. "
                       "See tools/cloudflared/ manually or run the installer.";
+        running_ = false;
         return false;
     }
 
@@ -247,15 +171,19 @@ bool CloudflareTunnelService::start_tunnel(std::uint16_t port, TunnelUrlCallback
     HANDLE stdout_write = nullptr;
     if (!CreatePipe(&stdout_read, &stdout_write, &sa, 0)) {
         last_error_ = "Failed to create stdout pipe";
+        running_ = false;
         return false;
     }
     if (!SetHandleInformation(stdout_read, HANDLE_FLAG_INHERIT, 0)) {
         CloseHandle(stdout_read); CloseHandle(stdout_write);
         last_error_ = "Failed to set stdout pipe handle info";
+        running_ = false;
         return false;
     }
 
-    std::wstring args = L"tunnel --url http://localhost:" + std::to_wstring(port);
+    // cloudflared tunnel --url http://127.0.0.1:<port>
+    // Bind to 127.0.0.1 explicitly (not localhost which could resolve to ::1)
+    std::wstring args = L"tunnel --url http://127.0.0.1:" + std::to_wstring(overlay_port_);
     std::wstring cmd = L"\"" + cloudflared_path.wstring() + L"\" " + args;
 
     STARTUPINFOW si{};
@@ -272,6 +200,7 @@ bool CloudflareTunnelService::start_tunnel(std::uint16_t port, TunnelUrlCallback
             nullptr, nullptr, &si, &pi)) {
         CloseHandle(stdout_read); CloseHandle(stdout_write);
         last_error_ = "Failed to start cloudflared process";
+        running_ = false;
         return false;
     }
 
@@ -280,11 +209,10 @@ bool CloudflareTunnelService::start_tunnel(std::uint16_t port, TunnelUrlCallback
 
     process_handle_ = pi.hProcess;
     stdout_read_ = stdout_read;
-    running_ = true;
 
     // Reader thread: parses the tunnel URL from cloudflared stdout
-    reader_thread_ = std::make_unique<std::thread>([this, port, on_url]() {
-        reader_thread(port);
+    reader_thread_ = std::make_unique<std::thread>([this, overlay_port, on_url]() {
+        reader_thread(overlay_port);
         std::string url;
         {
             std::lock_guard<std::mutex> lock(mutex_);
@@ -295,37 +223,51 @@ bool CloudflareTunnelService::start_tunnel(std::uint16_t port, TunnelUrlCallback
         }
     });
 
-    // Watchdog thread: monitors tunnel liveness every 12s, auto-restarts on failure
-    watchdog_thread_ = std::make_unique<std::thread>([this, port, on_url]() {
-        watchdog_thread(port, on_url);
-    });
+    // NO watchdog thread - Panel controls lifecycle via UI
+    // NO auto-restart - Zero zombie guarantee
 
     return true;
 }
 
 void CloudflareTunnelService::stop_tunnel() {
+    if (!running_) return;
     running_ = false;
 
-    if (watchdog_thread_ && watchdog_thread_->joinable()) {
-        watchdog_thread_->join();
-        watchdog_thread_.reset();
+    // 1. Close stdout_read -> EOF in cloudflared (graceful signal)
+    if (stdout_read_ != nullptr) {
+        CloseHandle(static_cast<HANDLE>(stdout_read_));
+        stdout_read_ = nullptr;
     }
 
+    // 2. Send CTRL_BREAK_EVENT to process group (graceful shutdown for cloudflared)
+    if (process_handle_ != nullptr) {
+        DWORD pid = GetProcessId(static_cast<HANDLE>(process_handle_));
+        if (pid != 0) {
+            GenerateConsoleCtrlEvent(CTRL_BREAK_EVENT, pid);
+        }
+
+        // 3. Wait 3s for graceful exit
+        DWORD wait = WaitForSingleObject(static_cast<HANDLE>(process_handle_), 3000);
+        if (wait == WAIT_TIMEOUT) {
+            // 4. Fallback: TerminateProcess with exit code 0 (clean)
+            TerminateProcess(static_cast<HANDLE>(process_handle_), 0);
+            WaitForSingleObject(static_cast<HANDLE>(process_handle_), 1000);
+        }
+        CloseHandle(static_cast<HANDLE>(process_handle_));
+        process_handle_ = nullptr;
+    }
+
+    // 5. Join reader thread
     if (reader_thread_ && reader_thread_->joinable()) {
         reader_thread_->join();
         reader_thread_.reset();
     }
 
-    if (process_handle_ != nullptr) {
-        HANDLE h = static_cast<HANDLE>(process_handle_);
-        TerminateProcess(h, 0);
-        CloseHandle(h);
-        process_handle_ = nullptr;
-    }
-
-    if (stdout_read_ != nullptr) {
-        CloseHandle(static_cast<HANDLE>(stdout_read_));
-        stdout_read_ = nullptr;
+    // 6. Clear state
+    {
+        std::lock_guard<std::mutex> lock(mutex_);
+        tunnel_url_.clear();
+        last_error_.clear();
     }
 }
 
@@ -382,7 +324,7 @@ void CloudflareTunnelService::reader_thread(std::uint16_t port) {
                 }
             }
         } else {
-            break;
+            break; // EOF or error
         }
 
         if (std::chrono::steady_clock::now() - start_time > max_wait) {
@@ -390,76 +332,6 @@ void CloudflareTunnelService::reader_thread(std::uint16_t port) {
         }
 
         std::this_thread::sleep_for(std::chrono::milliseconds(50));
-    }
-}
-
-void CloudflareTunnelService::watchdog_thread(std::uint16_t port, TunnelUrlCallback on_url) {
-    constexpr auto kCheckInterval = std::chrono::seconds(12);
-    constexpr auto kStaleUrlThreshold = std::chrono::seconds(30);
-
-    while (running_) {
-        std::this_thread::sleep_for(kCheckInterval);
-        if (!running_) break;
-
-        // 1) Check if the process died
-        if (!is_process_alive()) {
-            last_error_ = "cloudflared process died — restarting";
-            restart_tunnel(port, on_url);
-            continue;
-        }
-
-        // 2) Check if we have a URL
-        std::string url;
-        {
-            std::lock_guard<std::mutex> lock(mutex_);
-            url = tunnel_url_;
-        }
-        if (url.empty()) {
-            // Reader thread still parsing — give it more time
-            continue;
-        }
-
-        // 3) Health check: try to fetch the tunnel URL to see if it responds
-        // Use WinInet with a short timeout
-        HINTERNET hOpen = InternetOpenW(
-            L"NisojeStudio-Watchdog/1.0",
-            INTERNET_OPEN_TYPE_PRECONFIG,
-            nullptr, nullptr, 0);
-        if (!hOpen) continue;
-
-        // Strip "/overlay/live-timer" for the health check, use /health
-        std::string health_url = url;
-        {
-            auto pos = health_url.rfind("/overlay/live-timer");
-            if (pos != std::string::npos) {
-                health_url = health_url.substr(0, pos);
-            }
-        }
-        health_url += "/health";
-
-        HINTERNET hFile = InternetOpenUrlA(
-            hOpen, health_url.c_str(), nullptr, 0,
-            INTERNET_FLAG_RELOAD | INTERNET_FLAG_NO_CACHE_WRITE |
-            INTERNET_FLAG_PRAGMA_NOCACHE | INTERNET_FLAG_NO_UI |
-            INTERNET_FLAG_NO_COOKIES,
-            0);
-
-        bool reachable = false;
-        if (hFile) {
-            // Just check that we got a response (any HTTP status)
-            char status_buffer[64]{};
-            DWORD status_len = sizeof(status_buffer);
-            if (HttpQueryInfoA(hFile, HTTP_QUERY_STATUS_CODE, status_buffer, &status_len, nullptr)) {
-                reachable = true;
-            }
-            InternetCloseHandle(hFile);
-        }
-        InternetCloseHandle(hOpen);
-
-        if (!reachable) {
-            last_error_ = "Tunnel URL unreachable — restarting tunnel";
-            restart_tunnel(port, on_url);
-        }
     }
 }
 

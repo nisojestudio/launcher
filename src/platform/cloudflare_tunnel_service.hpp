@@ -27,16 +27,14 @@ public:
 
 private:
     void reader_thread(std::uint16_t port);
-    void watchdog_thread(std::uint16_t port, TunnelUrlCallback on_url);
     bool is_process_alive() const noexcept;
-    void restart_tunnel(std::uint16_t port, TunnelUrlCallback on_url);
     std::uint16_t port_ = 0;
+    std::uint16_t overlay_port_ = 0;
 
     void* process_handle_ = nullptr;
     void* stdout_read_ = nullptr;
     void* stdout_write_ = nullptr;
     std::unique_ptr<std::thread> reader_thread_;
-    std::unique_ptr<std::thread> watchdog_thread_;
     mutable std::mutex mutex_;
     std::string tunnel_url_;
     std::string last_error_;

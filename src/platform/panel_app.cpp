@@ -51,6 +51,7 @@
 #include "platform/external_game_state.hpp"
 #include "platform/external_game_bridge_runner.hpp"
 #include "platform/cloudflare_tunnel_service.hpp"
+#include "platform/port_zombie_detector.hpp"
 #include "platform/panel_activity.hpp"
 #include "platform/wall_clock.h"
 #include "platform/panel_config_storage.hpp"
@@ -633,6 +634,12 @@ PanelApp::~PanelApp() {
         if (bridge_controller_ != nullptr) {
             bridge_controller_->stop();
         }
+
+        // FASE 4: Limpieza final de zombies al cerrar
+        auto shutdown_zombies = PortZombieDetector::detect_zombies();
+        if (!shutdown_zombies.empty()) {
+            PortZombieDetector::cleanup_zombies(shutdown_zombies);
+        }
     } catch (...) {
         // Best-effort shutdown only. Destructors must not throw.
     }
@@ -683,6 +690,18 @@ bool PanelApp::initialize(const std::string& config_path) {
         apply_embedded_ui_env_overrides(config_);
 
         activity_log_ = std::make_unique<PanelActivityLog>(256);
+
+        // FASE 4: Limpieza agresiva del puerto 8765 al inicio (test isolation)
+        // Fuerza liberación si un test anterior no limpió correctamente
+        PortZombieDetector::force_cleanup_owned_ports();
+        
+        // Verificar puerto 8765 libre ANTES de bind
+        if (!PortZombieDetector::is_port_free(PortZombieDetector::BRIDGE_WS_PORT)) {
+            activity_log_->push({PanelActivityKind::unknown, "bridge_port_8765_occupied_at_startup", "system", "", "", now_wall_clock_ms()});
+            // Intentar limpieza forzada
+            PortZombieDetector::force_cleanup_owned_ports();
+        }
+
         license_service_ = std::make_unique<ServerLicenseService>(config_.auth);
         remote_game_distribution_service_ = std::make_unique<RemoteGameDistributionService>(config_.auth);
         panel_updater_service_ = std::make_unique<PanelUpdaterService>();
@@ -1583,12 +1602,18 @@ bool PanelApp::start_http_ui(std::uint16_t port) {
     if (tunnel_service_ == nullptr) {
         tunnel_service_ = std::make_unique<CloudflareTunnelService>();
     }
-    tunnel_service_->start_tunnel(port, nullptr);
+    // Tunnel expone el overlay HTTP (mismo puerto que panel HTTP) vía Cloudflare
+    // Callback actualiza config.embedded_ui_url con la URL del túnel
+    tunnel_service_->start_tunnel(port, [this](const std::string& url) {
+        config_.embedded_ui_url = url;
+        save_config();
+    });
 
     return true;
 }
 
 void PanelApp::stop_http_ui() {
+    // Orden CRÍTICO: primero túnel (libera cloudflared), luego HTTP server
     if (tunnel_service_ != nullptr) {
         tunnel_service_->stop_tunnel();
     }
@@ -1932,10 +1957,14 @@ bool PanelApp::reconnect_external_pipeline() {
         if (!ws_status.running || ws_status.port != configured_port) {
             stop_external_ws();
             if (!start_external_ws(configured_port)) {
+                external_bridge_connection_state_ = "config_error";
+                external_bridge_last_status_message_ =
+                    "No se pudo iniciar el servidor WebSocket en puerto 8765";
+                external_bridge_last_status_timestamp_ms_ = now_wall_clock_ms();
                 return false;
             }
         }
-        if (target_user.empty()) {
+if (target_user.empty()) {
             external_bridge_connection_state_ = "config_error";
             external_bridge_last_status_message_ =
                 "Configura external_target_user antes de reconectar TikTok";

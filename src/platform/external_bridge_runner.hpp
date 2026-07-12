@@ -11,6 +11,7 @@ struct ExternalBridgeRunnerStartRequest {
     std::string ws_url{};
     std::uint16_t control_port = 0;
     std::uint64_t max_seconds = 0;
+    bool enable_broadcast_ws = true;  // Default: enabled
 };
 
 struct ExternalBridgeRunnerStatus {

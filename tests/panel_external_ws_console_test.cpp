@@ -176,6 +176,7 @@ private:
 } // namespace
 
 int main() {
+    nlp3::bridge::TikTokExternalWsServer::set_test_mode(true);
     const auto config_path =
         std::filesystem::temp_directory_path() / "nlp3_panel_external_ws_console_test_config.json";
     std::filesystem::remove(config_path);
@@ -191,13 +192,13 @@ int main() {
 
     const auto codec = nlp3::bridge::TikTokExternalEventCodec{};
 
-    assert(panel_app.start_external_ws(18765));
+    assert(panel_app.start_external_ws(8765));
     const auto started_status = panel_app.external_ws_status();
     assert(started_status.running);
-    assert(started_status.port == 18765);
+    assert(started_status.port == 8765);
     const auto started_snapshot = panel_app.snapshot();
     assert(started_snapshot.external_ws.running);
-    assert(started_snapshot.external_ws.port == 18765);
+    assert(started_snapshot.external_ws.port == 8765);
     const auto before_total_events = started_snapshot.total_events;
     const auto status_codec = nlp3::bridge::TikTokExternalSessionStatusCodec{};
 
@@ -249,30 +250,34 @@ int main() {
     };
 
     assert(panel_console.execute_line("bridge target ws_live_target"));
-    assert(panel_console.execute_line("bridge ws port 19876"));
+    assert(panel_console.execute_line("bridge ws port 8765"));
     assert(panel_console.execute_line("bridge attach"));
     assert(panel_console.execute_line("bridge ws"));
     assert(panel_console.execute_line("bridge demo ws"));
     assert(panel_console.execute_line("bridge ws stop"));
     assert(!panel_app.external_ws_status().running);
 
-    assert(panel_console.execute_line("bridge demo live 19876"));
+assert(panel_console.execute_line("bridge demo live 8765"));
     const auto restarted_status = panel_app.external_ws_status();
     assert(restarted_status.running);
-    assert(restarted_status.port == 19876);
+    assert(restarted_status.port == 8765);
 
 #ifdef _WIN32
+    // Enable test mode to allow SO_REUSEADDR for test isolation (port reuse after crashes)
+    nlp3::bridge::TikTokExternalWsServer::set_test_mode(true);
     WsTestClient ws_test_client;
-    assert(ws_test_client.connect_tcp(19876));
+    assert(ws_test_client.connect_tcp(8765));
     assert(ws_test_client.send_handshake_request("Origin: https://example.invalid\r\n"));
+    // Match backup test exactly: 5 ticks, 0ms wait
     assert(panel_console.execute_line("bridge demo ws run 5 0"));
     const auto forbidden_response = ws_test_client.receive_response();
+    std::fprintf(stderr, "DEBUG: Response = '%s'\n", forbidden_response.c_str());
     assert(forbidden_response.find("403 Forbidden") != std::string::npos);
     assert(forbidden_response.find("origin_not_allowed") != std::string::npos);
     ws_test_client.close();
 
-    assert(ws_test_client.connect_tcp(19876));
-    assert(ws_test_client.send_handshake_request("Origin: http://127.0.0.1:18913\r\n"));
+    assert(ws_test_client.connect_tcp(8765));
+    assert(ws_test_client.send_handshake_request("Origin: http://127.0.0.1:8765\r\n"));
     assert(panel_console.execute_line("bridge demo ws run 5 0"));
     assert(ws_test_client.receive_handshake_response());
 
@@ -371,7 +376,7 @@ int main() {
         0,
     });
     assert(ws_test_client.send_text(third_payload));
-    assert(panel_console.execute_line("bridge demo session 1 10 0 19876"));
+    assert(panel_console.execute_line("bridge demo session 1 10 0 8765"));
     const auto snapshot_after_session = panel_app.snapshot();
     assert(snapshot_after_session.total_events == before_session_total_events + 1);
     assert(snapshot_after_session.external_ws.accepted_messages == 4);
@@ -396,7 +401,7 @@ int main() {
         0,
     });
     assert(ws_test_client.send_text(fourth_payload));
-    assert(panel_console.execute_line("bridge demo observe 1 10 0 19876"));
+    assert(panel_console.execute_line("bridge demo observe 1 10 0 8765"));
     const auto snapshot_after_observe = panel_app.snapshot();
     assert(snapshot_after_observe.total_events == before_observe_total_events + 1);
     assert(snapshot_after_observe.external_ws.accepted_messages == 5);
@@ -421,15 +426,15 @@ int main() {
     assert(output.find("current_room_id=room-ws-005") != std::string::npos);
     assert(output.find("event_counts=chat=") != std::string::npos);
     assert(output.find("Demo ready: yes") != std::string::npos);
-    assert(output.find("bridge live demo ready on port 19876") != std::string::npos);
+    assert(output.find("bridge live demo ready on port 8765") != std::string::npos);
     assert(output.find("panel await: bridge demo ws await 1 200 0") != std::string::npos);
     assert(output.find("ws_running=yes") != std::string::npos);
     assert(output.find("game_active=yes (event-counter)") != std::string::npos);
     assert(output.find("Bridge WS demo:") != std::string::npos);
     assert(
-        output.find("sample_command=python tools/bridge_py/sample_events.py --ws ws://127.0.0.1:19876")
+        output.find("sample_command=python tools/bridge_py/sample_events.py --ws ws://127.0.0.1:8765")
             != std::string::npos
-        || output.find("sample_command=python tools/bridge_py/sample_events.py --ws ws://127.0.0.1:18765")
+        || output.find("sample_command=python tools/bridge_py/sample_events.py --ws ws://127.0.0.1:8765")
             != std::string::npos);
     assert(
         output.find("bridge ws demo run: ticks=5") != std::string::npos
@@ -447,9 +452,9 @@ int main() {
         || output.find("target_met=no") != std::string::npos);
     assert(output.find("accepted_messages=") != std::string::npos);
     assert(output.find("bridge ws stopped") != std::string::npos);
-    assert(
-        output.find("python tools/bridge_py/run_tiktok_bridge.py --user ws_live_target --ws ws://127.0.0.1:19876")
-        != std::string::npos);
+assert(
+        output.find("python tools/bridge_py/run_tiktok_bridge.py --user ws_live_target --ws ws://127.0.0.1:8765")
+            != std::string::npos);
 
     panel_app.stop_external_ws();
     assert(!panel_app.external_ws_status().running);

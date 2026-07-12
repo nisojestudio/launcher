@@ -173,7 +173,10 @@ std::wstring build_command_line(
         command_line += L" --status-port ";
         command_line += std::to_wstring(request.control_port);
     }
-    command_line += L" --no-broadcast-ws";
+    // Broadcast WS enabled by default; add --no-broadcast-ws only if explicitly disabled
+    if (!request.enable_broadcast_ws) {
+        command_line += L" --no-broadcast-ws";
+    }
 
     if (request.max_seconds > 0) {
         command_line += L" --max-seconds ";
@@ -818,7 +821,16 @@ void ExternalBridgeRunner::stop() {
                 GetExitCodeProcess(reinterpret_cast<HANDLE>(process_handle_), &exit_code);
             }
             if (exit_code == STILL_ACTIVE) {
-                TerminateProcess(reinterpret_cast<HANDLE>(process_handle_), 1);
+                // CERRAR PIPES ANTES de matar el proceso (evita handles huérfanos)
+                if (stdout_read_handle_ != nullptr) {
+                    CloseHandle(reinterpret_cast<HANDLE>(stdout_read_handle_));
+                    stdout_read_handle_ = nullptr;
+                }
+                if (stderr_read_handle_ != nullptr) {
+                    CloseHandle(reinterpret_cast<HANDLE>(stderr_read_handle_));
+                    stderr_read_handle_ = nullptr;
+                }
+                TerminateProcess(reinterpret_cast<HANDLE>(process_handle_), 0);
                 WaitForSingleObject(reinterpret_cast<HANDLE>(process_handle_), 2000);
                 terminated_by_panel = true;
             }

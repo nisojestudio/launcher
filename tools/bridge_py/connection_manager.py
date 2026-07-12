@@ -82,7 +82,10 @@ class ConnectionManager:
                     final_message = f"max_events reached ({max_events})"
                     supervisor.stop()
                     if connection is not None:
-                        await connection.close()
+                        try:
+                            await connection.close()
+                        except BaseException:
+                            pass
                     return
 
                 remaining_seconds = remaining_runtime_seconds(started_at, max_seconds)
@@ -90,7 +93,10 @@ class ConnectionManager:
                     final_message = f"max_seconds reached ({max_seconds})"
                     supervisor.stop()
                     if connection is not None:
-                        await connection.close()
+                        try:
+                            await connection.close()
+                        except BaseException:
+                            pass
 
             try:
                 remaining_seconds = remaining_runtime_seconds(started_at, max_seconds)
@@ -131,26 +137,40 @@ class ConnectionManager:
                     status_callback=emit_status,
                 )
                 wait_task = asyncio.create_task(connection.wait_closed(), name="bridge-connection-wait")
-                while True:
-                    remaining_seconds = remaining_runtime_seconds(started_at, max_seconds)
-                    if remaining_seconds is not None and remaining_seconds <= 0:
-                        final_message = f"max_seconds reached ({max_seconds})"
-                        supervisor.stop()
-                        await connection.close()
-                    if self._stop_requested or supervisor.stop_requested:
-                        await connection.close()
-                    if wait_task.done():
-                        await wait_task
-                        break
+                try:
+                    while True:
+                        remaining_seconds = remaining_runtime_seconds(started_at, max_seconds)
+                        if remaining_seconds is not None and remaining_seconds <= 0:
+                            final_message = f"max_seconds reached ({max_seconds})"
+                            supervisor.stop()
+                            await connection.close()
+                        if self._stop_requested or supervisor.stop_requested:
+                            await connection.close()
+                        if wait_task.done():
+                            try:
+                                await wait_task
+                            except BaseException:
+                                pass
+                            break
 
-                    wait_timeout = 0.5
-                    if remaining_seconds is not None:
-                        wait_timeout = max(0.05, min(wait_timeout, remaining_seconds))
+                        wait_timeout = 0.5
+                        if remaining_seconds is not None:
+                            wait_timeout = max(0.05, min(wait_timeout, remaining_seconds))
 
-                    done, _pending = await asyncio.wait({wait_task}, timeout=wait_timeout)
-                    if done:
-                        await wait_task
-                        break
+                        done, _pending = await asyncio.wait({wait_task}, timeout=wait_timeout)
+                        if done:
+                            try:
+                                await wait_task
+                            except BaseException:
+                                pass
+                            break
+                finally:
+                    if not wait_task.done():
+                        wait_task.cancel()
+                        try:
+                            await wait_task
+                        except BaseException:
+                            pass
 
                 if supervisor.stop_requested or self._stop_requested:
                     break
@@ -206,7 +226,10 @@ class ConnectionManager:
                 )
                 await supervisor.stop_heartbeat()
                 if connection is not None:
-                    await connection.close()
+                    try:
+                        await connection.close()
+                    except BaseException:
+                        pass
                 remaining_seconds = remaining_runtime_seconds(started_at, max_seconds)
                 sleep_delay = retry_delay if remaining_seconds is None else min(retry_delay, max(0.0, remaining_seconds))
                 if sleep_delay <= 0:
@@ -218,7 +241,10 @@ class ConnectionManager:
                 self._metrics.set_gauge("connected", 0)
                 await supervisor.stop_heartbeat()
                 if connection is not None:
-                    await connection.close()
+                    try:
+                        await connection.close()
+                    except BaseException:
+                        pass
 
         await emit_status(
             SessionStatus(

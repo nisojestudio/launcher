@@ -269,6 +269,22 @@ async def run_probe(args: argparse.Namespace) -> tuple[int, dict[str, Any]]:
             observed_room_id=observed_room_id,
         )
         return exit_code, report
+    except asyncio.TimeoutError as exc:
+        report["result"] = "failed"
+        report["errorCode"] = "NETWORK_ERROR"
+        report["errorMessage"] = f"TikTok no completo el handshake dentro del CONNECT_TIMEOUT_SEC configurado."
+        report["rawError"] = str(exc)
+        report["observedRoomId"] = observed_room_id
+        log_json(
+            logger,
+            "error",
+            "tiktok_probe",
+            "tiktok connection timed out waiting for connect event",
+            error_message=report["errorMessage"],
+            raw_error=report["rawError"],
+            observed_room_id=observed_room_id,
+        )
+        return EXIT_CODES["NETWORK_ERROR"], report
     except Exception as exc:
         report["result"] = "failed"
         report["errorCode"] = "UNEXPECTED"
@@ -289,18 +305,65 @@ async def run_probe(args: argparse.Namespace) -> tuple[int, dict[str, Any]]:
         if connection is not None:
             try:
                 await connection.close()
-            except Exception:
+            except BaseException:
                 pass
-        close_logger(logger)
+        try:
+            close_logger(logger)
+        except Exception:
+            pass
 
 
 def main() -> int:
     args = parse_args()
-    exit_code, report = asyncio.run(run_probe(args))
-    report_path = Path(args.report_path) if args.report_path else default_report_path(report["runtime"]["logPath"])
-    report_path.parent.mkdir(parents=True, exist_ok=True)
-    report_path.write_text(json.dumps(report, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
-    sys.stdout.write(json.dumps(report, ensure_ascii=False, indent=2) + "\n")
+    exit_code = EXIT_CODES["UNEXPECTED"]
+    report: dict[str, Any] = {
+        "result": "crashed_outside_probe",
+        "errorCode": "UNEXPECTED",
+        "errorMessage": "",
+        "traceback": "",
+        "eventCount": 0,
+        "statusTimeline": [],
+        "eventSamples": [],
+    }
+    try:
+        exit_code, report = asyncio.run(run_probe(args))
+    except KeyboardInterrupt:
+        exit_code = 0
+    except SystemExit:
+        raise
+    except Exception as exc:
+        report = {
+            "result": "crashed",
+            "errorCode": "UNEXPECTED",
+            "errorMessage": str(exc),
+            "traceback": traceback.format_exc(),
+            "eventCount": int(report.get("eventCount", 0)) if isinstance(report, dict) else 0,
+            "statusTimeline": report.get("statusTimeline", []) if isinstance(report, dict) else [],
+            "eventSamples": report.get("eventSamples", []) if isinstance(report, dict) else [],
+        }
+    finally:
+        try:
+            report_path = (
+                Path(args.report_path)
+                if args.report_path
+                else default_report_path(args.log_path or "tools/bridge_py/logs/bridge.jsonl")
+            )
+            report_path.parent.mkdir(parents=True, exist_ok=True)
+            serialized = json.dumps(report, ensure_ascii=False, indent=2, default=str) + "\n"
+            report_path.write_text(serialized, encoding="utf-8")
+            sys.stdout.write(serialized)
+        except Exception as write_exc:
+            sys.stdout.write(
+                json.dumps(
+                    {
+                        "result": "report_write_failed",
+                        "errorCode": "REPORT_WRITE_FAILED",
+                        "errorMessage": str(write_exc),
+                    },
+                    ensure_ascii=False,
+                )
+                + "\n"
+            )
     return exit_code
 
 

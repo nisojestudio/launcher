@@ -56,6 +56,7 @@ private:
 } // namespace
 
 int main() {
+    nlp3::bridge::TikTokExternalWsServer::set_test_mode(true);
     std::puts("panel_app_smoke cp1");
     std::fflush(stdout);
     const auto config_path = nlp3::testsupport::write_temp_panel_config(
@@ -147,7 +148,7 @@ int main() {
         []() {
             nlp3::platform::PanelConfig config{};
             config.bridge_mode = "external";
-            config.external_ws_port = 28779;
+            config.external_ws_port = 8765;
             config.external_target_user.clear();
             config.bridge.stub_mode = false;
             config.bridge.source_name = "tiktok-external";

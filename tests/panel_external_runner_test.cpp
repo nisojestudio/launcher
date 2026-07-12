@@ -150,13 +150,14 @@ bool wait_until_runner_stops(
 } // namespace
 
 int main() {
+    nlp3::bridge::TikTokExternalWsServer::set_test_mode(true);
     const auto config_path = nlp3::testsupport::write_temp_panel_config(
         "nlp3_panel_external_runner_test_config.json",
         []() {
             nlp3::platform::PanelConfig config{};
             config.bridge_mode = "external";
             config.external_target_user = "runner_test_user";
-            config.external_ws_port = 28777;
+            config.external_ws_port = 8765;
             return config;
         }());
 
@@ -174,7 +175,7 @@ int main() {
     NLP3_TEST_REQUIRE(runner_status.running);
     NLP3_TEST_REQUIRE(runner_status.process_id != 0);
     NLP3_TEST_REQUIRE(runner_status.target_user == "runner_test_user");
-    NLP3_TEST_REQUIRE(runner_status.ws_url == "ws://127.0.0.1:28777");
+    NLP3_TEST_REQUIRE(runner_status.ws_url == "ws://127.0.0.1:8765");
     NLP3_TEST_REQUIRE(!runner_status.recent_log_lines.empty());
     NLP3_TEST_REQUIRE(std::find_if(
         runner_status.recent_log_lines.begin(),
@@ -192,7 +193,7 @@ int main() {
     auto snapshot_running = panel_app.snapshot();
     NLP3_TEST_REQUIRE(snapshot_running.external_bridge.runner_running);
     NLP3_TEST_REQUIRE(snapshot_running.external_bridge.runner_process_id != 0);
-    NLP3_TEST_REQUIRE(snapshot_running.external_bridge.runner_ws_url == "ws://127.0.0.1:28777");
+    NLP3_TEST_REQUIRE(snapshot_running.external_bridge.runner_ws_url == "ws://127.0.0.1:8765");
 
     NLP3_TEST_REQUIRE(wait_until_runner_stops(panel_app, std::chrono::milliseconds(3000)));
 
