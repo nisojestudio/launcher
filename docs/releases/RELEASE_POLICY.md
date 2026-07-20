@@ -17,7 +17,7 @@ Rules:
 - MINOR: new compatible capabilities.
 - PATCH: fixes and low-risk improvements.
 
-Current project baseline is `0.1.0` in `CMakeLists.txt` and `vcpkg.json`.
+Current project baseline is `0.2.24` in `CMakeLists.txt` and `vcpkg.json`.
 
 ## Branches
 

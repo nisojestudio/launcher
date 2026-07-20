@@ -9,7 +9,7 @@
 - `src/live`, `src/render` and `src/audio` already exist as folders, but they are still empty.
 - `tests/smoke_test.cpp` only checks the engine version.
 - `vcpkg.json` declares future dependencies, but phase 1 does not need to wire them yet.
-- The workspace directory does not contain `.git` metadata, so traceability must live in files and command validation.
+- The workspace directory contains `.git` metadata (95+ commits, 27 tags, upstream remote). Traceability uses both git history and file-based documentation.
 
 ## Initial target architecture
 

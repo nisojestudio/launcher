@@ -122,18 +122,33 @@ Use these after the primary workflow is stable:
 - Security Reviewer: auth, secrets, downloads, WebSocket boundaries.
 - Installer Packager: installer UX, signing, prerequisites, clean VM validation.
 
+## Specialist Personas (from agent-skills)
+
+Full definitions in `agents/<name>.md`. These are additive quality gates — invoke AFTER the primary skill workflow:
+
+| Persona | File | Role | Use when |
+|---------|------|------|----------|
+| Code Reviewer | `agents/code-reviewer.md` | Staff Engineer | 5-axis review before merge |
+| Test Engineer | `agents/test-engineer.md` | QA Specialist | Coverage analysis, test strategy |
+| Security Auditor | `agents/security-auditor.md` | Security Engineer | Vulnerability detection, threat modeling |
+| Web Performance Auditor | `agents/web-performance-auditor.md` | Perf Engineer | Core Web Vitals, loading optimization |
+
+These personas complement the primary agents defined above. See `docs/agent-skills-orchestration.md` for composition rules.
+
 ## Routing Matrix
 
-| Task | Primary | Supporting |
-| --- | --- | --- |
-| Live event protocol change | Python Engineer | C++ Engineer, QA |
-| Host runtime change | C++ Engineer | QA |
-| Embedded UI change | Frontend Web Engineer | QA |
-| Remote game catalog/worker | Node.js Engineer | Release Manager, QA |
-| Installer/release artifact | Release Manager | QA, C++ Engineer |
-| Backup/restore process | Release Manager | QA |
-| Architecture decision | Orchestrator | Relevant specialist |
-| Security-sensitive change | Security Reviewer | Orchestrator, QA |
+| Task | Primary | Supporting | Skill to activate |
+| --- | --- | --- | --- |
+| Live event protocol change | Python Engineer | C++ Engineer, QA | `spec-driven-development`, `incremental-implementation`, `test-driven-development` |
+| Host runtime change | C++ Engineer | QA | `incremental-implementation`, `test-driven-development` |
+| Embedded UI change | Frontend Web Engineer | QA, Web Performance Auditor | `frontend-ui-engineering` (from catalog), `test-driven-development` |
+| Remote game catalog/worker | Node.js Engineer | Release Manager, QA | `incremental-implementation`, `test-driven-development` |
+| Installer/release artifact | Release Manager | QA, C++ Engineer | `shipping-and-launch`, `ci-cd-and-automation` |
+| Backup/restore process | Release Manager | QA | `documentation-and-adrs` |
+| Architecture decision | Orchestrator | Relevant specialist | `spec-driven-development`, `documentation-and-adrs` |
+| Security-sensitive change | Security Reviewer | Orchestrator, QA, Security Auditor | `security-and-hardening` |
+| Code review before merge | Code Reviewer | QA (Test Engineer) | `code-review-and-quality` |
+| Bug fix / debugging | Primary engineer | QA (Test Engineer) | `debugging-and-error-recovery`, `test-driven-development` |
 
 ## Completion Contract
 
@@ -141,6 +156,8 @@ Every completed task should report:
 - Objective.
 - Files changed.
 - Decision made.
+- Skills activated.
+- Personas invoked.
 - Validation executed.
 - Validation not executed and why.
 - Risks.

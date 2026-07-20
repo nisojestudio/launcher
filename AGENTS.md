@@ -103,19 +103,55 @@ El agente puede usar:
 - CMake
 - scripts PowerShell/Bash/Python/Node
 - documentación local del proyecto
+- el tool `skill` para cargar skills automáticamente
 
+### 8.1 Activación automática de skills
+El agente evalúa cada solicitud y activa los skills aplicables SIN que el usuario los pida explícitamente:
+
+| Si la tarea es... | Activar skill(s) |
+|---|---|
+| Diseñar una feature, proyecto o cambio grande | `spec-driven-development` |
+| Planificar la implementación | `planning-and-task-breakdown` |
+| Implementar código (1+ archivos) | `incremental-implementation` + `test-driven-development` |
+| Arreglar un bug o error | `debugging-and-error-recovery` + `test-driven-development` |
+| Revisar código antes de merge | `code-review-and-quality` |
+| Evaluar seguridad | `security-and-hardening` |
+| Simplificar código existente | `code-simplification` |
+| Preparar release/deploy | `shipping-and-launch` + `ci-cd-and-automation` |
+| Documentar decisión arquitectónica | `documentation-and-adrs` |
+| Cambiar flujo git o versionado | `git-workflow-and-versioning` |
+
+Si un skill aplica, el agente DEBE cargarlo con el tool `skill` y seguir sus pasos. No saltarse workflows.
+
+### 8.2 Personas especializadas
+Para revisiones profundas el agente puede activar una persona desde `agents/<name>.md`:
+
+- `code-reviewer` — revisión 5 ejes (Staff Engineer)
+- `test-engineer` — estrategia de tests y coverage
+- `security-auditor` — vulnerabilidades y threat modeling
+- `web-performance-auditor` — Core Web Vitals
+
+### 8.3 Creación de nuevos skills
 El agente debe crear skills o subagentes solo si aportan valor real, por ejemplo:
 - migración de protocolo
 - auditoría de integración live
 - generador de scaffolds de juego
 - validador de contratos C++ ↔ web
 
+### 8.4 Referencias rápidas
+Checklists disponibles en `skills/references/` para consulta durante cualquier skill.
+
 La capa operativa del proyecto queda documentada en:
 - `agents/definitions/AGENT_MAP.md`
 - `agents/routing/ROUTING_POLICY.md`
 - `skills/SKILL_CATALOG.md`
+- `agents/code-reviewer.md` — persona de revisión
+- `agents/security-auditor.md` — persona de seguridad
+- `agents/test-engineer.md` — persona de testing
+- `agents/web-performance-auditor.md` — persona de performance
 - `docs/releases/RELEASE_POLICY.md`
 - `docs/runbooks/BACKUP_POLICY.md`
+- `docs/agent-skills-orchestration.md` — reglas de orquestación multi-persona
 
 ## 9. Entregables por etapa
 Cada etapa debe terminar con:
