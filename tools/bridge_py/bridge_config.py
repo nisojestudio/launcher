@@ -82,6 +82,7 @@ class RetryPolicyConfig:
 class ConnectionConfig:
     username: str = ""
     room_id: str = ""
+    api_key: str = ""
     connect_timeout_sec: float = 20.0
     heartbeat_interval_sec: float = 15.0
     heartbeat_warning_after_sec: float = 60.0
@@ -125,7 +126,7 @@ class LoggingConfig:
 
 @dataclass(slots=True)
 class BridgeConfig:
-    connection_mode: str = "tiktok_live"
+    connection_mode: str = "tiktools"
     connection: ConnectionConfig = field(default_factory=ConnectionConfig)
     retry_policy: RetryPolicyConfig = field(default_factory=RetryPolicyConfig)
     buffer: BufferConfig = field(default_factory=BufferConfig)
@@ -139,6 +140,14 @@ class BridgeConfig:
     def to_dict(self) -> dict[str, Any]:
         return json.loads(json.dumps(asdict(self)))
 
+    def to_safe_dict(self) -> dict[str, Any]:
+        """Return configuration suitable for diagnostics without credentials."""
+        result = self.to_dict()
+        connection = result.get("connection")
+        if isinstance(connection, dict) and connection.get("api_key"):
+            connection["api_key"] = "***"
+        return result
+
 
 def load_bridge_config(path: str | Path | None = None) -> BridgeConfig:
     config_path = Path(path) if path else Path("tools/bridge_py/bridge_config.yaml")
@@ -151,11 +160,18 @@ def load_bridge_config(path: str | Path | None = None) -> BridgeConfig:
     replay = data.get("replay", {}) if isinstance(data.get("replay"), dict) else {}
     logging = data.get("logging", {}) if isinstance(data.get("logging"), dict) else {}
 
+    connection_mode = _parse_text(_env("LIVEPANEL_TIKTOK_PROVIDER") or data.get("connection_mode"), "tiktools").lower()
+    if connection_mode in {"direct", "tiktoklive", "tiktok_live"}:
+        connection_mode = "direct"
+    elif connection_mode != "tiktools":
+        connection_mode = "tiktools"
+
     config = BridgeConfig(
-        connection_mode=_parse_text(data.get("connection_mode"), "tiktok_live"),
+        connection_mode=connection_mode,
         connection=ConnectionConfig(
             username=_parse_text(_env("LIVEPANEL_TIKTOK_USER") or connection.get("username"), ""),
             room_id=_parse_text(_env("LIVEPANEL_TIKTOK_ROOM_ID") or connection.get("room_id"), ""),
+            api_key=_parse_text(_env("LIVEPANEL_TIKTOOLS_API_KEY") or connection.get("api_key"), ""),
             connect_timeout_sec=_parse_float(
                 _env("LIVEPANEL_TIKTOK_CONNECT_TIMEOUT_SEC") or connection.get("connect_timeout_sec"),
                 20.0,

@@ -28,6 +28,7 @@ from tiktok_adapter import (
 
 def canonical_event_to_panel_payload(event: CanonicalEvent) -> dict[str, Any]:
     payload = event.to_dict()
+    payload["message_type"] = "canonical_event"
     payload["kind"] = event.event_type.value
     payload["text"] = event.text
     payload["gift"] = event.gift.to_dict() if event.gift is not None else None

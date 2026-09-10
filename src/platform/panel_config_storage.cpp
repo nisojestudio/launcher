@@ -381,6 +381,8 @@ bool PanelConfigStorage::save_to_file(const PanelConfig& input_config, const std
         root["default_game_id"] = input_config.default_game_id;
         root["bridge_mode"] = normalized_bridge_mode_value;
         root["external_target_user"] = input_config.external_target_user;
+        root["tiktools_api_key"] = input_config.tiktools_api_key;
+        root["tiktok_provider"] = input_config.tiktok_provider;
         root["external_ws_port"] = input_config.external_ws_port;
         root["embedded_ui_enabled"] = input_config.embedded_ui_enabled;
         root["embedded_ui_fallback_to_browser"] = input_config.embedded_ui_fallback_to_browser;
@@ -437,6 +439,8 @@ bool PanelConfigStorage::load_from_file(const std::string& path, PanelConfig& ou
             || !try_read_string(parsed, "default_game_id", config.default_game_id)
             || !try_read_string(parsed, "bridge_mode", config.bridge_mode)
             || !try_read_string(parsed, "external_target_user", config.external_target_user)
+            || !try_read_string(parsed, "tiktools_api_key", config.tiktools_api_key)
+            || !try_read_string(parsed, "tiktok_provider", config.tiktok_provider)
             || !try_read_unsigned(parsed, "external_ws_port", config.external_ws_port)
             || !try_read_bool(parsed, "embedded_ui_enabled", config.embedded_ui_enabled)
             || !try_read_bool(parsed, "embedded_ui_fallback_to_browser", config.embedded_ui_fallback_to_browser)
@@ -473,6 +477,11 @@ bool PanelConfigStorage::load_from_file(const std::string& path, PanelConfig& ou
         }
 
         normalize_bridge_settings(config);
+        if (config.tiktok_provider == "tiktok_live" || config.tiktok_provider == "tiktoklive") {
+            config.tiktok_provider = "direct";
+        } else if (config.tiktok_provider != "direct") {
+            config.tiktok_provider = "tiktools";
+        }
         out_config = std::move(config);
         return true;
     } catch (const std::exception&) {

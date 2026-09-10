@@ -169,6 +169,12 @@ std::wstring build_command_line(
     command_line += quote_windows_argument(widen(request.target_user));
     command_line += L" --ws ";
     command_line += quote_windows_argument(widen(request.ws_url));
+    command_line += L" --provider ";
+    command_line += quote_windows_argument(widen(request.provider));
+    if (!request.api_key.empty()) {
+        command_line += L" --api-key ";
+        command_line += quote_windows_argument(widen(request.api_key));
+    }
     if (request.control_port > 0) {
         command_line += L" --status-port ";
         command_line += std::to_wstring(request.control_port);

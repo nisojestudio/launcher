@@ -1,0 +1,60 @@
+{
+  "generatedAtMs": 1788996028679,
+  "targetUser": "hisoka9210",
+  "requestedRoomId": "",
+  "maxSeconds": 30,
+  "requireEvent": false,
+  "runtime": {
+    "pythonExecutable": "C:\\Users\\Nisoje\\Desktop\\Panel live 3.0\\tools\\bridge_py\\.venv\\Scripts\\python.exe",
+    "pythonVersion": "3.14.3",
+    "platform": "Windows-10-10.0.19045-SP0",
+    "cwd": "C:\\Users\\Nisoje\\Desktop\\Panel live 3.0\\tools\\bridge_py",
+    "opensslVersion": "OpenSSL 3.0.18 30 Sep 2025",
+    "moduleVersions": {
+      "TikTokLive": "7.0.0",
+      "websockets": "15.0.1",
+      "PyYAML": "6.0.3",
+      "certifi": "2026.6.17"
+    },
+    "logPath": "C:\\Users\\Nisoje\\Desktop\\Panel live 3.0\\tools\\bridge_py\\tools\\bridge_py\\logs\\bridge.jsonl",
+    "logPathRequested": "tools/bridge_py/logs/bridge.jsonl",
+    "logPathUsesLocalFallback": false,
+    "logDirectoryWritable": true
+  },
+  "browserFlowRequired": false,
+  "redirectUriExpected": "",
+  "environmentPresence": {
+    "LIVEPANEL_TIKTOK_PYTHON_EXE": false,
+    "LIVEPANEL_TIKTOK_RUNNER_SCRIPT": false,
+    "LIVEPANEL_LEGACY_BRIDGE_ROOT": false,
+    "LIVEPANEL_BRIDGE_LOG_PATH": false,
+    "LIVEPANEL_PANEL_WS_URL": false,
+    "HTTP_PROXY": false,
+    "HTTPS_PROXY": false,
+    "NO_PROXY": false
+  },
+  "statusTimeline": [
+    {
+      "timestampMs": 1788996031064,
+      "state": "resolving_room",
+      "message": "Resolving room id",
+      "roomId": "",
+      "retryCount": 0
+    },
+    {
+      "timestampMs": 1788996032632,
+      "state": "connecting",
+      "message": "Opening TikTok live connection",
+      "roomId": "7683643506404952845",
+      "retryCount": 0
+    }
+  ],
+  "eventCount": 0,
+  "eventSamples": [],
+  "result": "failed",
+  "errorCode": "NETWORK_ERROR",
+  "errorMessage": "TikTok no completo el handshake dentro del CONNECT_TIMEOUT_SEC configurado.",
+  "rawError": "",
+  "traceback": "",
+  "observedRoomId": "7683643506404952845"
+}

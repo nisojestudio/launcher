@@ -4,6 +4,32 @@ All notable Panel Live changes should be recorded here.
 
 Format follows a lightweight Keep a Changelog style. Versions use SemVer.
 
+## 0.2.25 - 2026-09-10
+
+### Added
+
+- **Proveedor `tiktools` para bridge TikTok**: Nueva alternativa al modo `direct` (TikTokLive). Conecta vía WebSocket a `api.tik.tools` usando API key, sin depender de `TikTokLive` local. Incluye manejo de errores específico (API key inválida, límites de sesión, usuario no en vivo) y mapeo completo de eventos (chat, gift, like, follow, share, viewer count, live start/end).
+- **Campo API key de tik.tools en UI**: Nuevo selector de proveedor (`tiktools` / `direct`) y campo de API key en la sección "Live / TikTok" del panel. La clave se guarda encriptada en config y persiste al alternar proveedores.
+- **Recuperación de contraseña (Forgot Password)**: Botón "¿Olvidaste la contraseña?" en la pantalla de auth que usa Firebase Auth `sendOobCode` para enviar correo de restablecimiento.
+- **CLI extendido del bridge Python**: Nuevos argumentos `--api-key` y `--provider` (`tiktools` | `direct`) en `run_tiktok_bridge.py`. Variable de entorno `LIVEPANEL_TIKTOOLS_API_KEY` soportada.
+
+### Changed
+
+- **Proveedor por defecto a `tiktools`**: `bridge_config.yaml` y `BridgeConfig` ahora usan `tiktools` como `connection_mode` predeterminado.
+- **Flujo de conexión bridge unificado**: `/api/bridge/connect` ahora acepta `provider` y `api_key`, guarda configuración siempre, y si el panel no está en modo `external` lo fuerza y pide reinicio (error `bridge_not_external_mode_saved`).
+- **API key persistente**: La clave de tik.tools se guarda en `panel_config.json` (`tiktools_api_key`) para no tener que reingresarla al cambiar de proveedor.
+- **Endpoint `/api/bridge/status`**: Expone `api_key_configured` y `provider` para que la UI refleje el estado real.
+
+### Fixed
+
+- **HTTP 403 en bridge WebSocket**: `tiktok_external_ws_server.cpp` usa cierre graceful (`shutdown(SD_SEND)` + `SO_LINGER` off) tras enviar respuesta 403, evitando que un RST descarte la respuesta antes de que el cliente la lea.
+- **Validación de usuario TikTok**: Eliminada validación estricta `is_valid_tiktok_user()` que rechazaba formatos válidos; ahora `normalize_tiktok_user()` acepta `usuario`, `@usuario` y URLs.
+
+### Build & Workflow
+
+- `clear_ports.bat` y `clear_port8765.bat` actualizados para limpieza robusta de puertos 8765/8766/8770 antes de arranque.
+- Tests Python: 38 tests pasan (`unittest discover -s tools/bridge_py/tests`).
+
 ## 0.2.24 - 2026-07-12
 
 ### Fixed

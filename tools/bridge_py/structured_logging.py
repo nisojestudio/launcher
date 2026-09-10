@@ -108,6 +108,8 @@ def configure_logger(
 
     formatter = JsonLogFormatter()
 
+    # Do not wrap stdout here. Closing a logging handler would otherwise close
+    # the process-wide stdout buffer and break subsequent bridge/test output.
     stream_handler = logging.StreamHandler(sys.stdout)
     stream_handler.setFormatter(formatter)
     logger.addHandler(stream_handler)

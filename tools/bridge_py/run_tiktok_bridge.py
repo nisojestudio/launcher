@@ -8,7 +8,7 @@ import sys
 from bridge_config import BridgeConfig, load_bridge_config
 from event_stream import TikTokBridgeService
 from structured_logging import log_json
-from tiktok_connection import is_valid_tiktok_user, normalize_tiktok_user
+from tiktok_connection import normalize_tiktok_user
 
 
 DEFAULT_PANEL_WS_URL = "ws://127.0.0.1:8765"
@@ -21,13 +21,15 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--config", default="tools/bridge_py/bridge_config.yaml", help="Path to bridge_config.yaml.")
     parser.add_argument("--user", default="", help="TikTok username, @username or TikTok profile URL.")
     parser.add_argument("--room-id", default="", help="Optional numeric room id override.")
+    parser.add_argument("--api-key", default="", help="tik.tools API key.")
+    parser.add_argument("--provider", choices=("tiktools", "direct"), default="", help="TikTok provider to use.")
     parser.add_argument("--output", default="", help="Optional JSONL output path.")
     parser.add_argument("--inbox", default="", help="Optional inbox directory with one JSON file per event.")
     parser.add_argument("--ws", default="", help="Panel WebSocket URL. Defaults to ws://127.0.0.1:8765.")
     parser.add_argument("--session-name", default="", help="Base name for inbox files.")
     parser.add_argument("--max-events", type=int, default=-1, help="Stop after N accepted events. Use 0 for unlimited.")
     parser.add_argument("--max-seconds", type=int, default=-1, help="Stop after N seconds. Use 0 for unlimited.")
-    parser.add_argument("--legacy-bridge-root", default="", help="Legacy bridge root used to reuse TikTokLive dependencies.")
+    parser.add_argument("--legacy-bridge-root", default="", help="Legacy bridge root used to reuse dependencies.")
     parser.add_argument("--status-port", type=int, default=0, help="Local control HTTP port exposing /health, /status and /metrics.")
     parser.add_argument("--broadcast-ws-port", type=int, default=0, help="Optional local broadcast WebSocket port for canonical events.")
     parser.add_argument("--replay", default="", help="Replay a JSONL file instead of connecting to TikTok live.")
@@ -44,6 +46,10 @@ def apply_cli_overrides(config: BridgeConfig, args: argparse.Namespace) -> Bridg
         config.connection.username = normalize_tiktok_user(args.user)
     if args.room_id:
         config.connection.room_id = str(args.room_id).strip()
+    if args.api_key:
+        config.connection.api_key = str(args.api_key).strip()
+    if args.provider:
+        config.connection_mode = args.provider
     if args.output:
         config.output.output_jsonl = args.output
         output_destination_overridden = True
@@ -102,10 +108,6 @@ def validate_runtime_args(config: BridgeConfig, args: argparse.Namespace) -> Non
 
     if not config.connection.username:
         raise SystemExit("error: --user is required unless --replay or --simulate-burst is used")
-    if not is_valid_tiktok_user(config.connection.username):
-        raise SystemExit(
-            "error: --user debe ser el username real de TikTok, por ejemplo alice, @alice o https://www.tiktok.com/@alice"
-        )
 
 
 def print_user_not_found_help() -> None:

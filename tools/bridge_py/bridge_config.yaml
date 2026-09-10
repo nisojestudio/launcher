@@ -1,8 +1,12 @@
-connection_mode: tiktok_live
+# Provider: tiktools (recommended) or direct (unofficial TikTokLive fallback).
+connection_mode: tiktools
 
 connection:
   username: ""
   room_id: ""
+  # Do not commit credentials. The panel passes this at launch, or set
+  # LIVEPANEL_TIKTOOLS_API_KEY for command-line use.
+  api_key: ""
   connect_timeout_sec: 20
   heartbeat_interval_sec: 15
   heartbeat_warning_after_sec: 60
@@ -20,16 +24,16 @@ buffer:
   overflow_policy: drop_oldest
 
 output:
-  panel_ws_url: ws://127.0.0.1:8765
-  output_jsonl: ""
-  inbox_dir: ""
-  session_name: tiktok-live
-  broadcast_ws_enabled: true
-  broadcast_ws_host: 127.0.0.1
-  broadcast_ws_port: 8766
-  control_host: 127.0.0.1
-  control_port: 8770
-  auto_emit_session_status: true
+    panel_ws_url: ws://127.0.0.1:8765
+    output_jsonl: ""
+    inbox_dir: ""
+    session_name: tiktok-live
+    broadcast_ws_enabled: true
+    broadcast_ws_host: 127.0.0.1
+    broadcast_ws_port: 8766
+    control_host: 127.0.0.1
+    control_port: 8770
+    auto_emit_session_status: true
 
 replay:
   enabled: false

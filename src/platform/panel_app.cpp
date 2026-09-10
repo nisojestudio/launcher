@@ -1552,8 +1552,11 @@ bool PanelApp::start_external_runner(const std::string& target_user, std::uint64
     const auto started = external_runner_->start(ExternalBridgeRunnerStartRequest{
         resolved_target_user,
         "ws://127.0.0.1:" + std::to_string(configured_port),
+        config_.tiktools_api_key,
         resolve_runner_control_port(configured_port),
         max_seconds,
+        true,
+        config_.tiktok_provider,
     });
     if (started) {
         external_bridge_connection_state_ = "starting";

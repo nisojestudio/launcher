@@ -65,7 +65,7 @@ class TikTokBridgeService:
         await self.dispatcher.start()
         await self._server.start()
         self.metrics.set_gauge("service_running", 1)
-        log_json(self.logger, "info", "bridge_service", "service started", config=self.config.to_dict())
+        log_json(self.logger, "info", "bridge_service", "service started", config=self.config.to_safe_dict())
 
     async def stop(self) -> None:
         self._shutdown_requested = True
@@ -158,7 +158,7 @@ class TikTokBridgeService:
     def status_payload(self) -> dict[str, Any]:
         return {
             "timestamp_ms": utc_now_ms(),
-            "config": self.config.to_dict(),
+            "config": self.config.to_safe_dict(),
             "metrics": self.metrics.snapshot().to_dict(),
             "last_replay_result": self._last_replay_result,
             "last_status_message": self._last_status_message,

@@ -76,8 +76,21 @@
 
           <form class="panel-form connection-form" id="connect-form">
             <label class="field">
+              <span>Proveedor de conexi&oacute;n</span>
+              <select id="tiktok-provider">
+                <option value="tiktools">tik.tools (recomendado)</option>
+                <option value="direct">Directo con TikTokLive (experimental)</option>
+              </select>
+            </label>
+
+            <label class="field" id="tiktools-api-key-field">
               <span>Usuario de TikTok</span>
               <input id="tiktok-user" type="text" autocomplete="off" spellcheck="false" placeholder="@tuusuario">
+            </label>
+
+            <label class="field">
+              <span>API Key de tik.tools</span>
+              <input id="tiktools-api-key" type="password" autocomplete="off" spellcheck="false" placeholder="tk_...">
             </label>
 
             <div class="info-grid connection-info-grid">
@@ -823,6 +836,12 @@
 
           <p class="auth-feedback" id="auth-feedback">
             Valida tus datos para habilitar este equipo.
+          </p>
+
+          <p class="auth-forgot-row" id="auth-forgot-row">
+            <button class="auth-forgot-button" id="auth-forgot-button" type="button">
+              &iquest;Olvidaste tu contrase&ntilde;a?
+            </button>
           </p>
         </div>
 

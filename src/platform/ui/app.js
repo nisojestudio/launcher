@@ -13,6 +13,7 @@
   ];
   const AUTH_PERSISTENT_KEY = "nlp3-auth-persistent-v1";
   const VOICE_NOTICES_STORAGE_KEY = "nlp3-custom-voice-notices-v1";
+  const FIREBASE_API_KEY = "AIzaSyBWRMoHbPNkOw0zvflcPb_dv9G1Bgg1uLc";
   let _timerOverlayUrl = "";
   const AUDIO_NOTICE_MAX_BYTES = 1572864;
 
@@ -185,6 +186,9 @@
     connectionNote: $("#connection-note"),
     connectForm: $("#connect-form"),
     tiktokUser: $("#tiktok-user"),
+    tiktoolsApiKey: $("#tiktools-api-key"),
+    tiktokProvider: $("#tiktok-provider"),
+    tiktoolsApiKeyField: $("#tiktools-api-key-field"),
     connectButton: $("#connect-button"),
     disconnectButton: $("#disconnect-button"),
     authGate: $("#auth-gate"),
@@ -205,6 +209,8 @@
     authSessionNote: $("#auth-session-note"),
     authLogoutButton: $("#auth-logout-button"),
     authPasswordToggle: $("#auth-password-toggle"),
+    authForgotButton: $("#auth-forgot-button"),
+    authForgotRow: $("#auth-forgot-row"),
 
     metricViewers: $("#metric-viewers"),
     metricLikes: $("#metric-likes"),
@@ -2472,6 +2478,51 @@
     return { text: rawMessage || "Error inesperado. Intenta de nuevo o contacta a soporte.", tone: "error" };
   }
 
+  async function forgotPassword() {
+    const email = String(els.authEmail?.value || "").trim();
+    if (!email) {
+      setAuthFeedback("Ingresa tu correo electr\u00f3nico primero.", "warn");
+      els.authEmail?.focus();
+      return;
+    }
+
+    const button = els.authForgotButton;
+    if (!button) return;
+
+    button.classList.add("is-sending");
+    setAuthFeedback("Enviando correo de restablecimiento...", "warn");
+
+    try {
+      const response = await fetch(
+        "https://identitytoolkit.googleapis.com/v1/accounts:sendOobCode?key=" + FIREBASE_API_KEY,
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            requestType: "PASSWORD_RESET",
+            email: email,
+          }),
+        }
+      );
+
+      const data = await response.json();
+
+      if (response.ok && data.email) {
+        setAuthFeedback(
+          "Correo de restablecimiento enviado a " + email + ". Revisa tu bandeja de entrada y SPAM.",
+          "success"
+        );
+      } else {
+        const errorMsg = data?.error?.message || "Error al enviar el correo. Intenta de nuevo.";
+        setAuthFeedback(errorMsg.replace(/_/g, " "), "error");
+      }
+    } catch (err) {
+      setAuthFeedback("No se pudo contactar el servidor. Verifica tu conexi\u00f3n.", "error");
+    } finally {
+      button.classList.remove("is-sending");
+    }
+  }
+
   async function submitAuthLogin() {
     const email = String(els.authEmail?.value || "").trim();
     const password = String(els.authPassword?.value || "");
@@ -2590,26 +2641,29 @@
       return;
     }
 
+    const provider = els.tiktokProvider?.value || "tiktools";
+    const apiKey = (els.tiktoolsApiKey?.value || "").trim();
+
     try {
-      const attachResponse = await runCommand(`bridge attach ${user}`);
-      if (!attachResponse?.ok) {
-        await exportSupportBundle("tiktok_attach_failed", { silent: true });
-        return;
-      }
-
-      const saveResponse = await runCommand("config save", { silent: true });
-      if (saveResponse && saveResponse.ok === false) {
-        appendLog("No se pudo guardar el usuario de TikTok en la configuraci\u00f3n actual.");
-      }
-
-      const runnerResponse = await runCommand(`bridge runner start ${user}`);
-      if (!runnerResponse?.ok) {
-        await exportSupportBundle("tiktok_runner_start_failed", { silent: true });
+      const response = await postJsonAction(
+        "/api/bridge/connect",
+        { target_user: user, provider, api_key: provider === "tiktools" ? apiKey : "" },
+        "conectar live"
+      );
+      if (response?.error === "bridge_not_external_mode_saved") {
+        appendLog("Configuraci\u00f3n guardada. El panel necesita reiniciarse en modo external. Reinicia el panel para conectar.");
+      } else if (!response?.ok) {
+        await exportSupportBundle("tiktok_connect_failed", { silent: true });
       }
     } catch (error) {
       appendLog(`No se pudo conectar: ${error}`);
       await exportSupportBundle("tiktok_runner_launch_error", { silent: true });
     }
+  }
+
+  function updateTikTokProviderUi() {
+    const usesTikTools = (els.tiktokProvider?.value || "tiktools") === "tiktools";
+    if (els.tiktoolsApiKeyField) els.tiktoolsApiKeyField.hidden = !usesTikTools;
   }
 
   async function disconnectLive() {
@@ -2695,6 +2749,10 @@
       exportSupportBundle("auth_manual");
     });
 
+    els.authForgotButton?.addEventListener("click", () => {
+      forgotPassword();
+    });
+
     els.authPasswordToggle?.addEventListener("click", () => {
       const input = els.authPassword;
       if (!input) return;
@@ -2714,6 +2772,9 @@
       event.preventDefault();
       connectLive();
     });
+
+    els.tiktokProvider?.addEventListener("change", updateTikTokProviderUi);
+    updateTikTokProviderUi();
 
     els.disconnectButton?.addEventListener("click", () => {
       disconnectLive();

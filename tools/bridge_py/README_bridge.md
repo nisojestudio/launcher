@@ -31,6 +31,23 @@ pip install -r requirements.txt
 
 ## Arranque
 
+### tik.tools (modo real)
+
+El panel solicita la API key al conectar y la pasa al proceso del bridge; no la
+copies en `bridge_config.yaml` ni en logs. Para ejecutar el bridge de forma
+manual, define `LIVEPANEL_TIKTOOLS_API_KEY` temporalmente o usa `--api-key`:
+
+```powershell
+$env:LIVEPANEL_TIKTOOLS_API_KEY = "tk_..."
+.\.venv\Scripts\python.exe .\run_tiktok_bridge.py --user tuusuario
+Remove-Item Env:LIVEPANEL_TIKTOOLS_API_KEY
+```
+
+Si tik.tools cierra con `4429`, no es una caída de red: la sesión alcanzó el
+límite de plan/demo o de WebSockets. El bridge deja de reintentarla para evitar
+un bucle y muestra el diagnóstico; cierra las sesiones duplicadas o usa una
+key con cuota disponible.
+
 WS directo al panel:
 
 ```bash

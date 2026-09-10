@@ -1212,6 +1212,43 @@ body.auth-locked .app-shell {
   min-height: 46px;
 }
 
+.auth-forgot-row {
+  display: flex;
+  justify-content: center;
+  margin-top: 4px;
+  margin-bottom: 0;
+}
+
+.auth-forgot-button {
+  background: none;
+  border: none;
+  color: var(--accent, #60a5fa);
+  font-size: 13px;
+  cursor: pointer;
+  padding: 6px 12px;
+  border-radius: 4px;
+  transition: background 0.15s, color 0.15s;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+  text-decoration-color: transparent;
+}
+
+.auth-forgot-button:hover {
+  background: rgba(96, 165, 250, 0.08);
+  color: var(--accent-hover, #93c5fd);
+  text-decoration-color: currentColor;
+}
+
+.auth-forgot-button:active {
+  background: rgba(96, 165, 250, 0.14);
+}
+
+.auth-forgot-button.is-sending {
+  opacity: 0.6;
+  pointer-events: none;
+  cursor: default;
+}
+
 .games-list {
   flex: 1;
   min-height: 0;

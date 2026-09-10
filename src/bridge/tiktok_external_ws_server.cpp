@@ -43,6 +43,27 @@ void close_socket(SOCKET& socket_handle) {
     }
 }
 
+void close_socket_after_http_response(SOCKET& socket_handle) {
+    if (socket_handle == INVALID_SOCKET) {
+        return;
+    }
+
+    // The listener uses abortive close to make a fixed local port reusable.
+    // Do not inherit that behavior after writing an HTTP error: an RST can
+    // discard the queued 403 response before the client reads it.
+    linger graceful_linger{};
+    graceful_linger.l_onoff = 0;
+    setsockopt(
+        socket_handle,
+        SOL_SOCKET,
+        SO_LINGER,
+        reinterpret_cast<const char*>(&graceful_linger),
+        sizeof(graceful_linger));
+    shutdown(socket_handle, SD_SEND);
+    closesocket(socket_handle);
+    socket_handle = INVALID_SOCKET;
+}
+
 bool socket_readable(SOCKET socket_handle) {
     fd_set read_set;
     FD_ZERO(&read_set);
@@ -573,8 +594,7 @@ const auto origin = extract_header_value(request, "origin");
             const auto forbidden_response =
                 make_http_error_response("403 Forbidden", "origin_not_allowed");
             send_all(impl_->client_socket, forbidden_response);
-            // Close socket completely (like backup) so client receives 403 and connection closes
-            close_socket(impl_->client_socket);
+            close_socket_after_http_response(impl_->client_socket);
             impl_->handshake_complete = false;
             impl_->receive_buffer.clear();
             return 0;

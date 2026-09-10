@@ -10,6 +10,12 @@ from bridge_config import load_bridge_config
 
 
 class BridgeConfigTests(unittest.TestCase):
+    def test_safe_config_redacts_tiktools_api_key(self) -> None:
+        config = load_bridge_config()
+        config.connection.api_key = "secret-value"
+
+        self.assertEqual(config.to_safe_dict()["connection"]["api_key"], "***")
+
     def test_load_bridge_config_from_yaml(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
             config_path = Path(temp_dir) / "bridge_config.yaml"
@@ -62,6 +68,12 @@ class BridgeConfigTests(unittest.TestCase):
             config = load_bridge_config(Path("missing-bridge-config.yaml"))
 
         self.assertEqual(config.legacy_bridge_root, r"C:\bridge-runtime")
+
+    def test_load_bridge_config_normalizes_direct_provider(self) -> None:
+        with patch.dict("os.environ", {"LIVEPANEL_TIKTOK_PROVIDER": "tiktok_live"}, clear=False):
+            config = load_bridge_config(Path("missing-bridge-config.yaml"))
+
+        self.assertEqual(config.connection_mode, "direct")
 
 
 if __name__ == "__main__":

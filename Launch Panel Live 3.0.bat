@@ -12,6 +12,11 @@ if "%PANEL_ROOT:~-1%"=="\" set "PANEL_ROOT=%PANEL_ROOT:~0,-1%"
 rem Limpiar túneles cloudflared zombies que bloquean puertos
 taskkill /f /im cloudflared.exe >nul 2>&1
 
+rem Liberar todos los puertos del sistema (18913, 8765, 8766, 8770)
+if exist "%PANEL_ROOT%scripts\free_ports.ps1" (
+    powershell -NoProfile -ExecutionPolicy Bypass -File "%PANEL_ROOT%scripts\free_ports.ps1" >nul 2>&1
+)
+
 set "TOOLS_ROOT=%PANEL_ROOT%\tools\bridge_py"
 set "PACKAGED_PYTHON=%TOOLS_ROOT%\python_runtime\python.exe"
 set "VENV_DIR=%TOOLS_ROOT%\.venv"

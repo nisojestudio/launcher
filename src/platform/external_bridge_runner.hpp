@@ -9,9 +9,11 @@ namespace nlp3::platform {
 struct ExternalBridgeRunnerStartRequest {
     std::string target_user{};
     std::string ws_url{};
+    std::string api_key{};
     std::uint16_t control_port = 0;
     std::uint64_t max_seconds = 0;
     bool enable_broadcast_ws = true;  // Default: enabled
+    std::string provider = "tiktools";
 };
 
 struct ExternalBridgeRunnerStatus {

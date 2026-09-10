@@ -1353,9 +1353,6 @@ std::string handle_bridge_connect(PanelApp* app, std::string_view body) {
     if (app == nullptr) {
         return nlp3::platform::build_panel_http_error_json("panel unavailable");
     }
-    if (!app->is_external_bridge_mode()) {
-        return make_simple_result(false, "bridge_not_external_mode");
-    }
 
     auto target_user = parse_json_string(body, "target_user").value_or("");
     target_user = normalize_tiktok_user(target_user);
@@ -1364,21 +1361,49 @@ std::string handle_bridge_connect(PanelApp* app, std::string_view body) {
         return make_simple_result(false, "invalid_tiktok_user");
     }
 
-    // 1. Guardar en config persistente
+    auto api_key = parse_json_string(body, "api_key").value_or("");
+    auto provider = to_lower_copy(parse_json_string(body, "provider").value_or("tiktools"));
+    if (provider == "tiktok_live" || provider == "tiktoklive") {
+        provider = "direct";
+    }
+    if (provider != "tiktools" && provider != "direct") {
+        return make_simple_result(false, "invalid_tiktok_provider");
+    }
+
+    // 1. Guardar en config persistente (siempre, sin importar bridge mode)
     app->config().external_target_user = target_user;
+    // La clave se conserva al alternar temporalmente al adaptador directo, de
+    // modo que el usuario pueda volver a TikTools sin reingresarla.
+    if (provider == "tiktools") {
+        app->config().tiktools_api_key = api_key;
+    }
+    app->config().tiktok_provider = provider;
+
+    // Si no está en modo external, forzarlo y pedir reinicio
+    if (!app->is_external_bridge_mode()) {
+        app->config().bridge_mode = "external";
+        app->save_config();
+        return make_simple_result(false, "bridge_not_external_mode_saved");
+    }
+
     app->save_config();
 
-    // 2. Iniciar WS server (puerto 8765 exclusivo)
+    // 2. Asegurar WS server (puerto 8765 exclusivo) — puede ya estar corriendo del startup
     const auto port = app->config().external_ws_port == 0 ? static_cast<std::uint16_t>(8765)
                                                           : app->config().external_ws_port;
-    if (!app->start_external_ws(port)) {
-        return make_simple_result(false, "ws_start_failed");
+    auto ws = app->external_ws_status();
+    if (!ws.running || ws.port != port) {
+        if (!app->start_external_ws(port)) {
+            return make_simple_result(false, "ws_start_failed");
+        }
     }
 
     // 3. Iniciar runner (lanza Python bridge)
-    if (!app->start_external_runner(target_user, 0)) {
-        app->stop_external_ws();  // Rollback
-        return make_simple_result(false, "runner_start_failed");
+    auto runner = app->external_runner_status();
+    if (!runner.running) {
+        if (!app->start_external_runner(target_user, 0)) {
+            return make_simple_result(false, "runner_start_failed");
+        }
     }
 
     return make_simple_result(true, "bridge_connected");
@@ -1414,6 +1439,8 @@ std::string handle_bridge_status(PanelApp* app) {
     out << "{"
         << "\"configured\":" << (cfg.external_target_user.empty() ? "false" : "true") << ","
         << "\"target_user\":" << json_quote(cfg.external_target_user) << ","
+        << "\"api_key_configured\":" << (cfg.tiktools_api_key.empty() ? "false" : "true") << ","
+        << "\"provider\":" << json_quote(cfg.tiktok_provider) << ","
         << "\"ws_port\":" << (cfg.external_ws_port == 0 ? 8765 : cfg.external_ws_port) << ","
         << "\"ws_running\":" << (ws.running ? "true" : "false") << ","
         << "\"ws_port_actual\":" << ws.port << ","

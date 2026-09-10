@@ -10,7 +10,7 @@ from connection_manager import ConnectionManager
 from event_decoder import decode_canonical_event
 from metrics_registry import MetricsRegistry
 from structured_logging import configure_logger
-from tiktok_connection import TikTokConnectionError
+from tiktools_connection import TikToolsConnectionError
 
 
 class FakeConnection:
@@ -38,9 +38,9 @@ class FakeConnection:
     async def open(self) -> None:
         type(self).attempts += 1
         if type(self).user_not_found:
-            raise TikTokConnectionError("USER_NOT_FOUND", "No se encontro ese usuario en TikTok.")
+            raise TikToolsConnectionError("USER_NOT_FOUND", "No se encontro ese usuario en TikTok.")
         if type(self).fail_first and type(self).attempts == 1:
-            raise TikTokConnectionError("NETWORK_ERROR", "Fallo temporal de red.")
+            raise TikToolsConnectionError("NETWORK_ERROR", "Fallo temporal de red.")
 
         if type(self).hang_until_closed:
             async def _wait() -> None:
@@ -109,7 +109,7 @@ class ConnectionManagerTests(unittest.IsolatedAsyncioTestCase):
             status_callback=status_callback,
         )
 
-        with mock.patch("connection_manager.TikTokConnection", FakeConnection), mock.patch(
+        with mock.patch("connection_manager.TikToolsConnection", FakeConnection), mock.patch(
             "connection_manager.asyncio.sleep",
             side_effect=fast_sleep,
         ):
@@ -146,7 +146,7 @@ class ConnectionManagerTests(unittest.IsolatedAsyncioTestCase):
             status_callback=status_callback,
         )
 
-        with mock.patch("connection_manager.TikTokConnection", FakeConnection):
+        with mock.patch("connection_manager.TikToolsConnection", FakeConnection):
             exit_code = await manager.run(target_user="missing-user", max_events=1, max_seconds=0)
 
         self.assertEqual(exit_code, 1)
@@ -177,12 +177,40 @@ class ConnectionManagerTests(unittest.IsolatedAsyncioTestCase):
             status_callback=status_callback,
         )
 
-        with mock.patch("connection_manager.TikTokConnection", FakeConnection):
+        with mock.patch("connection_manager.TikToolsConnection", FakeConnection):
             exit_code = await manager.run(target_user="alice", max_events=0, max_seconds=1)
 
         self.assertEqual(exit_code, 0)
         self.assertEqual(FakeConnection.attempts, 1)
         self.assertIn("max_seconds reached (1)", messages)
+
+    async def test_selects_direct_tiktoklive_provider(self) -> None:
+        FakeConnection.attempts = 0
+        FakeConnection.fail_first = False
+        FakeConnection.user_not_found = False
+        FakeConnection.hang_until_closed = False
+        config = BridgeConfig()
+        config.connection_mode = "direct"
+
+        async def event_callback(_event) -> bool:
+            return True
+
+        async def status_callback(_status) -> None:
+            return None
+
+        manager = ConnectionManager(
+            config=config,
+            logger=configure_logger(name="livepanel.bridge.test.connection.direct", log_path="tools/bridge_py/logs/test_connection_direct.jsonl"),
+            metrics=MetricsRegistry(),
+            event_callback=event_callback,
+            status_callback=status_callback,
+        )
+
+        with mock.patch("connection_manager.TikTokConnection", FakeConnection):
+            exit_code = await manager.run(target_user="alice", max_events=1)
+
+        self.assertEqual(exit_code, 0)
+        self.assertEqual(FakeConnection.attempts, 1)
 
 
 if __name__ == "__main__":

@@ -29,6 +29,8 @@ struct PanelConfig {
     std::string default_game_id = "event-counter";
     std::string bridge_mode = "stub";
     std::string external_target_user{};
+    std::string tiktools_api_key{};
+    std::string tiktok_provider = "tiktools";
     std::uint16_t external_ws_port = 8765;
     bool embedded_ui_enabled = true;
     bool embedded_ui_fallback_to_browser = true;

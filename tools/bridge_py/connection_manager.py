@@ -9,6 +9,7 @@ from event_models import CanonicalEvent, ConnectionState, SessionStatus
 from metrics_registry import MetricsRegistry
 from session_manager import HeartbeatMonitor, SessionSupervisor
 from structured_logging import log_json, utc_now_ms
+from tiktools_connection import TikToolsConnection, TikToolsConnectionError
 from tiktok_connection import TikTokConnection, TikTokConnectionError
 
 
@@ -19,7 +20,7 @@ StatusCallback = Callable[[SessionStatus], Awaitable[None]]
 def compute_retry_delay(config: BridgeConfig, code: str, attempt_index: int) -> float | None:
     if not config.retry_policy.enabled:
         return None
-    if code in ("INVALID_USERNAME", "USER_NOT_FOUND", "AGE_RESTRICTED", "ACCESS_BLOCKED", "RATE_LIMIT"):
+    if code in ("INVALID_USERNAME", "USER_NOT_FOUND", "AGE_RESTRICTED", "ACCESS_BLOCKED", "RATE_LIMIT", "INVALID_API_KEY", "API_SESSION_ENDED"):
         return None
     if config.retry_policy.max_attempts > 0 and attempt_index >= config.retry_policy.max_attempts:
         return None
@@ -70,7 +71,7 @@ class ConnectionManager:
             await self._status_callback(status)
 
         while not self._stop_requested:
-            connection: TikTokConnection | None = None
+            connection: Any | None = None
 
             async def emit_event(event: CanonicalEvent) -> None:
                 nonlocal accepted_events, connection, final_message
@@ -115,16 +116,23 @@ class ConnectionManager:
                         retry_count=attempt,
                     )
                 )
-                connection = TikTokConnection(
-                    logger=self._logger,
-                    legacy_bridge_root=self._config.legacy_bridge_root,
-                    connect_timeout_sec=self._config.connection.connect_timeout_sec,
-                    event_callback=emit_event,
-                    status_callback=emit_status,
-                    target_user=target_user,
-                    room_id=room_id,
-                    session_id=utc_now_ms(),
-                )
+                connection_args = {
+                    "logger": self._logger,
+                    "legacy_bridge_root": self._config.legacy_bridge_root,
+                    "connect_timeout_sec": self._config.connection.connect_timeout_sec,
+                    "event_callback": emit_event,
+                    "status_callback": emit_status,
+                    "target_user": target_user,
+                    "room_id": room_id,
+                    "session_id": utc_now_ms(),
+                }
+                if self._config.connection_mode == "direct":
+                    connection = TikTokConnection(**connection_args)
+                else:
+                    connection = TikToolsConnection(
+                        **connection_args,
+                        api_key=self._config.connection.api_key,
+                    )
 
                 heartbeat_monitor.set_state(ConnectionState.CONNECTING, retry_count=attempt)
                 await connection.open()
@@ -147,10 +155,7 @@ class ConnectionManager:
                         if self._stop_requested or supervisor.stop_requested:
                             await connection.close()
                         if wait_task.done():
-                            try:
-                                await wait_task
-                            except BaseException:
-                                pass
+                            await wait_task
                             break
 
                         wait_timeout = 0.5
@@ -159,10 +164,7 @@ class ConnectionManager:
 
                         done, _pending = await asyncio.wait({wait_task}, timeout=wait_timeout)
                         if done:
-                            try:
-                                await wait_task
-                            except BaseException:
-                                pass
+                            await wait_task
                             break
                 finally:
                     if not wait_task.done():
@@ -175,11 +177,11 @@ class ConnectionManager:
                 if supervisor.stop_requested or self._stop_requested:
                     break
 
-                raise TikTokConnectionError(
+                raise TikToolsConnectionError(
                     "STREAM_DISCONNECTED",
-                    "La conexion con TikTok se cerro.",
+                    "La conexion con tik.tools se cerro.",
                 )
-            except TikTokConnectionError as exc:
+            except (TikToolsConnectionError, TikTokConnectionError) as exc:
                 self._metrics.increment("session_failures_total")
                 self._metrics.set_gauge("connected", 0)
                 heartbeat_monitor.set_state(ConnectionState.FAULTED, retry_count=attempt, error=exc.message)
@@ -194,10 +196,10 @@ class ConnectionManager:
                     )
                 )
                 log_json(
-                    self._logger,
-                    "error",
-                    "connection_manager",
-                    "TikTok session failed",
+                self._logger,
+                "error",
+                "connection_manager",
+                "TikTok session failed",
                     code=exc.code,
                     error_message=exc.message,
                     retry_count=attempt,
