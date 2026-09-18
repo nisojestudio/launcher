@@ -381,7 +381,7 @@ bool PanelConfigStorage::save_to_file(const PanelConfig& input_config, const std
         root["default_game_id"] = input_config.default_game_id;
         root["bridge_mode"] = normalized_bridge_mode_value;
         root["external_target_user"] = input_config.external_target_user;
-        root["tiktools_api_key"] = input_config.tiktools_api_key;
+        root["provider_api_key"] = input_config.provider_api_key;
         root["tiktok_provider"] = input_config.tiktok_provider;
         root["external_ws_port"] = input_config.external_ws_port;
         root["embedded_ui_enabled"] = input_config.embedded_ui_enabled;
@@ -439,7 +439,7 @@ bool PanelConfigStorage::load_from_file(const std::string& path, PanelConfig& ou
             || !try_read_string(parsed, "default_game_id", config.default_game_id)
             || !try_read_string(parsed, "bridge_mode", config.bridge_mode)
             || !try_read_string(parsed, "external_target_user", config.external_target_user)
-            || !try_read_string(parsed, "tiktools_api_key", config.tiktools_api_key)
+            || !try_read_string(parsed, "provider_api_key", config.provider_api_key)
             || !try_read_string(parsed, "tiktok_provider", config.tiktok_provider)
             || !try_read_unsigned(parsed, "external_ws_port", config.external_ws_port)
             || !try_read_bool(parsed, "embedded_ui_enabled", config.embedded_ui_enabled)
@@ -450,6 +450,11 @@ bool PanelConfigStorage::load_from_file(const std::string& path, PanelConfig& ou
             || !try_read_string(parsed, "host_energy_level", config.host_energy_level)
             || !try_read_string(parsed, "host_tone_style", config.host_tone_style)) {
             return false;
+        }
+
+        // Backwards compatibility: load old "tiktools_api_key" if "provider_api_key" not present
+        if (config.provider_api_key.empty()) {
+            try_read_string(parsed, "tiktools_api_key", config.provider_api_key);
         }
 
         const ordered_json* bridge = nullptr;

@@ -1375,7 +1375,7 @@ std::string handle_bridge_connect(PanelApp* app, std::string_view body) {
     // La clave se conserva al alternar temporalmente al adaptador directo, de
     // modo que el usuario pueda volver a TikTools sin reingresarla.
     if (provider == "tiktools" || provider == "euler") {
-        app->config().tiktools_api_key = api_key;
+        app->config().provider_api_key = api_key;
     }
     app->config().tiktok_provider = provider;
 
@@ -1439,7 +1439,7 @@ std::string handle_bridge_status(PanelApp* app) {
     out << "{"
         << "\"configured\":" << (cfg.external_target_user.empty() ? "false" : "true") << ","
         << "\"target_user\":" << json_quote(cfg.external_target_user) << ","
-        << "\"api_key_configured\":" << (cfg.tiktools_api_key.empty() ? "false" : "true") << ","
+        << "\"api_key_configured\":" << (cfg.provider_api_key.empty() ? "false" : "true") << ","
         << "\"provider\":" << json_quote(cfg.tiktok_provider) << ","
         << "\"ws_port\":" << (cfg.external_ws_port == 0 ? 8765 : cfg.external_ws_port) << ","
         << "\"ws_running\":" << (ws.running ? "true" : "false") << ","

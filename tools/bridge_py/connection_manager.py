@@ -25,6 +25,7 @@ EventCallback = Callable[[CanonicalEvent], Awaitable[bool]]
 StatusCallback = Callable[[SessionStatus], Awaitable[None]]
 
 # Error codes that should NOT trigger a reconnect (permanent failures)
+# Includes codes from TikTools, TikTokLive (direct), and Euler providers
 _NON_RETRYABLE_CODES = frozenset({
     "INVALID_USERNAME",
     "USER_NOT_FOUND",
@@ -34,12 +35,15 @@ _NON_RETRYABLE_CODES = frozenset({
     "INVALID_API_KEY",
     "API_SESSION_ENDED",
     "NOT_LIVE",
+    "BOOTSTRAP_FAILED",      # Euler: websockets not installed
+    "INVALID_JWT",           # Euler: JWT token invalid
 })
 
 # Error codes that indicate the server deliberately closed the connection
 _SERVER_CLOSE_CODES = frozenset({
     "STREAM_DISCONNECTED",
     "NOT_LIVE",
+    "API_SESSION_ENDED",     # Provider ended session (limit reached)
 })
 
 
@@ -73,26 +77,33 @@ def remaining_runtime_seconds(started_at: float, max_seconds: int) -> float | No
 
 
 class ReconnectRateLimiter:
-    """Tracks reconnect attempts per hour to avoid exhausting provider tokens."""
+    """Tracks reconnect attempts per hour per provider to avoid exhausting provider tokens."""
 
     def __init__(self, max_per_hour: int) -> None:
         self._max_per_hour = max(1, max_per_hour)
-        self._timestamps: list[float] = []
+        self._provider_timestamps: dict[str, list[float]] = {}
 
-    def can_reconnect(self) -> bool:
+    def can_reconnect(self, provider: str) -> bool:
         now = time.monotonic()
         cutoff = now - 3600.0
-        self._timestamps = [t for t in self._timestamps if t > cutoff]
-        return len(self._timestamps) < self._max_per_hour
+        timestamps = self._provider_timestamps.get(provider, [])
+        timestamps = [t for t in timestamps if t > cutoff]
+        self._provider_timestamps[provider] = timestamps
+        return len(timestamps) < self._max_per_hour
 
-    def record_reconnect(self) -> None:
-        self._timestamps.append(time.monotonic())
+    def record_reconnect(self, provider: str) -> None:
+        now = time.monotonic()
+        timestamps = self._provider_timestamps.get(provider, [])
+        timestamps.append(now)
+        self._provider_timestamps[provider] = timestamps
 
-    def remaining(self) -> int:
+    def remaining(self, provider: str) -> int:
         now = time.monotonic()
         cutoff = now - 3600.0
-        self._timestamps = [t for t in self._timestamps if t > cutoff]
-        return max(0, self._max_per_hour - len(self._timestamps))
+        timestamps = self._provider_timestamps.get(provider, [])
+        timestamps = [t for t in timestamps if t > cutoff]
+        self._provider_timestamps[provider] = timestamps
+        return max(0, self._max_per_hour - len(timestamps))
 
 
 class ConnectionManager:
@@ -210,14 +221,29 @@ class ConnectionManager:
                     connection = TikTokConnection(**connection_args)
                 elif self._config.connection_mode == "euler":
                     from euler_connection import EulerConnection
+                    api_key = self._config.connection.api_key
+                    if not api_key:
+                        raise EulerConnectionError(
+                            "INVALID_API_KEY",
+                            "Euler requiere API key (JWT). Proporcione --api-key o LIVEPANEL_BRIDGE_API_KEY.",
+                        )
                     connection = EulerConnection(
                         **connection_args,
-                        api_key=self._config.connection.api_key,
+                        api_key=api_key,
+                        heartbeat_interval_sec=self._config.connection.heartbeat_interval_sec,
+                        heartbeat_warning_after_sec=self._config.connection.heartbeat_warning_after_sec,
+                        silence_timeout_sec=self._config.connection.silence_timeout_sec,
                     )
                 else:
+                    api_key = self._config.connection.api_key
+                    if not api_key:
+                        raise TikToolsConnectionError(
+                            "INVALID_API_KEY",
+                            "tik.tools requiere API key. Proporcione --api-key o LIVEPANEL_BRIDGE_API_KEY.",
+                        )
                     connection = TikToolsConnection(
                         **connection_args,
-                        api_key=self._config.connection.api_key,
+                        api_key=api_key,
                     )
 
                 heartbeat_monitor.set_state(ConnectionState.CONNECTING, retry_count=attempt)
@@ -290,6 +316,7 @@ class ConnectionManager:
                         retry_count=attempt,
                     )
                 )
+                provider = self._config.connection_mode
                 log_json(
                     self._logger,
                     "error",
@@ -300,8 +327,8 @@ class ConnectionManager:
                     retry_count=attempt,
                     target_user=target_user,
                     raw_error=exc.raw_error,
-                    provider=self._config.connection_mode,
-                    reconnects_remaining=self._reconnect_limiter.remaining(),
+                    provider=provider,
+                    reconnects_remaining=self._reconnect_limiter.remaining(provider),
                 )
 
                 # Check if we should retry
@@ -319,8 +346,8 @@ class ConnectionManager:
                     exit_code = 1
                     break
 
-                # Check rate limiter
-                if not self._reconnect_limiter.can_reconnect():
+                # Check rate limiter (per provider)
+                if not self._reconnect_limiter.can_reconnect(provider):
                     log_json(
                         self._logger,
                         "warning",
@@ -328,6 +355,7 @@ class ConnectionManager:
                         "reconnect rate limit reached",
                         max_per_hour=self._config.retry_policy.max_reconnect_per_hour,
                         attempt=attempt,
+                        provider=provider,
                     )
                     final_message = "reconnect rate limit exceeded"
                     exit_code = 1
@@ -339,9 +367,9 @@ class ConnectionManager:
                     break
 
                 attempt += 1
-                self._reconnect_limiter.record_reconnect()
+                self._reconnect_limiter.record_reconnect(provider)
                 self._metrics.increment("reconnect_total")
-                self._metrics.set_gauge("reconnects_remaining", float(self._reconnect_limiter.remaining()))
+                self._metrics.set_gauge("reconnects_remaining", float(self._reconnect_limiter.remaining(provider)))
                 heartbeat_monitor.set_state(ConnectionState.RECONNECTING, retry_count=attempt, error=exc.message)
                 await emit_status(
                     SessionStatus(

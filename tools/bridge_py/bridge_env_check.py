@@ -11,6 +11,7 @@ from typing import Any
 
 from bridge_config import load_bridge_config
 from structured_logging import describe_log_destination
+from urllib.parse import urlparse
 
 
 REQUIRED_MODULES = (
@@ -35,6 +36,9 @@ REQUIRED_REMOTE_AUTH_FIELDS = (
     "me_licenses_path",
     "me_games_catalog_path",
 )
+
+EULER_WS_BASE = "wss://ws.eulerstream.com"
+EULER_API_BASE = "https://api.eulerstream.com"
 
 REQUIRED_RUNTIME_FILES = (
     "python.exe",
@@ -69,6 +73,96 @@ def _module_version(module_name: str, module: Any | None = None) -> str:
             return version_value.strip()
 
     return "unknown"
+
+
+def _check_euler_connectivity(bridge_config) -> tuple[bool, str, dict[str, Any]]:
+    """Check if Euler Stream is reachable and API key is configured.
+    Returns (ok, message, details)."""
+    provider = getattr(bridge_config, "connection_mode", "tiktools")
+    if provider != "euler":
+        return True, "Provider is not Euler, skipping Euler connectivity check", {"skipped": True}
+
+    api_key = getattr(bridge_config.connection, "api_key", "") or ""
+    if not api_key:
+        return False, "Euler provider selected but no API key (JWT) configured", {
+            "provider": "euler",
+            "api_key_configured": False,
+            "endpoint": EULER_WS_BASE,
+        }
+
+    # Check API key format (basic JWT check: should have 3 parts separated by dots)
+    jwt_parts = api_key.split(".")
+    if len(jwt_parts) != 3:
+        return False, "Euler API key does not appear to be a valid JWT (expected 3 parts)", {
+            "provider": "euler",
+            "api_key_configured": True,
+            "api_key_format_valid": False,
+            "endpoint": EULER_WS_BASE,
+        }
+
+    # Try to resolve DNS for Euler endpoints (non-blocking check)
+    import socket
+    try:
+        ws_host = urlparse(EULER_WS_BASE).hostname
+        api_host = urlparse(EULER_API_BASE).hostname
+        socket.gethostbyname(ws_host)
+        socket.gethostbyname(api_host)
+        dns_ok = True
+    except Exception as exc:
+        dns_ok = False
+        return False, f"Cannot resolve Euler endpoints DNS: {exc}", {
+            "provider": "euler",
+            "api_key_configured": True,
+            "api_key_format_valid": True,
+            "endpoint": EULER_WS_BASE,
+            "dns_error": str(exc),
+        }
+
+    return True, "Euler connectivity check passed (DNS resolution OK)", {
+        "provider": "euler",
+        "api_key_configured": True,
+        "api_key_format_valid": True,
+        "endpoint": EULER_WS_BASE,
+        "dns_ok": dns_ok,
+    }
+
+
+def _check_tiktools_connectivity(bridge_config) -> tuple[bool, str, dict[str, Any]]:
+    """Check if tik.tools is reachable and API key is configured.
+    Returns (ok, message, details)."""
+    provider = getattr(bridge_config, "connection_mode", "tiktools")
+    if provider != "tiktools":
+        return True, "Provider is not tiktools, skipping tiktools connectivity check", {"skipped": True}
+
+    api_key = getattr(bridge_config.connection, "api_key", "") or ""
+    if not api_key:
+        return False, "tiktools provider selected but no API key configured", {
+            "provider": "tiktools",
+            "api_key_configured": False,
+            "endpoint": "wss://api.tik.tools",
+        }
+
+    # Try to resolve DNS for tik.tools endpoint
+    import socket
+    try:
+        ws_host = "api.tik.tools"
+        socket.gethostbyname(ws_host)
+        dns_ok = True
+    except Exception as exc:
+        dns_ok = False
+        return False, f"Cannot resolve tik.tools endpoint DNS: {exc}", {
+            "provider": "tiktools",
+            "api_key_configured": True,
+            "endpoint": "wss://api.tik.tools",
+            "dns_error": str(exc),
+        }
+
+    return True, "tiktools connectivity check passed (DNS resolution OK)", {
+        "provider": "tiktools",
+        "api_key_configured": True,
+        "endpoint": "wss://api.tik.tools",
+        "dns_ok": dns_ok,
+    }
 
 
 def _build_report(
@@ -269,6 +363,30 @@ def _build_report(
             alerts.append(
                 "panel_config.json no pudo validarse. Reinstala Panel Live para restaurar la configuracion inicial."
             )
+
+    # Euler connectivity check (only if provider is euler)
+    euler_ok, euler_msg, euler_details = _check_euler_connectivity(bridge_config)
+    checks.append({
+        "type": "provider_connectivity",
+        "id": "euler_stream",
+        "ok": euler_ok,
+        "message": euler_msg,
+        **euler_details,
+    })
+    if not euler_ok:
+        alerts.append(euler_msg)
+
+    # TikTools connectivity check (only if provider is tiktools)
+    tiktools_ok, tiktools_msg, tiktools_details = _check_tiktools_connectivity(bridge_config)
+    checks.append({
+        "type": "provider_connectivity",
+        "id": "tiktools",
+        "ok": tiktools_ok,
+        "message": tiktools_msg,
+        **tiktools_details,
+    })
+    if not tiktools_ok:
+        alerts.append(tiktools_msg)
 
     ok = not alerts
     if ok:

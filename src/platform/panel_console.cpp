@@ -607,7 +607,7 @@ bool PanelConsole::execute_line(const std::string& line) {
         *output_ << "  default_game_id=" << config.default_game_id << "\n";
         *output_ << "  bridge_mode=" << config.bridge_mode << "\n";
         *output_ << "  external_target_user=" << (config.external_target_user.empty() ? "-" : config.external_target_user) << "\n";
-        *output_ << "  tiktools_api_key=" << (config.tiktools_api_key.empty() ? "-" : "***") << "\n";
+        *output_ << "  provider_api_key=" << (config.provider_api_key.empty() ? "-" : "***") << "\n";
         *output_ << "  external_ws_port=" << resolve_configured_external_ws_port(app_) << "\n";
         *output_ << "  embedded_ui_enabled=" << (config.embedded_ui_enabled ? "yes" : "no") << "\n";
         *output_ << "  embedded_ui_fallback_to_browser=" << (config.embedded_ui_fallback_to_browser ? "yes" : "no") << "\n";

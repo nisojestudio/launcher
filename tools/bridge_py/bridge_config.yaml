@@ -5,7 +5,8 @@ connection:
   username: ""
   room_id: ""
   # Do not commit credentials. The panel passes this at launch, or set
-  # LIVEPANEL_TIKTOOLS_API_KEY for command-line use.
+  # LIVEPANEL_BRIDGE_API_KEY for any provider (tiktools, euler).
+  # Legacy: LIVEPANEL_TIKTOOLS_API_KEY still works for tiktools.
   api_key: ""
   connect_timeout_sec: 20
   heartbeat_interval_sec: 15

@@ -176,7 +176,13 @@ def load_bridge_config(path: str | Path | None = None) -> BridgeConfig:
         connection=ConnectionConfig(
             username=_parse_text(_env("LIVEPANEL_TIKTOK_USER") or connection.get("username"), ""),
             room_id=_parse_text(_env("LIVEPANEL_TIKTOK_ROOM_ID") or connection.get("room_id"), ""),
-            api_key=_parse_text(_env("LIVEPANEL_TIKTOOLS_API_KEY") or connection.get("api_key"), ""),
+            # Generic API key for any provider (tiktools, euler), with backwards compat for tiktools
+            api_key=_parse_text(
+                _env("LIVEPANEL_BRIDGE_API_KEY")
+                or _env("LIVEPANEL_TIKTOOLS_API_KEY")
+                or connection.get("api_key"),
+                "",
+            ),
             connect_timeout_sec=_parse_float(
                 _env("LIVEPANEL_TIKTOK_CONNECT_TIMEOUT_SEC") or connection.get("connect_timeout_sec"),
                 20.0,

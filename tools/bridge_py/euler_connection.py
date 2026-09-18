@@ -37,6 +37,8 @@ def classify_euler_error(raw_error: str) -> tuple[str, str]:
         return "API_SESSION_ENDED", "Euler cerro la sesion por limite de conexiones."
     if "invalid" in lower and ("key" in lower or "api" in lower or "jwt" in lower):
         return "INVALID_API_KEY", "La API key o JWT de Euler es invalida."
+    if "jwt" in lower and ("invalid" in lower or "expired" in lower or "malformed" in lower):
+        return "INVALID_JWT", "El token JWT de Euler es invalido o ha expirado."
     if "not found" in lower or "user not found" in lower:
         return "USER_NOT_FOUND", "No se encontro ese usuario en TikTok."
     if "not live" in lower or "not currently live" in lower or "offline" in lower:
@@ -47,6 +49,8 @@ def classify_euler_error(raw_error: str) -> tuple[str, str]:
         return "RATE_LIMIT", "Se agoto el limite de la API de Euler."
     if "timeout" in lower or "network" in lower or "connection" in lower:
         return "NETWORK_ERROR", "No se pudo conectar por un problema de red."
+    if "websockets" in lower and ("not installed" in lower or "no module" in lower):
+        return "BOOTSTRAP_FAILED", "Falta dependencia 'websockets'. Instale requirements.txt."
     return "UNKNOWN", "No se pudo completar la conexion con Euler."
 
 
@@ -139,6 +143,9 @@ class EulerConnection:
         event_callback: Callable[[CanonicalEvent], Awaitable[None]],
         status_callback: Callable[[SessionStatus], Awaitable[None]],
         target_user: str, room_id: str = "", session_id: int = 0, api_key: str = "",
+        heartbeat_interval_sec: float = 15.0,
+        heartbeat_warning_after_sec: float = 60.0,
+        silence_timeout_sec: float = 0.0,
     ) -> None:
         self._logger = logger
         self._legacy_bridge_root = legacy_bridge_root
@@ -149,6 +156,9 @@ class EulerConnection:
         self._room_id = str(room_id or "").strip()
         self._session_id = session_id or utc_now_ms()
         self._api_key = api_key.strip()
+        self._heartbeat_interval_sec = heartbeat_interval_sec
+        self._heartbeat_warning_after_sec = heartbeat_warning_after_sec
+        self._silence_timeout_sec = silence_timeout_sec
         self._stop = False
         self._remote_live_ended = False
         self._ws_task: asyncio.Task[None] | None = None
@@ -157,6 +167,8 @@ class EulerConnection:
         self._session_events_received: int = 0
         self._session_gifts_received: int = 0
         self._session_chat_received: int = 0
+        self._last_event_time: float = 0.0
+        self._heartbeat_task: asyncio.Task[None] | None = None
 
     @property
     def room_id(self) -> str:
@@ -189,9 +201,9 @@ class EulerConnection:
 
     async def open(self) -> None:
         if websockets is None:
-            raise EulerConnectionError("BOOTSTRAP_FAILED", "websockets no esta instalado.")
+            raise EulerConnectionError("BOOTSTRAP_FAILED", "Falta dependencia 'websockets'. Instale requirements.txt.")
         if not self._api_key:
-            raise EulerConnectionError("INVALID_API_KEY", "No se proporciono una API key de Euler.")
+            raise EulerConnectionError("INVALID_API_KEY", "No se proporciono una API key de Euler (JWT).")
         await self._status_callback(SessionStatus(
             target_user=self._target_user, connection_state=ConnectionState.CONNECTING,
             room_id=self._room_id, message="Connecting via Euler Stream", timestamp_ms=utc_now_ms(),
@@ -200,7 +212,11 @@ class EulerConnection:
         self._session_events_received = 0
         self._session_gifts_received = 0
         self._session_chat_received = 0
+        self._last_event_time = time.monotonic()
         self._ws_task = asyncio.create_task(self._ws_loop(), name="euler-ws")
+        # Start heartbeat/silence monitor if configured
+        if self._silence_timeout_sec > 0:
+            self._heartbeat_task = asyncio.create_task(self._silence_monitor(), name="euler-silence-monitor")
 
     async def _ws_loop(self) -> None:
         if websockets is None:
@@ -212,8 +228,13 @@ class EulerConnection:
                 "schemaVersion": "v1", "features.bundleEvents": "true",
                 "features.rawMessages": "false", "features.normalizeUniqueId": "true",
             }
+            if self._room_id:
+                query["roomId"] = self._room_id
             uri = f"{EULER_WS_BASE}?{urlencode(query)}"
-            ws = await websockets.connect(uri, open_timeout=self._connect_timeout_sec, ping_interval=30, ping_timeout=15)
+            # Use configurable heartbeat intervals (convert to int for websockets)
+            ping_interval = max(5, int(self._heartbeat_interval_sec))
+            ping_timeout = max(5, int(self._heartbeat_interval_sec / 2))
+            ws = await websockets.connect(uri, open_timeout=self._connect_timeout_sec, ping_interval=ping_interval, ping_timeout=ping_timeout)
             self._websocket = ws
             log_json(self._logger, "info", "euler_connection", "websocket connected",
                      target_user=self._target_user, session_uptime_ms=self._session_uptime_ms())
@@ -255,6 +276,7 @@ class EulerConnection:
                     c = _euler_event_to_canonical(ed, room_id=self._room_id, session_id=self._session_id, target_user=self._target_user)
                     if c is not None:
                         self._session_events_received += 1
+                        self._last_event_time = time.monotonic()
                         if c.event_type == CanonicalEventType.GIFT:
                             self._session_gifts_received += 1
                         elif c.event_type == CanonicalEventType.CHAT:
@@ -307,8 +329,38 @@ class EulerConnection:
             code, message = classify_euler_error(str(exc))
             raise EulerConnectionError(code, message, raw_error=str(exc)) from exc
 
+    async def _silence_monitor(self) -> None:
+        """Monitor for silence timeout and trigger reconnect if no events received."""
+        try:
+            while not self._stop:
+                await asyncio.sleep(self._heartbeat_interval_sec)
+                if self._stop:
+                    break
+                silence_duration = time.monotonic() - self._last_event_time
+                if silence_duration >= self._silence_timeout_sec:
+                    log_json(self._logger, "warning", "euler_connection", "silence timeout reached",
+                             silence_duration_sec=round(silence_duration, 1),
+                             timeout_sec=self._silence_timeout_sec)
+                    # Trigger disconnect to force reconnect
+                    if self._websocket is not None:
+                        try:
+                            await self._websocket.close(code=1000, reason="silence timeout")
+                        except Exception:
+                            pass
+                    break
+        except asyncio.CancelledError:
+            return
+        except Exception as exc:
+            log_json(self._logger, "error", "euler_connection", "silence_monitor_error", error=str(exc))
+
     async def close(self) -> None:
         self._stop = True
+        if self._heartbeat_task is not None and not self._heartbeat_task.done():
+            self._heartbeat_task.cancel()
+            try:
+                await self._heartbeat_task
+            except asyncio.CancelledError:
+                pass
         if self._websocket is not None:
             try:
                 await self._websocket.close(code=1000, reason="bridge shutdown")
