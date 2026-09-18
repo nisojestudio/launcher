@@ -4,6 +4,13 @@ All notable Panel Live changes should be recorded here.
 
 Format follows a lightweight Keep a Changelog style. Versions use SemVer.
 
+## 0.2.29 - 2026-09-18
+
+### Fixed
+
+- **Updater no podía descargar el instalador**: `win_http_client.cpp` ahora sigue redirects HTTP (301/302/303/307/308) manualmente con límite de 5 saltos. GitHub devuelve 302 hacia `release-assets.githubusercontent.com` al descargar cualquier release, lo que hacía fallar `trigger_update()` silenciosamente. Verificado end-to-end: descarga completa de 245 MB del instalador v0.2.28.
+- Nota: instalaciones en versión ≤0.2.28 tienen el updater roto y deben instalar 0.2.29 manualmente una vez. Desde 0.2.29 en adelante la auto-actualización funciona.
+
 ## 0.2.27 - 2026-09-17
 
 ### Fixed

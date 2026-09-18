@@ -55,6 +55,20 @@ std::wstring utf8_to_wide(std::string_view value) {
     return wide;
 }
 
+std::string wide_to_utf8(const std::wstring& value) {
+    if (value.empty()) {
+        return {};
+    }
+    const auto required = WideCharToMultiByte(
+        CP_UTF8, 0, value.data(), static_cast<int>(value.size()), nullptr, 0, nullptr, nullptr);
+    if (required <= 0) {
+        return {};
+    }
+    std::string utf8(static_cast<std::size_t>(required), '\0');
+    WideCharToMultiByte(CP_UTF8, 0, value.data(), static_cast<int>(value.size()), utf8.data(), required, nullptr, nullptr);
+    return utf8;
+}
+
 ParsedUrl parse_url(std::string_view raw_url) {
     ParsedUrl parsed{};
     auto wide = utf8_to_wide(raw_url);
@@ -113,6 +127,41 @@ std::wstring build_header_block(
     return block;
 }
 
+bool is_redirect_status(DWORD status_code) {
+    return status_code == 301 || status_code == 302 ||
+           status_code == 303 || status_code == 307 ||
+           status_code == 308;
+}
+
+std::wstring query_location_header(HINTERNET request) {
+    DWORD size = 0;
+    WinHttpQueryHeaders(
+        request,
+        WINHTTP_QUERY_CUSTOM,
+        L"Location",
+        WINHTTP_NO_OUTPUT_BUFFER,
+        &size,
+        WINHTTP_NO_HEADER_INDEX);
+    if (GetLastError() != ERROR_INSUFFICIENT_BUFFER || size == 0) {
+        return {};
+    }
+
+    std::wstring buffer(size / sizeof(wchar_t) + 1, L'\0');
+    if (WinHttpQueryHeaders(
+            request,
+            WINHTTP_QUERY_CUSTOM,
+            L"Location",
+            buffer.data(),
+            &size,
+            WINHTTP_NO_HEADER_INDEX) == FALSE) {
+        return {};
+    }
+    while (!buffer.empty() && (buffer.back() == L'\0' || buffer.back() == L'\r' || buffer.back() == L'\n' || buffer.back() == L' ')) {
+        buffer.pop_back();
+    }
+    return buffer;
+}
+
 bool query_content_length(HINTERNET request, std::uint64_t& value) {
     value = 0;
 
@@ -144,11 +193,6 @@ nlp3::platform::HttpResponse open_request(
     const std::vector<nlp3::platform::HttpHeader>& headers,
     std::function<bool(HINTERNET request, nlp3::platform::HttpResponse& response)> consume) {
     nlp3::platform::HttpResponse response{};
-    const auto parsed_url = parse_url(url);
-    if (!parsed_url.valid) {
-        response.error = "invalid_url";
-        return response;
-    }
 
     const auto session = WinHttpOpen(
         L"NisojeStudio/1.0",
@@ -163,74 +207,110 @@ nlp3::platform::HttpResponse open_request(
 
     WinHttpSetTimeouts(session, 10000, 10000, 30000, 30000);
 
-    const auto connection = WinHttpConnect(session, parsed_url.host.c_str(), parsed_url.port, 0);
-    if (connection == nullptr) {
-        response.error = "winhttp_connect_failed";
-        WinHttpCloseHandle(session);
-        return response;
-    }
+    // Follow redirects manually: WinHTTP does not follow 3xx by default.
+    // GitHub release downloads return 302 to a signed asset URL, so without
+    // this loop the updater receives a 302 and aborts the download.
+    std::string current_url(url);
+    constexpr int kMaxRedirects = 5;
 
-    const auto wide_method = utf8_to_wide(method);
-    const auto request = WinHttpOpenRequest(
-        connection,
-        wide_method.c_str(),
-        parsed_url.path_and_query.c_str(),
-        nullptr,
-        WINHTTP_NO_REFERER,
-        WINHTTP_DEFAULT_ACCEPT_TYPES,
-        parsed_url.secure ? WINHTTP_FLAG_SECURE : 0);
-    if (request == nullptr) {
-        response.error = "winhttp_open_request_failed";
-        WinHttpCloseHandle(connection);
-        WinHttpCloseHandle(session);
-        return response;
-    }
+    for (int redirect_count = 0;; ++redirect_count) {
+        const auto parsed_url = parse_url(current_url);
+        if (!parsed_url.valid) {
+            response.error = "invalid_url";
+            break;
+        }
 
-    if (parsed_url.secure) {
-        DWORD protocols = WINHTTP_FLAG_SECURE_PROTOCOL_TLS1_2 | WINHTTP_FLAG_SECURE_PROTOCOL_TLS1_3;
-        WinHttpSetOption(request, WINHTTP_OPTION_SECURE_PROTOCOLS, &protocols, sizeof(protocols));
+        const auto connection = WinHttpConnect(session, parsed_url.host.c_str(), parsed_url.port, 0);
+        if (connection == nullptr) {
+            response.error = "winhttp_connect_failed";
+            break;
+        }
 
-        // NOTE: SECURITY_FLAG_IGNORE_REVOCATION was removed in Win11 24H2 SDK.
-        // WinHTTP verifies certificate revocation by default — this is correct behavior.
-        // No security flags to override.
-    }
+        const auto wide_method = utf8_to_wide(method);
+        const auto request = WinHttpOpenRequest(
+            connection,
+            wide_method.c_str(),
+            parsed_url.path_and_query.c_str(),
+            nullptr,
+            WINHTTP_NO_REFERER,
+            WINHTTP_DEFAULT_ACCEPT_TYPES,
+            parsed_url.secure ? WINHTTP_FLAG_SECURE : 0);
+        if (request == nullptr) {
+            response.error = "winhttp_open_request_failed";
+            WinHttpCloseHandle(connection);
+            break;
+        }
 
-    const auto header_block = build_header_block(content_type, headers);
-    const auto send_ok = WinHttpSendRequest(
-        request,
-        header_block.empty() ? WINHTTP_NO_ADDITIONAL_HEADERS : header_block.c_str(),
-        header_block.empty() ? 0 : static_cast<DWORD>(header_block.size()),
-        body.empty() ? WINHTTP_NO_REQUEST_DATA : const_cast<char*>(body.data()),
-        static_cast<DWORD>(body.size()),
-        static_cast<DWORD>(body.size()),
-        0);
-    if (send_ok == FALSE || WinHttpReceiveResponse(request, nullptr) == FALSE) {
-        response.error = "winhttp_send_failed";
+        if (parsed_url.secure) {
+            DWORD protocols = WINHTTP_FLAG_SECURE_PROTOCOL_TLS1_2 | WINHTTP_FLAG_SECURE_PROTOCOL_TLS1_3;
+            WinHttpSetOption(request, WINHTTP_OPTION_SECURE_PROTOCOLS, &protocols, sizeof(protocols));
+
+            // NOTE: SECURITY_FLAG_IGNORE_REVOCATION was removed in Win11 24H2 SDK.
+            // WinHTTP verifies certificate revocation by default — this is correct behavior.
+            // No security flags to override.
+        }
+
+        // Disable automatic redirection and handle it manually so we can
+        // detect redirect loops and resend custom headers on each hop.
+        DWORD redirect_policy = WINHTTP_OPTION_REDIRECT_POLICY_NEVER;
+        WinHttpSetOption(request, WINHTTP_OPTION_REDIRECT_POLICY, &redirect_policy, sizeof(redirect_policy));
+
+        const auto header_block = build_header_block(content_type, headers);
+        const auto send_ok = WinHttpSendRequest(
+            request,
+            header_block.empty() ? WINHTTP_NO_ADDITIONAL_HEADERS : header_block.c_str(),
+            header_block.empty() ? 0 : static_cast<DWORD>(header_block.size()),
+            body.empty() ? WINHTTP_NO_REQUEST_DATA : const_cast<char*>(body.data()),
+            static_cast<DWORD>(body.size()),
+            static_cast<DWORD>(body.size()),
+            0);
+        if (send_ok == FALSE || WinHttpReceiveResponse(request, nullptr) == FALSE) {
+            response.error = "winhttp_send_failed";
+            WinHttpCloseHandle(request);
+            WinHttpCloseHandle(connection);
+            break;
+        }
+
+        DWORD status_code = 0;
+        DWORD status_size = sizeof(status_code);
+        if (WinHttpQueryHeaders(
+                request,
+                WINHTTP_QUERY_STATUS_CODE | WINHTTP_QUERY_FLAG_NUMBER,
+                WINHTTP_HEADER_NAME_BY_INDEX,
+                &status_code,
+                &status_size,
+                WINHTTP_NO_HEADER_INDEX) == TRUE) {
+            response.status_code = static_cast<int>(status_code);
+        }
+
+        if (is_redirect_status(status_code)) {
+            const auto location = query_location_header(request);
+            WinHttpCloseHandle(request);
+            WinHttpCloseHandle(connection);
+
+            const auto next_url = wide_to_utf8(location);
+            if (next_url.empty()) {
+                response.error = "redirect_without_location";
+                break;
+            }
+            if (redirect_count >= kMaxRedirects) {
+                response.error = "redirect_limit_exceeded";
+                break;
+            }
+            current_url = next_url;
+            continue;
+        }
+
+        query_content_length(request, response.content_length);
+        if (!consume(request, response) && response.error.empty()) {
+            response.error = "winhttp_consume_failed";
+        }
+
         WinHttpCloseHandle(request);
         WinHttpCloseHandle(connection);
-        WinHttpCloseHandle(session);
-        return response;
+        break;
     }
 
-    DWORD status_code = 0;
-    DWORD status_size = sizeof(status_code);
-    if (WinHttpQueryHeaders(
-            request,
-            WINHTTP_QUERY_STATUS_CODE | WINHTTP_QUERY_FLAG_NUMBER,
-            WINHTTP_HEADER_NAME_BY_INDEX,
-            &status_code,
-            &status_size,
-            WINHTTP_NO_HEADER_INDEX) == TRUE) {
-        response.status_code = static_cast<int>(status_code);
-    }
-
-    query_content_length(request, response.content_length);
-    if (!consume(request, response) && response.error.empty()) {
-        response.error = "winhttp_consume_failed";
-    }
-
-    WinHttpCloseHandle(request);
-    WinHttpCloseHandle(connection);
     WinHttpCloseHandle(session);
     return response;
 }
