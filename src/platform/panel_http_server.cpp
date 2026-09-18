@@ -1366,7 +1366,7 @@ std::string handle_bridge_connect(PanelApp* app, std::string_view body) {
     if (provider == "tiktok_live" || provider == "tiktoklive") {
         provider = "direct";
     }
-    if (provider != "tiktools" && provider != "direct") {
+    if (provider != "tiktools" && provider != "direct" && provider != "euler") {
         return make_simple_result(false, "invalid_tiktok_provider");
     }
 
@@ -1374,7 +1374,7 @@ std::string handle_bridge_connect(PanelApp* app, std::string_view body) {
     app->config().external_target_user = target_user;
     // La clave se conserva al alternar temporalmente al adaptador directo, de
     // modo que el usuario pueda volver a TikTools sin reingresarla.
-    if (provider == "tiktools") {
+    if (provider == "tiktools" || provider == "euler") {
         app->config().tiktools_api_key = api_key;
     }
     app->config().tiktok_provider = provider;

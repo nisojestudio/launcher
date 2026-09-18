@@ -1,4 +1,4 @@
-# Provider: tiktools (recommended) or direct (unofficial TikTokLive fallback).
+# Provider: tiktools (recommended), euler (community), or direct (unofficial TikTokLive fallback).
 connection_mode: tiktools
 
 connection:

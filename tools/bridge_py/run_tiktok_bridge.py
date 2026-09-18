@@ -22,7 +22,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--user", default="", help="TikTok username, @username or TikTok profile URL.")
     parser.add_argument("--room-id", default="", help="Optional numeric room id override.")
     parser.add_argument("--api-key", default="", help="tik.tools API key.")
-    parser.add_argument("--provider", choices=("tiktools", "direct"), default="", help="TikTok provider to use.")
+    parser.add_argument("--provider", choices=("tiktools", "direct", "euler"), default="", help="TikTok provider to use.")
     parser.add_argument("--output", default="", help="Optional JSONL output path.")
     parser.add_argument("--inbox", default="", help="Optional inbox directory with one JSON file per event.")
     parser.add_argument("--ws", default="", help="Panel WebSocket URL. Defaults to ws://127.0.0.1:8765.")

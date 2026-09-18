@@ -2653,8 +2653,16 @@
       );
       if (response?.error === "bridge_not_external_mode_saved") {
         appendLog("Configuraci\u00f3n guardada. El panel necesita reiniciarse en modo external. Reinicia el panel para conectar.");
+      } else if (response?.error === "invalid_tiktok_provider") {
+        appendLog("Proveedor no v\u00e1lido. Opciones: tiktools, euler, direct.");
+      } else if (response?.error === "ws_start_failed") {
+        appendLog("No se pudo iniciar el WebSocket. El puerto 8765 puede estar ocupado. Ejecut\u00e1 clear_ports.bat y reinici\u00e1 el panel.");
+      } else if (response?.error === "runner_start_failed") {
+        appendLog("No se pudo iniciar el bridge Python. Verific\u00e1 que Python y las dependencias est\u00e9n instaladas.");
       } else if (!response?.ok) {
-        await exportSupportBundle("tiktok_connect_failed", { silent: true });
+        appendLog("Error de conexi\u00f3n: " + (response?.error || "desconocido"));
+      } else if (response?.ok) {
+        appendLog("Bridge conectado correctamente.");
       }
     } catch (error) {
       appendLog(`No se pudo conectar: ${error}`);

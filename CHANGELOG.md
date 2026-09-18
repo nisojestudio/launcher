@@ -4,6 +4,17 @@ All notable Panel Live changes should be recorded here.
 
 Format follows a lightweight Keep a Changelog style. Versions use SemVer.
 
+## 0.2.27 - 2026-09-17
+
+### Fixed
+
+- **Backend C++ no aceptaba Euler como provider**: `panel_http_server.cpp` ahora valida `euler` junto con `tiktools` y `direct`. Antes rechazaba con `invalid_tiktok_provider`.
+- **Config storage reseteaba Euler a tiktools**: `panel_config_storage.cpp` ahora preserva `euler` al recargar la config guardada.
+- **Python bridge rechazaba `--provider euler`**: `argparse.choices` en `run_tiktok_bridge.py` ahora incluye `("tiktools", "direct", "euler")`. Antes el bridge Python no arrancaba al recibir `--provider euler`.
+- **JS no mostraba errores de conexión**: `app.js` ahora muestra mensajes claros para `invalid_tiktok_provider`, `ws_start_failed`, `runner_start_failed` en vez de tragar los errores silenciosamente.
+- **Dist desincronizado**: `run_tiktok_bridge.py`, `bridge_config.yaml`, `structured_logging.py` en `dist/` estaban desactualizados y no tenían los argumentos `--provider`/`--api-key`.
+- **API key no se guardaba para Euler**: El backend ahora guarda la API key tanto para `tiktools` como para `euler`.
+
 ## 0.2.26 - 2026-09-17
 
 ### Added

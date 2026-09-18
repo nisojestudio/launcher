@@ -4,3 +4,18 @@
 {"timestamp":1789023783112,"severity":"error","component":"connection_manager","message":"TikTools session failed","code":"NETWORK_ERROR","error_message":"Fallo temporal de red.","retry_count":0,"target_user":"alice","raw_error":""}
 {"timestamp":1789024942223,"severity":"error","component":"connection_manager","message":"TikTools session failed","code":"NETWORK_ERROR","error_message":"Fallo temporal de red.","retry_count":0,"target_user":"alice","raw_error":""}
 {"timestamp":1789025250385,"severity":"error","component":"connection_manager","message":"TikTok session failed","code":"NETWORK_ERROR","error_message":"Fallo temporal de red.","retry_count":0,"target_user":"alice","raw_error":""}
+{"timestamp":1789690729672,"severity":"error","component":"connection_manager","message":"session failed","code":"NETWORK_ERROR","error_message":"Fallo temporal de red.","retry_count":0,"target_user":"alice","raw_error":"","provider":"tiktools","reconnects_remaining":10}
+{"timestamp":1789690729683,"severity":"info","component":"connection_manager","message":"scheduling reconnect","delay_sec":2.84,"attempt":1,"code":"NETWORK_ERROR"}
+{"timestamp":1789690729684,"severity":"info","component":"connection_manager","message":"session connected","target_user":"alice","provider":"tiktools","attempt":1}
+{"timestamp":1789690729687,"severity":"info","component":"connection_manager","message":"run finished","final_message":"max_events reached (1)","total_events":1,"total_attempts":1}
+{"timestamp":1789690805762,"severity":"error","component":"connection_manager","message":"session failed","code":"NETWORK_ERROR","error_message":"Fallo temporal de red.","retry_count":0,"target_user":"alice","raw_error":"","provider":"tiktools","reconnects_remaining":10}
+{"timestamp":1789690805763,"severity":"info","component":"connection_manager","message":"scheduling reconnect","delay_sec":2.42,"attempt":1,"code":"NETWORK_ERROR"}
+{"timestamp":1789690805764,"severity":"info","component":"connection_manager","message":"session connected","target_user":"alice","provider":"tiktools","attempt":1}
+{"timestamp":1789690805767,"severity":"info","component":"connection_manager","message":"run finished","final_message":"max_events reached (1)","total_events":1,"total_attempts":1}
+{"timestamp":1789691451452,"severity":"info","component":"sound_alert","message":"play: disconnected"}
+{"timestamp":1789691451453,"severity":"error","component":"connection_manager","message":"session failed","code":"NETWORK_ERROR","error_message":"Fallo temporal de red.","retry_count":0,"target_user":"alice","raw_error":"","provider":"tiktools","reconnects_remaining":10}
+{"timestamp":1789691451671,"severity":"info","component":"sound_alert","message":"play: reconnecting"}
+{"timestamp":1789691451671,"severity":"info","component":"connection_manager","message":"scheduling reconnect","delay_sec":2.73,"attempt":1,"code":"NETWORK_ERROR"}
+{"timestamp":1789691451682,"severity":"info","component":"connection_manager","message":"session connected","target_user":"alice","provider":"tiktools","attempt":1}
+{"timestamp":1789691452256,"severity":"info","component":"sound_alert","message":"play: disconnected"}
+{"timestamp":1789691452256,"severity":"info","component":"connection_manager","message":"run finished","final_message":"max_events reached (1)","total_events":1,"total_attempts":1}

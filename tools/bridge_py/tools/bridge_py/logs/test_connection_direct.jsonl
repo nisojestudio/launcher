@@ -1,0 +1,7 @@
+{"timestamp":1789690729699,"severity":"info","component":"connection_manager","message":"session connected","target_user":"alice","provider":"direct","attempt":0}
+{"timestamp":1789690729702,"severity":"info","component":"connection_manager","message":"run finished","final_message":"max_events reached (1)","total_events":1,"total_attempts":0}
+{"timestamp":1789690805798,"severity":"info","component":"connection_manager","message":"session connected","target_user":"alice","provider":"direct","attempt":0}
+{"timestamp":1789690805801,"severity":"info","component":"connection_manager","message":"run finished","final_message":"max_events reached (1)","total_events":1,"total_attempts":0}
+{"timestamp":1789691452288,"severity":"info","component":"connection_manager","message":"session connected","target_user":"alice","provider":"direct","attempt":0}
+{"timestamp":1789691452863,"severity":"info","component":"sound_alert","message":"play: disconnected"}
+{"timestamp":1789691452863,"severity":"info","component":"connection_manager","message":"run finished","final_message":"max_events reached (1)","total_events":1,"total_attempts":0}

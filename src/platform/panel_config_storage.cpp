@@ -479,7 +479,7 @@ bool PanelConfigStorage::load_from_file(const std::string& path, PanelConfig& ou
         normalize_bridge_settings(config);
         if (config.tiktok_provider == "tiktok_live" || config.tiktok_provider == "tiktoklive") {
             config.tiktok_provider = "direct";
-        } else if (config.tiktok_provider != "direct") {
+        } else if (config.tiktok_provider != "direct" && config.tiktok_provider != "euler") {
             config.tiktok_provider = "tiktools";
         }
         out_config = std::move(config);
