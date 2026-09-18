@@ -40,7 +40,7 @@ public:
     bool start(const ExternalBridgeRunnerStartRequest& request);
     void stop();
     void poll();
-    void refresh_runtime_status(bool force = false);
+    void refresh_runtime_status(bool force = false, const std::string& api_key = "");
 
     ExternalBridgeRunnerStatus status() const noexcept;
 

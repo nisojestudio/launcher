@@ -476,7 +476,18 @@ def main() -> int:
         action="store_true",
         help="No imprime el reporte en stdout; util cuando otro proceso lo guarda por archivo.",
     )
+    parser.add_argument(
+        "--api-key",
+        default="",
+        help="API key del provider (ingresada en el panel); se aplica solo a este proceso de verificacion.",
+    )
     args = parser.parse_args()
+
+    # La key llega de la UI del panel por peticion: no depende de archivos ni de
+    # variables de entorno persistentes. Se inyecta solo en este proceso hijo.
+    if args.api_key:
+        import os
+        os.environ["LIVEPANEL_BRIDGE_API_KEY"] = args.api_key
 
     bridge_root = _normalize_bridge_root(args.bridge_root or None)
     report = perform_bridge_env_check(
