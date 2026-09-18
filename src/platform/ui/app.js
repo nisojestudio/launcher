@@ -2643,11 +2643,12 @@
 
     const provider = els.tiktokProvider?.value || "tiktools";
     const apiKey = (els.tiktoolsApiKey?.value || "").trim();
+    const needsApiKey = provider === "tiktools" || provider === "euler";
 
     try {
       const response = await postJsonAction(
         "/api/bridge/connect",
-        { target_user: user, provider, api_key: provider === "tiktools" ? apiKey : "" },
+        { target_user: user, provider, api_key: needsApiKey ? apiKey : "" },
         "conectar live"
       );
       if (response?.error === "bridge_not_external_mode_saved") {
@@ -2662,8 +2663,9 @@
   }
 
   function updateTikTokProviderUi() {
-    const usesTikTools = (els.tiktokProvider?.value || "tiktools") === "tiktools";
-    if (els.tiktoolsApiKeyField) els.tiktoolsApiKeyField.hidden = !usesTikTools;
+    const provider = els.tiktokProvider?.value || "tiktools";
+    const needsApiKey = provider === "tiktools" || provider === "euler";
+    if (els.tiktoolsApiKeyField) els.tiktoolsApiKeyField.hidden = !needsApiKey;
   }
 
   async function disconnectLive() {
