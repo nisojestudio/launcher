@@ -4,6 +4,35 @@ All notable Panel Live changes should be recorded here.
 
 Format follows a lightweight Keep a Changelog style. Versions use SemVer.
 
+## 0.2.26 - 2026-09-17
+
+### Added
+
+- **Proveedor Euler Stream**: Nuevo proveedor WebSocket `euler` para conectar a `wss://ws.eulerstream.com` con autenticación JWT. Selector de 3 proveedores en UI (tiktools / euler / directo).
+- **Alertas sonoras de conexión/desconexión**: Módulo `sound_alerts.py` que reproduce tonos via `winsound.Beep()` en Windows: dos tonos ascendentes al conectar, tres tonos descendentes al desconectar, tono único al reconectar.
+- **Detección de silencio automática**: `HeartbeatMonitor` declara estado `DISCONNECTED` cuando no llegan eventos por más de `silence_timeout_sec` (default: 2× warning_after_sec). El panel ahora muestra mensajes claros en vez de quedarse en "conectado" cuando la conexión cae.
+- **Rate limiter de reconexiones**: `ReconnectRateLimiter` limita a N reconexiones por hora (default: 10) para no agotar tokens del proveedor.
+- **Script de prueba de carga**: `test_load.py` con 5 niveles de carga para validar el bridge bajo presión.
+
+### Changed
+
+- **Máximo 5 intentos de reconexión**: `max_attempts` cambiado de 0 (ilimitado) a 5 por defecto.
+- **Jitter en backoff exponencial**: `jitter_sec` (default 1.0s) evita thundering herd en reconexiones simultáneas.
+- **I/O de archivo asíncrono**: `append_jsonl_async()` y `write_json_async()` usan `asyncio.to_thread()` para no bloquear el event loop.
+- **PanelWsSink con cooldown exponencial**: Fallos consecutivos aumentan el cooldown de reconexión al panel (0.5s → 32s).
+- **Mensajes de estado en español**: "DESCONECTADO", "RECONECTANDO", "Advertencia: sin eventos durante Xs".
+- **UI del panel**: Campo API Key ahora sirve para tiktools y euler. Label genérico "API Key" en vez de "API Key de tik.tools".
+
+### Fixed
+
+- **Panel mostraba "conectado" tras caída de conexión**: El heartbeat ahora detecta silencio y cambia el estado a DISCONNECTED con mensaje claro.
+- **I/O síncrono bloqueaba el event loop**: Escritura a JSONL e inbox ahora es completamente asíncrona.
+
+### Build & Workflow
+
+- Tests Python: 44 tests pasan.
+- UI embebida en `NisojeStudio.exe` via `.inc` generados por CMake.
+
 ## 0.2.25 - 2026-09-10
 
 ### Added
