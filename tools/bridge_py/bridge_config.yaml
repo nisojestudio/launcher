@@ -10,13 +10,16 @@ connection:
   connect_timeout_sec: 20
   heartbeat_interval_sec: 15
   heartbeat_warning_after_sec: 60
+  silence_timeout_sec: 0
 
 retry_policy:
   enabled: true
   base_delay_sec: 2
   max_delay_sec: 45
   not_live_delay_sec: 20
-  max_attempts: 0
+  max_attempts: 5
+  max_reconnect_per_hour: 10
+  jitter_sec: 1.0
 
 buffer:
   size: 8192
