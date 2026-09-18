@@ -6,7 +6,7 @@ import time
 from pathlib import Path
 from typing import Any, Awaitable, Callable
 
-from bridge_client import append_jsonl, write_json
+from bridge_client import append_jsonl_async, write_json_async, payload_to_json
 from event_models import CanonicalEvent, SessionStatus
 from event_normalizer import canonical_event_to_json, canonical_event_to_panel_payload
 from metrics_registry import MetricsRegistry
@@ -23,14 +23,18 @@ class PanelWsSink:
         self._connect_factory = connect_factory
         self._connection: Any = None
         self._last_failure_monotonic = 0.0
-        self._retry_cooldown_sec = 0.5
+        self._retry_cooldown_sec = 2.0
+        self._consecutive_failures = 0
 
     async def _ensure_connection(self) -> Any:
         if self._connection is None:
             now = time.monotonic()
-            if self._last_failure_monotonic > 0 and (now - self._last_failure_monotonic) < self._retry_cooldown_sec:
+            # Exponential cooldown on consecutive failures
+            cooldown = self._retry_cooldown_sec * (2 ** min(self._consecutive_failures, 5))
+            if self._last_failure_monotonic > 0 and (now - self._last_failure_monotonic) < cooldown:
                 raise RuntimeError("panel ws reconnect cooldown")
             self._connection = await self._connect_factory(self._ws_url)
+            self._consecutive_failures = 0
         return self._connection
 
     async def send_json(self, payload: dict[str, Any]) -> None:
@@ -40,6 +44,7 @@ class PanelWsSink:
             await connection.send(serialized)
         except Exception:
             self._last_failure_monotonic = time.monotonic()
+            self._consecutive_failures += 1
             await self.close()
             raise
 
@@ -81,6 +86,8 @@ class AsyncEventDispatcher:
         self._running = False
         self._idle_event = asyncio.Event()
         self._idle_event.set()
+        self._total_dispatched = 0
+        self._total_dropped = 0
 
     async def start(self) -> None:
         if self._worker_task is not None:
@@ -118,6 +125,7 @@ class AsyncEventDispatcher:
             return True
         except asyncio.QueueFull:
             self._metrics.increment("events_dropped_total")
+            self._total_dropped += 1
             if self._overflow_policy == "drop_oldest":
                 try:
                     _ = self._queue.get_nowait()
@@ -157,28 +165,33 @@ class AsyncEventDispatcher:
                 except asyncio.QueueEmpty:
                     break
 
+            batch_start = time.monotonic()
             for item in batch:
                 try:
                     await self._dispatch_one(item)
                 except Exception:
                     self._metrics.increment("events_dispatch_failures_total")
+            batch_elapsed_ms = (time.monotonic() - batch_start) * 1000
             self._metrics.set_gauge("queue_size", float(self._queue.qsize()))
+            self._metrics.set_gauge("last_batch_dispatch_ms", batch_elapsed_ms)
             if self._queue.empty():
                 self._idle_event.set()
 
     async def _dispatch_one(self, event: CanonicalEvent) -> None:
+        dispatch_start = time.monotonic()
         self._metrics.record_event(event.event_type.value, event.latency_ms)
         payload = canonical_event_to_panel_payload(event)
         dispatched = False
 
+        # Async file I/O — non-blocking
         if self._jsonl_path is not None:
-            append_jsonl(self._jsonl_path, payload)
+            await append_jsonl_async(self._jsonl_path, payload)
             dispatched = True
 
         if self._inbox_dir is not None:
             self._sequence += 1
             file_name = f"{self._session_name}-{self._sequence:06d}-{event.event_type.value}.json"
-            write_json(self._inbox_dir / file_name, payload)
+            await write_json_async(self._inbox_dir / file_name, payload)
             dispatched = True
 
         if self._panel_ws_sink is not None:
@@ -202,6 +215,10 @@ class AsyncEventDispatcher:
 
         if dispatched:
             self._metrics.increment("events_dispatched_total")
+            self._total_dispatched += 1
+
+        dispatch_elapsed_ms = (time.monotonic() - dispatch_start) * 1000
+        self._metrics.set_gauge("last_event_dispatch_ms", dispatch_elapsed_ms)
 
 
 async def connect_websocket(url: str) -> Any:

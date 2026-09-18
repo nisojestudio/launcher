@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import asyncio
+import random
 import time
 from typing import Any, Awaitable, Callable
 
@@ -8,32 +9,90 @@ from bridge_config import BridgeConfig
 from event_models import CanonicalEvent, ConnectionState, SessionStatus
 from metrics_registry import MetricsRegistry
 from session_manager import HeartbeatMonitor, SessionSupervisor
+from sound_alerts import SoundAlerts
 from structured_logging import log_json, utc_now_ms
 from tiktools_connection import TikToolsConnection, TikToolsConnectionError
 from tiktok_connection import TikTokConnection, TikTokConnectionError
+
+try:
+    from euler_connection import EulerConnection, EulerConnectionError
+except ImportError:
+    EulerConnection = None  # type: ignore[assignment,misc]
+    EulerConnectionError = TikToolsConnectionError  # type: ignore[misc]
 
 
 EventCallback = Callable[[CanonicalEvent], Awaitable[bool]]
 StatusCallback = Callable[[SessionStatus], Awaitable[None]]
 
+# Error codes that should NOT trigger a reconnect (permanent failures)
+_NON_RETRYABLE_CODES = frozenset({
+    "INVALID_USERNAME",
+    "USER_NOT_FOUND",
+    "AGE_RESTRICTED",
+    "ACCESS_BLOCKED",
+    "RATE_LIMIT",
+    "INVALID_API_KEY",
+    "API_SESSION_ENDED",
+    "NOT_LIVE",
+})
+
+# Error codes that indicate the server deliberately closed the connection
+_SERVER_CLOSE_CODES = frozenset({
+    "STREAM_DISCONNECTED",
+    "NOT_LIVE",
+})
+
 
 def compute_retry_delay(config: BridgeConfig, code: str, attempt_index: int) -> float | None:
+    """Compute delay before next reconnect attempt. Returns None if should not retry."""
     if not config.retry_policy.enabled:
         return None
-    if code in ("INVALID_USERNAME", "USER_NOT_FOUND", "AGE_RESTRICTED", "ACCESS_BLOCKED", "RATE_LIMIT", "INVALID_API_KEY", "API_SESSION_ENDED"):
+    if code in _NON_RETRYABLE_CODES:
         return None
     if config.retry_policy.max_attempts > 0 and attempt_index >= config.retry_policy.max_attempts:
         return None
     if code == "NOT_LIVE":
         return max(1.0, config.retry_policy.not_live_delay_sec)
-    delay = config.retry_policy.base_delay_sec * (2 ** max(0, attempt_index))
-    return max(1.0, min(config.retry_policy.max_delay_sec, delay))
+
+    # Exponential backoff with jitter
+    base_delay = config.retry_policy.base_delay_sec * (2 ** max(0, attempt_index))
+    delay = max(1.0, min(config.retry_policy.max_delay_sec, base_delay))
+
+    # Add jitter to prevent thundering herd
+    jitter = config.retry_policy.jitter_sec
+    if jitter > 0:
+        delay += random.uniform(0.0, jitter)
+
+    return delay
 
 
 def remaining_runtime_seconds(started_at: float, max_seconds: int) -> float | None:
     if max_seconds <= 0:
         return None
     return float(max_seconds) - (time.monotonic() - started_at)
+
+
+class ReconnectRateLimiter:
+    """Tracks reconnect attempts per hour to avoid exhausting provider tokens."""
+
+    def __init__(self, max_per_hour: int) -> None:
+        self._max_per_hour = max(1, max_per_hour)
+        self._timestamps: list[float] = []
+
+    def can_reconnect(self) -> bool:
+        now = time.monotonic()
+        cutoff = now - 3600.0
+        self._timestamps = [t for t in self._timestamps if t > cutoff]
+        return len(self._timestamps) < self._max_per_hour
+
+    def record_reconnect(self) -> None:
+        self._timestamps.append(time.monotonic())
+
+    def remaining(self) -> int:
+        now = time.monotonic()
+        cutoff = now - 3600.0
+        self._timestamps = [t for t in self._timestamps if t > cutoff]
+        return max(0, self._max_per_hour - len(self._timestamps))
 
 
 class ConnectionManager:
@@ -52,6 +111,11 @@ class ConnectionManager:
         self._event_callback = event_callback
         self._status_callback = status_callback
         self._stop_requested = False
+        self._reconnect_limiter = ReconnectRateLimiter(
+            config.retry_policy.max_reconnect_per_hour
+        )
+        self._sound = SoundAlerts(enabled=True)
+        self._last_played_state = ""
 
     def stop(self) -> None:
         self._stop_requested = True
@@ -61,13 +125,28 @@ class ConnectionManager:
         accepted_events = 0
         started_at = time.monotonic()
         final_message = "Bridge stopped"
+        exit_code = 0
         heartbeat_monitor = HeartbeatMonitor(
             warning_after_sec=self._config.connection.heartbeat_warning_after_sec,
             interval_sec=self._config.connection.heartbeat_interval_sec,
+            silence_timeout_sec=self._config.connection.silence_timeout_sec,
         )
         supervisor = SessionSupervisor(heartbeat_monitor=heartbeat_monitor)
 
         async def emit_status(status: SessionStatus) -> None:
+            # Play sound on meaningful state transitions
+            state_key = status.connection_state.value
+            if state_key != self._last_played_state and self._sound.should_alert(state_key):
+                if state_key == "connected":
+                    await self._sound.play_connected()
+                    log_json(self._logger, "info", "sound_alert", "play: connected")
+                elif state_key in ("disconnected", "faulted"):
+                    await self._sound.play_disconnected()
+                    log_json(self._logger, "info", "sound_alert", "play: disconnected")
+                elif state_key == "reconnecting":
+                    await self._sound.play_reconnecting()
+                    log_json(self._logger, "info", "sound_alert", "play: reconnecting")
+            self._last_played_state = state_key
             await self._status_callback(status)
 
         while not self._stop_requested:
@@ -76,6 +155,7 @@ class ConnectionManager:
             async def emit_event(event: CanonicalEvent) -> None:
                 nonlocal accepted_events, connection, final_message
                 heartbeat_monitor.mark_event()
+                self._metrics.record_event(event.event_type.value, event.latency_ms)
                 if await self._event_callback(event):
                     accepted_events += 1
 
@@ -128,6 +208,12 @@ class ConnectionManager:
                 }
                 if self._config.connection_mode == "direct":
                     connection = TikTokConnection(**connection_args)
+                elif self._config.connection_mode == "euler":
+                    from euler_connection import EulerConnection
+                    connection = EulerConnection(
+                        **connection_args,
+                        api_key=self._config.connection.api_key,
+                    )
                 else:
                     connection = TikToolsConnection(
                         **connection_args,
@@ -139,6 +225,15 @@ class ConnectionManager:
                 heartbeat_monitor.set_state(ConnectionState.CONNECTED, retry_count=attempt)
                 self._metrics.increment("session_starts_total")
                 self._metrics.set_gauge("connected", 1)
+                log_json(
+                    self._logger,
+                    "info",
+                    "connection_manager",
+                    "session connected",
+                    target_user=target_user,
+                    provider=self._config.connection_mode,
+                    attempt=attempt,
+                )
                 await supervisor.start_heartbeat(
                     target_user=target_user,
                     room_id_provider=lambda: connection.room_id,
@@ -179,9 +274,9 @@ class ConnectionManager:
 
                 raise TikToolsConnectionError(
                     "STREAM_DISCONNECTED",
-                    "La conexion con tik.tools se cerro.",
+                    "DESCONECTADO: la conexion con TikTok se cerro. Reintentando...",
                 )
-            except (TikToolsConnectionError, TikTokConnectionError) as exc:
+            except (TikToolsConnectionError, TikTokConnectionError, EulerConnectionError) as exc:
                 self._metrics.increment("session_failures_total")
                 self._metrics.set_gauge("connected", 0)
                 heartbeat_monitor.set_state(ConnectionState.FAULTED, retry_count=attempt, error=exc.message)
@@ -190,41 +285,82 @@ class ConnectionManager:
                         target_user=target_user,
                         connection_state=ConnectionState.FAULTED,
                         room_id=connection.room_id if connection is not None else room_id,
-                        message=exc.message,
+                        message=f"DESCONECTADO: {exc.message}",
                         timestamp_ms=utc_now_ms(),
                         retry_count=attempt,
                     )
                 )
                 log_json(
-                self._logger,
-                "error",
-                "connection_manager",
-                "TikTok session failed",
+                    self._logger,
+                    "error",
+                    "connection_manager",
+                    "session failed",
                     code=exc.code,
                     error_message=exc.message,
                     retry_count=attempt,
                     target_user=target_user,
                     raw_error=exc.raw_error,
+                    provider=self._config.connection_mode,
+                    reconnects_remaining=self._reconnect_limiter.remaining(),
                 )
+
+                # Check if we should retry
                 retry_delay = compute_retry_delay(self._config, exc.code, attempt)
                 if retry_delay is None:
-                    return 1
+                    log_json(
+                        self._logger,
+                        "warning",
+                        "connection_manager",
+                        "no more retries for this error code",
+                        code=exc.code,
+                        attempt=attempt,
+                    )
+                    final_message = f"permanent failure: {exc.message}"
+                    exit_code = 1
+                    break
+
+                # Check rate limiter
+                if not self._reconnect_limiter.can_reconnect():
+                    log_json(
+                        self._logger,
+                        "warning",
+                        "connection_manager",
+                        "reconnect rate limit reached",
+                        max_per_hour=self._config.retry_policy.max_reconnect_per_hour,
+                        attempt=attempt,
+                    )
+                    final_message = "reconnect rate limit exceeded"
+                    exit_code = 1
+                    break
+
                 remaining_seconds = remaining_runtime_seconds(started_at, max_seconds)
                 if remaining_seconds is not None and remaining_seconds <= 0:
                     final_message = f"max_seconds reached ({max_seconds})"
                     break
+
                 attempt += 1
+                self._reconnect_limiter.record_reconnect()
                 self._metrics.increment("reconnect_total")
+                self._metrics.set_gauge("reconnects_remaining", float(self._reconnect_limiter.remaining()))
                 heartbeat_monitor.set_state(ConnectionState.RECONNECTING, retry_count=attempt, error=exc.message)
                 await emit_status(
                     SessionStatus(
                         target_user=target_user,
                         connection_state=ConnectionState.RECONNECTING,
                         room_id=connection.room_id if connection is not None else room_id,
-                        message=f"Retrying in {retry_delay:.1f}s",
+                        message=f"RECONECTANDO: reintento {attempt} en {retry_delay:.0f}s...",
                         timestamp_ms=utc_now_ms(),
                         retry_count=attempt,
                     )
+                )
+                log_json(
+                    self._logger,
+                    "info",
+                    "connection_manager",
+                    "scheduling reconnect",
+                    delay_sec=round(retry_delay, 2),
+                    attempt=attempt,
+                    code=exc.code,
                 )
                 await supervisor.stop_heartbeat()
                 if connection is not None:
@@ -257,4 +393,13 @@ class ConnectionManager:
                 timestamp_ms=utc_now_ms(),
             )
         )
-        return 0
+        log_json(
+            self._logger,
+            "info",
+            "connection_manager",
+            "run finished",
+            final_message=final_message,
+            total_events=accepted_events,
+            total_attempts=attempt,
+        )
+        return exit_code

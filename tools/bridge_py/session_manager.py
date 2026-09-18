@@ -12,15 +12,29 @@ StatusCallback = Callable[[SessionStatus], Awaitable[None]]
 
 
 class HeartbeatMonitor:
-    def __init__(self, *, warning_after_sec: float, interval_sec: float) -> None:
+    def __init__(
+        self,
+        *,
+        warning_after_sec: float,
+        interval_sec: float,
+        silence_timeout_sec: float = 0.0,
+    ) -> None:
         self._warning_after_sec = max(1.0, warning_after_sec)
         self._interval_sec = max(1.0, interval_sec)
+        # silence_timeout_sec: after this many seconds without events, declare DISCONNECTED.
+        # Default 0 = disabled (use warning_after_sec * 2 as fallback).
+        self._silence_timeout_sec = (
+            max(2.0, silence_timeout_sec)
+            if silence_timeout_sec > 0
+            else max(2.0, self._warning_after_sec * 2)
+        )
         self._connected_since_monotonic: float | None = None
         self._last_status_monotonic = time.monotonic()
         self._last_event_monotonic = time.monotonic()
         self._last_error = ""
         self._retry_count = 0
         self._connection_state = ConnectionState.IDLE
+        self._silence_declared = False  # True once we've emitted DISCONNECTED due to silence
 
     def set_state(self, state: ConnectionState, *, retry_count: int = 0, error: str = "") -> None:
         self._connection_state = state
@@ -31,6 +45,7 @@ class HeartbeatMonitor:
         if state == ConnectionState.CONNECTED:
             self._connected_since_monotonic = time.monotonic()
             self._last_event_monotonic = self._connected_since_monotonic
+            self._silence_declared = False  # reset on new connection
         elif state in (ConnectionState.DISCONNECTED, ConnectionState.FAULTED, ConnectionState.STOPPED):
             self._connected_since_monotonic = None
 
@@ -62,9 +77,29 @@ class HeartbeatMonitor:
     ) -> None:
         while not stop_event.is_set():
             snapshot = self.snapshot()
-            message = "heartbeat"
-            if snapshot.last_event_age_ms > int(self._warning_after_sec * 1000):
-                message = "heartbeat warning: no recent events"
+            now = time.monotonic()
+
+            # Detect silence: connected but no events for too long
+            silence_detected = (
+                self._connection_state == ConnectionState.CONNECTED
+                and not self._silence_declared
+                and snapshot.last_event_age_ms > int(self._silence_timeout_sec * 1000)
+            )
+
+            if silence_detected:
+                # Declare disconnected due to silence
+                self._silence_declared = True
+                self._connection_state = ConnectionState.DISCONNECTED
+                self._connected_since_monotonic = None
+                message = (
+                    f"DESCONECTADO: sin eventos durante {snapshot.last_event_age_ms // 1000}s. "
+                    f"La conexion con TikTok se ha perdido."
+                )
+            elif snapshot.last_event_age_ms > int(self._warning_after_sec * 1000):
+                seconds_idle = snapshot.last_event_age_ms // 1000
+                message = f"Advertencia: sin eventos durante {seconds_idle}s. Verificando conexion..."
+            else:
+                message = "heartbeat"
 
             await status_callback(
                 SessionStatus(

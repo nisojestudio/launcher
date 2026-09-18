@@ -441,6 +441,7 @@ def payload_to_json(payload: Payload) -> str:
 
 
 def append_jsonl(path: str | Path, payload: Payload) -> None:
+    """Synchronous JSONL append. Use append_jsonl_async for non-blocking I/O."""
     target_path = Path(path)
     target_path.parent.mkdir(parents=True, exist_ok=True)
     with target_path.open("a", encoding="utf-8", newline="\n") as output:
@@ -449,9 +450,20 @@ def append_jsonl(path: str | Path, payload: Payload) -> None:
 
 
 def write_json(path: str | Path, payload: Payload) -> None:
+    """Synchronous JSON write. Use write_json_async for non-blocking I/O."""
     target_path = Path(path)
     target_path.parent.mkdir(parents=True, exist_ok=True)
     target_path.write_text(payload_to_json(payload), encoding="utf-8")
+
+
+async def append_jsonl_async(path: str | Path, payload: Payload) -> None:
+    """Async JSONL append using thread pool to avoid blocking the event loop."""
+    await asyncio.to_thread(append_jsonl, path, payload)
+
+
+async def write_json_async(path: str | Path, payload: Payload) -> None:
+    """Async JSON write using thread pool to avoid blocking the event loop."""
+    await asyncio.to_thread(write_json, path, payload)
 
 
 async def emit_ws(url: str, payload: Payload) -> None:

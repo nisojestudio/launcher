@@ -75,7 +75,9 @@ class RetryPolicyConfig:
     base_delay_sec: float = 2.0
     max_delay_sec: float = 45.0
     not_live_delay_sec: float = 20.0
-    max_attempts: int = 0
+    max_attempts: int = 5
+    max_reconnect_per_hour: int = 10
+    jitter_sec: float = 1.0
 
 
 @dataclass(slots=True)
@@ -86,6 +88,7 @@ class ConnectionConfig:
     connect_timeout_sec: float = 20.0
     heartbeat_interval_sec: float = 15.0
     heartbeat_warning_after_sec: float = 60.0
+    silence_timeout_sec: float = 0.0  # 0 = auto (warning * 2)
 
 
 @dataclass(slots=True)
@@ -163,6 +166,8 @@ def load_bridge_config(path: str | Path | None = None) -> BridgeConfig:
     connection_mode = _parse_text(_env("LIVEPANEL_TIKTOK_PROVIDER") or data.get("connection_mode"), "tiktools").lower()
     if connection_mode in {"direct", "tiktoklive", "tiktok_live"}:
         connection_mode = "direct"
+    elif connection_mode in {"euler", "eulerstream"}:
+        connection_mode = "euler"
     elif connection_mode != "tiktools":
         connection_mode = "tiktools"
 
@@ -191,6 +196,13 @@ def load_bridge_config(path: str | Path | None = None) -> BridgeConfig:
                 min_value=5.0,
                 max_value=3600.0,
             ),
+            silence_timeout_sec=_parse_float(
+                _env("LIVEPANEL_BRIDGE_SILENCE_TIMEOUT_SEC")
+                or connection.get("silence_timeout_sec"),
+                0.0,
+                min_value=0.0,
+                max_value=3600.0,
+            ),
         ),
         retry_policy=RetryPolicyConfig(
             enabled=_parse_bool(
@@ -217,9 +229,21 @@ def load_bridge_config(path: str | Path | None = None) -> BridgeConfig:
             ),
             max_attempts=_parse_int(
                 _env("LIVEPANEL_TIKTOK_RETRY_MAX_ATTEMPTS") or retry_policy.get("max_attempts"),
-                0,
+                5,
                 min_value=0,
                 max_value=1000,
+            ),
+            max_reconnect_per_hour=_parse_int(
+                _env("LIVEPANEL_TIKTOK_RECONNECT_PER_HOUR") or retry_policy.get("max_reconnect_per_hour"),
+                10,
+                min_value=1,
+                max_value=100,
+            ),
+            jitter_sec=_parse_float(
+                retry_policy.get("jitter_sec"),
+                1.0,
+                min_value=0.0,
+                max_value=10.0,
             ),
         ),
         buffer=BufferConfig(

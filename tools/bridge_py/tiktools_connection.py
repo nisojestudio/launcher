@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import asyncio
 import json
+import time
 from typing import Any, Awaitable, Callable
 from urllib.parse import urlencode
 
@@ -15,8 +16,10 @@ except ImportError:
 
 TIKTOOLS_WS_BASE = "wss://api.tik.tools"
 
+# tik.tools close codes
 _NOT_LIVE_CLOSE_CODES = {4005, 4006, 4404, 4555}
 _SESSION_LIMIT_CLOSE_CODE = 4429
+_SERVER_INITIATED_CLOSE_CODES = {4404, 4429, 4555, 4500, 4556}
 
 
 class TikToolsConnectionError(RuntimeError):
@@ -145,6 +148,11 @@ class TikToolsConnection:
         self._remote_live_ended = False
         self._ws_task: asyncio.Task[None] | None = None
         self._websocket: Any | None = None
+        # Session metrics
+        self._session_started_at: float = 0.0
+        self._session_events_received: int = 0
+        self._session_gifts_received: int = 0
+        self._session_chat_received: int = 0
 
     @property
     def room_id(self) -> str:
@@ -166,7 +174,16 @@ class TikToolsConnection:
             )
         )
 
+        self._session_started_at = time.monotonic()
+        self._session_events_received = 0
+        self._session_gifts_received = 0
+        self._session_chat_received = 0
         self._ws_task = asyncio.create_task(self._ws_loop(), name="tiktools-ws")
+
+    def _session_uptime_ms(self) -> int:
+        if self._session_started_at <= 0:
+            return 0
+        return int((time.monotonic() - self._session_started_at) * 1000)
 
     async def _ws_loop(self) -> None:
         if websockets is None:
@@ -191,6 +208,7 @@ class TikToolsConnection:
                 "tiktools_connection",
                 "websocket connected",
                 target_user=self._target_user,
+                session_uptime_ms=self._session_uptime_ms(),
             )
 
             try:
@@ -227,12 +245,14 @@ class TikToolsConnection:
                             "tiktools connected",
                             target_user=self._target_user,
                             room_id=self._room_id,
+                            session_uptime_ms=self._session_uptime_ms(),
                         )
 
                         canonical = _ws_event_to_canonical(
                             msg, room_id=self._room_id, session_id=self._session_id, target_user=self._target_user
                         )
                         if canonical is not None:
+                            self._session_events_received += 1
                             await self._event_callback(canonical)
                         continue
 
@@ -241,8 +261,18 @@ class TikToolsConnection:
                             msg, room_id=self._room_id, session_id=self._session_id, target_user=self._target_user
                         )
                         if canonical is not None:
+                            self._session_events_received += 1
                             await self._event_callback(canonical)
                         self._remote_live_ended = True
+                        log_json(
+                            self._logger,
+                            "info",
+                            "tiktools_connection",
+                            "remote live ended",
+                            event=event_name,
+                            session_events=self._session_events_received,
+                            session_uptime_ms=self._session_uptime_ms(),
+                        )
                         break
 
                     # Convert and emit canonical event
@@ -250,8 +280,14 @@ class TikToolsConnection:
                         msg, room_id=self._room_id, session_id=self._session_id, target_user=self._target_user
                     )
                     if canonical is not None:
+                        self._session_events_received += 1
+                        if canonical.event_type == CanonicalEventType.GIFT:
+                            self._session_gifts_received += 1
+                        elif canonical.event_type == CanonicalEventType.CHAT:
+                            self._session_chat_received += 1
                         await self._event_callback(canonical)
 
+                # WebSocket loop ended
                 if self._remote_live_ended:
                     raise TikToolsConnectionError(
                         "NOT_LIVE",
@@ -261,6 +297,20 @@ class TikToolsConnection:
                 if not self._stop:
                     close_code = getattr(ws, "close_code", None)
                     close_reason = str(getattr(ws, "close_reason", "") or "")
+
+                    log_json(
+                        self._logger,
+                        "warning",
+                        "tiktools_connection",
+                        "websocket closed unexpectedly",
+                        close_code=close_code,
+                        close_reason=close_reason,
+                        session_events=self._session_events_received,
+                        session_gifts=self._session_gifts_received,
+                        session_chat=self._session_chat_received,
+                        session_uptime_ms=self._session_uptime_ms(),
+                    )
+
                     if close_code == _SESSION_LIMIT_CLOSE_CODE:
                         raise TikToolsConnectionError(
                             "API_SESSION_ENDED",
@@ -283,6 +333,16 @@ class TikToolsConnection:
                 raise
             finally:
                 self._websocket = None
+                log_json(
+                    self._logger,
+                    "info",
+                    "tiktools_connection",
+                    "ws_loop cleanup",
+                    session_events=self._session_events_received,
+                    session_gifts=self._session_gifts_received,
+                    session_chat=self._session_chat_received,
+                    session_uptime_ms=self._session_uptime_ms(),
+                )
                 try:
                     await ws.close()
                 except Exception:
