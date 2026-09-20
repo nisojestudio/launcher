@@ -465,14 +465,20 @@ int run_application(const std::vector<std::string>& arguments) {
     }
 
     if (app.is_external_bridge_mode()) {
-        const auto external_ws_port = resolve_external_ws_port(app);
         const auto ws_status = app.external_ws_status();
-        if (!ws_status.running || ws_status.port != external_ws_port) {
-            if (app.start_external_ws(external_ws_port)) {
-                emit_startup_log("runtime_start", "External bridge WS auto-started on port " + std::to_string(external_ws_port));
+        if (!ws_status.running || ws_status.port == 0) {
+            std::uint16_t bound_port = 0;
+            if (app.start_external_ws_auto(bound_port)) {
+                emit_startup_log(
+                    "runtime_start",
+                    "External bridge WS auto-started on port " + std::to_string(bound_port));
             } else {
-                emit_startup_log("runtime_start", "External bridge WS auto-start failed on port " + std::to_string(external_ws_port), false);
+                emit_startup_log("runtime_start", "External bridge WS auto-start failed", false);
             }
+        } else {
+            emit_startup_log(
+                "runtime_start",
+                "External bridge WS already running on port " + std::to_string(ws_status.port));
         }
     }
 

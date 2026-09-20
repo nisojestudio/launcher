@@ -1551,19 +1551,19 @@ std::string handle_bridge_connect(PanelApp* app, std::string_view body) {
 
     app->save_config();
 
-    // 2. Asegurar WS server (puerto 8765 exclusivo) — puede ya estar corriendo del startup
-    const auto port = app->config().external_ws_port == 0 ? static_cast<std::uint16_t>(8765)
-                                                          : app->config().external_ws_port;
+    // 2. Asegurar WS server en el mejor puerto disponible (no depende de 8765)
     auto ws = app->external_ws_status();
-    if (!ws.running || ws.port != port) {
-        if (!app->start_external_ws(port)) {
+    std::uint16_t bound_port = 0;
+    if (!ws.running || ws.port == 0) {
+        if (!app->start_external_ws_auto(bound_port)) {
             return make_bridge_result(
                 false,
                 "ws_start_failed",
-                "No se pudo abrir el WebSocket interno del panel (puerto " + std::to_string(port)
-                    + "). Puede estar ocupado por una conexion anterior: cerra el panel y volve a intentar.",
+                "No se pudo abrir el WebSocket interno del panel (probados los puertos 8765-8795 y uno efimero). Cerra otros paneles y volve a intentar.",
                 nullptr);
         }
+    } else {
+        bound_port = ws.port;
     }
 
     // 3. Iniciar runner (lanza Python bridge)

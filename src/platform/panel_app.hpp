@@ -101,6 +101,13 @@ public:
     bool submit_external_session_status(const bridge::TikTokExternalSessionStatus& status);
     bool start_external_ws(std::uint16_t port = 8765);
     void stop_external_ws();
+    /// Puerto de escucha del bridge: usa el configurado si esta libre, si no el
+    /// primer libre del rango y como ultimo recurso uno efimero (0).
+    std::uint16_t resolve_external_ws_bind_port() const;
+    /// Puerto real donde quedo escuchando el bridge (o el configurado si aun no arranco).
+    std::uint16_t effective_external_ws_port() const;
+    /// Arranca el WS en el mejor puerto disponible (rango + efimero de respaldo).
+    bool start_external_ws_auto(std::uint16_t& out_port);
     bridge::TikTokExternalWsStatus external_ws_status() const;
     bool start_external_runner(const std::string& target_user = {}, std::uint64_t max_seconds = 0);
     void stop_external_runner();

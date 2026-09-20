@@ -413,12 +413,15 @@ bool TikTokExternalWsServer::start(std::uint16_t port) {
         return false;
     }
 
-    constexpr std::uint16_t kDefaultExclusiveBridgePort = 8765;
+    // El panel ya no depende de un puerto fijo: si 8765 esta tomado (por ejemplo
+    // por un socket huerfano) se puede usar cualquier puerto del rango, y con
+    // port=0 Windows asigna uno efimero que se reporta con getsockname.
     constexpr std::uint16_t kMinExclusiveBridgePort = 8765;
-    constexpr std::uint16_t kMaxExclusiveBridgePort = 8765;
-    const auto resolved_port = port == 0 ? kDefaultExclusiveBridgePort : port;
+    constexpr std::uint16_t kMaxExclusiveBridgePort = 8800;
+    auto resolved_port = port;
 
-    if (resolved_port < kMinExclusiveBridgePort || resolved_port > kMaxExclusiveBridgePort) {
+    if (resolved_port != 0
+        && (resolved_port < kMinExclusiveBridgePort || resolved_port > kMaxExclusiveBridgePort)) {
         return false;
     }
 
@@ -493,6 +496,21 @@ bool TikTokExternalWsServer::start(std::uint16_t port) {
     if (listen(listen_socket, SOMAXCONN) == SOCKET_ERROR) {
         close_socket(listen_socket);
         return false;
+    }
+
+    // Con puerto efimero hay que preguntarle al sistema cual quedo asignado:
+    // ese valor viaja al runner y a la UI.
+    if (resolved_port == 0) {
+        sockaddr_in bound_address{};
+        int bound_address_size = sizeof(bound_address);
+        if (getsockname(
+                listen_socket,
+                reinterpret_cast<sockaddr*>(&bound_address),
+                &bound_address_size) == SOCKET_ERROR) {
+            close_socket(listen_socket);
+            return false;
+        }
+        resolved_port = ntohs(bound_address.sin_port);
     }
 
     impl_->listen_socket = listen_socket;

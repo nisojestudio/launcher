@@ -185,6 +185,9 @@ std::wstring build_command_line(
     // Broadcast WS enabled by default; add --no-broadcast-ws only if explicitly disabled
     if (!request.enable_broadcast_ws) {
         command_line += L" --no-broadcast-ws";
+    } else if (request.broadcast_ws_port > 0) {
+        command_line += L" --broadcast-ws-port ";
+        command_line += std::to_wstring(request.broadcast_ws_port);
     }
 
     if (request.max_seconds > 0) {

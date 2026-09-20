@@ -17,6 +17,10 @@ struct ExternalBridgeRunnerStartRequest {
     // Pool de credenciales (JSON {keys:[{label,value}]}). Se prefiere al
     // --api-key porque no expone secretos en la linea de comandos.
     std::string api_keys_file{};
+    // Puerto del broadcast interno del bridge: debe derivarse del puerto WS
+    // efectivo, porque el default (8766) puede chocar cuando el panel elige
+    // otro puerto del rango.
+    std::uint16_t broadcast_ws_port = 0;
 };
 
 struct ExternalBridgeRunnerStatus {

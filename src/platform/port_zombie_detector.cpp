@@ -29,6 +29,9 @@ constexpr std::uint16_t kBridgeWsPort = 8765;
 constexpr std::uint16_t kBridgeControlPort = 8770;
 constexpr std::uint16_t kOverlayHttpPort = 18913;
 constexpr std::uint16_t kPanelHttpPort = 8080;
+// El bridge ya no usa un puerto fijo: el rango entero es "nuestro".
+constexpr std::uint16_t kBridgePortRangeStart = 8765;
+constexpr std::uint16_t kBridgePortRangeEnd = 8800;
 
 #ifdef _WIN32
 std::string get_process_name_by_pid(DWORD pid) {
@@ -71,6 +74,8 @@ const char* tcp_state_to_string(DWORD state) {
 }
 
 bool is_our_port(uint16_t port) {
+    // Solo los puertos historicos: la limpieza forzada no debe matar procesos
+    // ajenos que casualmente escuchen dentro del rango dinamico.
     return port == kBridgeWsPort || port == kBridgeControlPort ||
            port == kOverlayHttpPort || port == kPanelHttpPort;
 }
@@ -168,18 +173,30 @@ bool PortZombieDetector::cleanup_zombies(const std::vector<PortStatus>& zombies)
     return any_cleaned;
 }
 
-// Limpieza agresiva: mata cualquier proceso que tenga LISTENING en nuestros puertos
+// Limpieza agresiva: libera nuestros puertos matando SOLO procesos del panel.
+// Antes mataba cualquier proceso escuchando ahi (podria ser un tercero legitimo);
+// ademas, con puertos dinamicos el panel puede simplemente elegir otro puerto,
+// asi que solo se limpian restos propios (python del bridge, cloudflared, panel).
 bool PortZombieDetector::force_cleanup_owned_ports() {
     bool any_cleaned = false;
     auto all = scan_owned_ports();
     for (const auto& p : all) {
-        if (p.in_use && p.state == "LISTENING" && p.pid != 0 && p.pid != GetCurrentProcessId()) {
-            HANDLE hProcess = OpenProcess(PROCESS_TERMINATE, FALSE, p.pid);
-            if (hProcess) {
-                TerminateProcess(hProcess, 0);
-                CloseHandle(hProcess);
-                any_cleaned = true;
-            }
+        if (!p.in_use || p.state != "LISTENING" || p.pid == 0 || p.pid == GetCurrentProcessId()) {
+            continue;
+        }
+        const auto& name = p.process_name;
+        const bool looks_like_ours = name.find("python") != std::string::npos
+            || name.find("cloudflared") != std::string::npos
+            || name.find("Nisoje") != std::string::npos
+            || name.find("panel") != std::string::npos;
+        if (!looks_like_ours) {
+            continue;
+        }
+        HANDLE hProcess = OpenProcess(PROCESS_TERMINATE, FALSE, p.pid);
+        if (hProcess) {
+            TerminateProcess(hProcess, 0);
+            CloseHandle(hProcess);
+            any_cleaned = true;
         }
     }
     return any_cleaned;
@@ -193,6 +210,39 @@ bool PortZombieDetector::is_port_free(std::uint16_t port) {
         }
     }
     return true;
+}
+
+bool PortZombieDetector::is_port_listening(std::uint16_t port) {
+#ifdef _WIN32
+    // Se consulta la tabla TCP completa (cualquier PID): un bind exitoso NO
+    // garantiza ser el dueno del puerto. En Windows dos sockets pueden quedar
+    // escuchando en el mismo puerto si el primero uso SO_REUSEADDR, y entonces
+    // las conexiones nuevas llegan al socket ajeno.
+    ULONG size = 0;
+    DWORD result = GetExtendedTcpTable(nullptr, &size, TRUE, AF_INET, TCP_TABLE_OWNER_PID_ALL, 0);
+    if (result != ERROR_INSUFFICIENT_BUFFER) {
+        return false;
+    }
+
+    std::vector<BYTE> buffer(size);
+    auto* table = reinterpret_cast<MIB_TCPTABLE_OWNER_PID*>(buffer.data());
+    if (GetExtendedTcpTable(table, &size, TRUE, AF_INET, TCP_TABLE_OWNER_PID_ALL, 0) != NO_ERROR) {
+        return false;
+    }
+
+    for (DWORD index = 0; index < table->dwNumEntries; ++index) {
+        const auto& row = table->table[index];
+        if (ntohs(static_cast<uint16_t>(row.dwLocalPort)) != port) {
+            continue;
+        }
+        if (row.dwState == MIB_TCP_STATE_LISTEN) {
+            return true;
+        }
+    }
+#else
+    (void)port;
+#endif
+    return false;
 }
 
 std::string PortZombieDetector::generate_report() {

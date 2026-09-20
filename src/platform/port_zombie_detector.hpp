@@ -28,6 +28,9 @@ public:
     static bool cleanup_zombies(const std::vector<PortStatus>& zombies);
     static bool force_cleanup_owned_ports();
     static bool is_port_free(std::uint16_t port);
+    /// True si CUALQUIER proceso escucha en ese puerto (deteccion real de
+    /// ocupacion: en Windows un bind exitoso no implica ser el dueno).
+    static bool is_port_listening(std::uint16_t port);
 
     // Para diagnóstico
     static std::string generate_report();

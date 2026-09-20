@@ -31,7 +31,9 @@ struct PanelConfig {
     std::string external_target_user{};
     std::string provider_api_key{};
     std::string tiktok_provider = "tiktools";
-    std::uint16_t external_ws_port = 8765;
+    // 0 = automatico: el panel busca el primer puerto libre del rango 8765-8795
+    // y, si hace falta, deja que Windows asigne uno efimero.
+    std::uint16_t external_ws_port = 0;
     bool embedded_ui_enabled = true;
     bool embedded_ui_fallback_to_browser = true;
     bool embedded_ui_devtools = false;

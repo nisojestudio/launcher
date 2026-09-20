@@ -23,6 +23,8 @@
 #ifndef WIN32_LEAN_AND_MEAN
 #define WIN32_LEAN_AND_MEAN
 #endif
+#include <winsock2.h>
+#include <ws2tcpip.h>
 #include <windows.h>
 #endif
 
@@ -447,6 +449,95 @@ std::uint16_t resolve_runner_control_port(std::uint16_t ws_port) {
         return kDefaultControlPort;
     }
     return static_cast<std::uint16_t>(ws_port + 5);
+}
+
+namespace {
+
+constexpr std::uint16_t kBridgePortRangeStart = 8765;
+constexpr std::uint16_t kBridgePortRangeEnd = 8795;
+
+#ifdef _WIN32
+/// Inicializa Winsock una sola vez para el sondeo de puertos.
+bool ensure_port_probe_winsock() {
+    static bool initialized = false;
+    static bool failed = false;
+    if (initialized) {
+        return true;
+    }
+    if (failed) {
+        return false;
+    }
+    WSADATA winsock_data{};
+    if (WSAStartup(MAKEWORD(2, 2), &winsock_data) != 0) {
+        failed = true;
+        return false;
+    }
+    initialized = true;
+    return true;
+}
+
+/// True si el puerto de loopback se puede bindear ahora mismo.
+bool probe_bridge_port(std::uint16_t port) {
+    auto probe_socket = socket(AF_INET, SOCK_STREAM, IPPROTO_TCP);
+    if (probe_socket == INVALID_SOCKET) {
+        return false;
+    }
+    const BOOL exclusive = TRUE;
+    setsockopt(
+        probe_socket,
+        SOL_SOCKET,
+        SO_EXCLUSIVEADDRUSE,
+        reinterpret_cast<const char*>(&exclusive),
+        sizeof(exclusive));
+
+    sockaddr_in address{};
+    address.sin_family = AF_INET;
+    address.sin_port = htons(port);
+    address.sin_addr.s_addr = htonl(INADDR_LOOPBACK);
+
+    const bool available = bind(
+        probe_socket,
+        reinterpret_cast<const sockaddr*>(&address),
+        sizeof(address)) != SOCKET_ERROR;
+    closesocket(probe_socket);
+    return available;
+}
+#else
+bool probe_bridge_port(std::uint16_t) {
+    return false;
+}
+#endif
+
+} // namespace
+
+std::uint16_t resolve_bridge_bind_port(std::uint16_t configured_port) {
+    if (!ensure_port_probe_winsock()) {
+        return configured_port == 0 ? kBridgePortRangeStart : configured_port;
+    }
+
+    const auto port_taken = [](std::uint16_t candidate) {
+        // La tabla TCP es la fuente de verdad: en Windows un bind puede tener
+        // exito aunque otro proceso ya escuche el puerto, y en ese caso las
+        // conexiones nuevas irian al socket ajeno.
+        return nlp3::platform::PortZombieDetector::is_port_listening(candidate)
+            || !probe_bridge_port(candidate);
+    };
+
+    // 1. Puerto preferido por el usuario/proyecto, si esta libre.
+    if (configured_port >= kBridgePortRangeStart && configured_port <= kBridgePortRangeEnd
+        && !port_taken(configured_port)) {
+        return configured_port;
+    }
+
+    // 2. Primer puerto libre del rango (evita quedarse sin panel por un zombie).
+    for (auto candidate = kBridgePortRangeStart; candidate <= kBridgePortRangeEnd; ++candidate) {
+        if (!port_taken(candidate)) {
+            return candidate;
+        }
+    }
+
+    // 3. Ultimo recurso: que lo elija Windows (puerto efimero).
+    return 0;
 }
 
 std::string resolve_external_game_event_actor_id(const nlp3::events::HostActor& actor) {
@@ -1327,6 +1418,10 @@ const PanelConfig& PanelApp::config() const noexcept {
     return config_;
 }
 
+std::uint16_t PanelApp::resolve_external_ws_bind_port() const {
+    return resolve_bridge_bind_port(config_.external_ws_port);
+}
+
 BridgeKeyVault& PanelApp::bridge_key_vault() noexcept {
     return bridge_key_vault_;
 }
@@ -1605,6 +1700,33 @@ bool PanelApp::start_external_ws(std::uint16_t port) {
     return external_ws_server_->start(port);
 }
 
+std::uint16_t PanelApp::effective_external_ws_port() const {
+    if (external_ws_server_ != nullptr) {
+        const auto status = external_ws_server_->status();
+        if (status.running && status.port != 0) {
+            return status.port;
+        }
+    }
+    return config_.external_ws_port == 0 ? static_cast<std::uint16_t>(8765) : config_.external_ws_port;
+}
+
+// Arranca el WS en el mejor puerto disponible y devuelve el puerto efectivo.
+bool PanelApp::start_external_ws_auto(std::uint16_t& out_port) {
+    const auto candidate = resolve_external_ws_bind_port();
+    if (start_external_ws(candidate)) {
+        out_port = effective_external_ws_port();
+        return true;
+    }
+    // Si el puerto elegido fallo igual (carrera con otro proceso), se intenta
+    // una vez mas dejando que lo asigne el sistema.
+    if (candidate != 0 && start_external_ws(0)) {
+        out_port = effective_external_ws_port();
+        return true;
+    }
+    out_port = 0;
+    return false;
+}
+
 void PanelApp::stop_external_ws() {
     if (external_ws_server_ != nullptr) {
         external_ws_server_->stop();
@@ -1635,10 +1757,13 @@ bool PanelApp::start_external_runner(const std::string& target_user, std::uint64
     const auto configured_port =
         config_.external_ws_port == 0 ? static_cast<std::uint16_t>(8765) : config_.external_ws_port;
     const auto ws_status = external_ws_status();
-    if (!ws_status.running || ws_status.port != configured_port) {
-        if (!start_external_ws(configured_port)) {
+    std::uint16_t bound_port = configured_port;
+    if (!ws_status.running || ws_status.port == 0) {
+        if (!start_external_ws_auto(bound_port)) {
             return false;
         }
+    } else {
+        bound_port = ws_status.port;
     }
 
     if (external_runner_ == nullptr) {
@@ -1657,13 +1782,14 @@ bool PanelApp::start_external_runner(const std::string& target_user, std::uint64
 
     const auto started = external_runner_->start(ExternalBridgeRunnerStartRequest{
         resolved_target_user,
-        "ws://127.0.0.1:" + std::to_string(configured_port),
+        "ws://127.0.0.1:" + std::to_string(bound_port),
         api_keys_file.empty() ? config_.provider_api_key : std::string{},
-        resolve_runner_control_port(configured_port),
+        resolve_runner_control_port(bound_port),
         max_seconds,
         true,
         config_.tiktok_provider,
         api_keys_file,
+        static_cast<std::uint16_t>(bound_port + 1),
     });
     if (started) {
         external_bridge_connection_state_ = "starting";
@@ -2061,15 +2187,14 @@ bool PanelApp::reconnect_external_pipeline() {
     }
 
     if (is_external_bridge_mode()) {
-        const auto configured_port =
-            config_.external_ws_port == 0 ? static_cast<std::uint16_t>(8765) : config_.external_ws_port;
         const auto ws_status = external_ws_status();
-        if (!ws_status.running || ws_status.port != configured_port) {
+        if (!ws_status.running || ws_status.port == 0) {
             stop_external_ws();
-            if (!start_external_ws(configured_port)) {
+            std::uint16_t bound_port = 0;
+            if (!start_external_ws_auto(bound_port)) {
                 external_bridge_connection_state_ = "config_error";
                 external_bridge_last_status_message_ =
-                    "No se pudo iniciar el servidor WebSocket en puerto 8765";
+                    "No se pudo iniciar el WebSocket interno del panel (puertos 8765-8795 ocupados).";
                 external_bridge_last_status_timestamp_ms_ = now_wall_clock_ms();
                 return false;
             }
