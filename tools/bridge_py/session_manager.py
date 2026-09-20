@@ -74,6 +74,7 @@ class HeartbeatMonitor:
         room_id_provider: Callable[[], str],
         status_callback: StatusCallback,
         stop_event: asyncio.Event,
+        phase_provider: Callable[[], str] | None = None,
     ) -> None:
         while not stop_event.is_set():
             snapshot = self.snapshot()
@@ -95,11 +96,25 @@ class HeartbeatMonitor:
                     f"DESCONECTADO: sin eventos durante {snapshot.last_event_age_ms // 1000}s. "
                     f"La conexion con TikTok se ha perdido."
                 )
+                severity = "error"
             elif snapshot.last_event_age_ms > int(self._warning_after_sec * 1000):
                 seconds_idle = snapshot.last_event_age_ms // 1000
                 message = f"Advertencia: sin eventos durante {seconds_idle}s. Verificando conexion..."
+                severity = "warn"
             else:
-                message = "heartbeat"
+                # Latido normal: el mensaje describe el estado real para que el
+                # monitor no muestre una palabra tecnica suelta.
+                if self._connection_state == ConnectionState.CONNECTED:
+                    message = "Escuchando el live de TikTok."
+                elif self._connection_state in (
+                    ConnectionState.CONNECTING,
+                    ConnectionState.PREPARING,
+                    ConnectionState.RECONNECTING,
+                ):
+                    message = "Conectando con TikTok..."
+                else:
+                    message = "Esperando para reconectar con TikTok..."
+                severity = "info"
 
             await status_callback(
                 SessionStatus(
@@ -111,12 +126,30 @@ class HeartbeatMonitor:
                     retry_count=snapshot.retry_count,
                     uptime_ms=snapshot.connected_since_ms,
                     last_event_timestamp_ms=0,
+                    severity=severity,
+                    # La fase la decide el connection_manager: si esta esperando
+                    # el vivo, el latido no debe decir "conectando".
+                    phase=(phase_provider() if phase_provider is not None else self._phase_for_state()),
                 )
             )
             try:
                 await asyncio.wait_for(stop_event.wait(), timeout=self._interval_sec)
             except asyncio.TimeoutError:
                 continue
+
+    def _phase_for_state(self) -> str:
+        """Fase del monitor del live derivada del estado de conexion."""
+        if self._connection_state == ConnectionState.CONNECTED:
+            return "connected"
+        if self._connection_state in (
+            ConnectionState.CONNECTING,
+            ConnectionState.PREPARING,
+            ConnectionState.RECONNECTING,
+        ):
+            return "connecting"
+        if self._connection_state == ConnectionState.DISCONNECTED:
+            return "error"
+        return "starting"
 
 
 class SessionSupervisor:
@@ -140,6 +173,7 @@ class SessionSupervisor:
         target_user: str,
         room_id_provider: Callable[[], str],
         status_callback: StatusCallback,
+        phase_provider: Callable[[], str] | None = None,
     ) -> None:
         if self._heartbeat_task is not None:
             return
@@ -150,6 +184,7 @@ class SessionSupervisor:
                 room_id_provider=room_id_provider,
                 status_callback=status_callback,
                 stop_event=self._heartbeat_stop_event,
+                phase_provider=phase_provider,
             ),
             name="bridge-heartbeat",
         )

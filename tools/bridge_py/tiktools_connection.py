@@ -170,8 +170,10 @@ class TikToolsConnection:
                 target_user=self._target_user,
                 connection_state=ConnectionState.CONNECTING,
                 room_id=self._room_id,
-                message="Connecting via tik.tools WebSocket",
+                message="Conectando con el WebSocket de tik.tools...",
                 timestamp_ms=utc_now_ms(),
+                severity="info",
+                phase="connecting",
             )
         )
 
@@ -195,9 +197,10 @@ class TikToolsConnection:
             return False
 
         loop = asyncio.get_running_loop()
-        # El relay de tik.tools puede tardar en confirmar la sala; nunca menos
-        # de 30s para no declarar un falso timeout (configurable para tests).
-        timeout_sec = self._handshake_timeout_sec or max(float(self._connect_timeout_sec or 0.0), 30.0)
+        # El relay de tik.tools puede tardar en confirmar la sala (medido: hasta
+        # ~45s). Nunca menos de 45s para no declarar un falso "waiting"; el
+        # parametro handshake_timeout_sec permite ajustarlo (tests).
+        timeout_sec = self._handshake_timeout_sec or max(float(self._connect_timeout_sec or 0.0), 45.0)
         deadline = loop.time() + timeout_sec
 
         while True:
@@ -224,6 +227,8 @@ class TikToolsConnection:
                         room_id=self._room_id,
                         message="Esperando que TikTok confirme la sala del live...",
                         timestamp_ms=utc_now_ms(),
+                        severity="info",
+                        phase="connecting",
                     )
                 )
                 return False
@@ -289,8 +294,10 @@ class TikToolsConnection:
                                 target_user=self._target_user,
                                 connection_state=ConnectionState.CONNECTED,
                                 room_id=self._room_id,
-                                message="Connected via tik.tools",
+                                message="Conectado via tik.tools",
                                 timestamp_ms=utc_now_ms(),
+                                severity="info",
+                                phase="connected",
                             )
                         )
                         log_json(

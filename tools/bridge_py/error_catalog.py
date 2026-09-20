@@ -66,6 +66,13 @@ CATALOG: dict[str, ErrorSpec] = {
         ACTION_WAIT_FOR_LIVE,
         True,
     ),
+    "WAITING_ROOM": ErrorSpec(
+        "WAITING_ROOM",
+        "El proveedor todavia no confirma la sala del live. El panel sigue esperando.",
+        SEVERITY_INFO,
+        ACTION_WAIT_FOR_LIVE,
+        True,
+    ),
     "API_SESSION_ENDED": ErrorSpec(
         "API_SESSION_ENDED",
         "tik.tools corto la sesion por limite del plan o de WebSockets. Se rota la API key.",

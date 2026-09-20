@@ -263,6 +263,63 @@ class ConnectionManagerTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(classify_close_code(4556, "Relay connection error"), "RELAY_ERROR")
         self.assertEqual(classify_close_code(1012, "service restart"), "SERVER_RESTART")
 
+    async def test_late_room_confirmation_is_declared_as_connected(self) -> None:
+        """Si la sala se confirma despues del timeout, el panel debe ver 'connected'."""
+
+        class LateHandshakeConnection(FakeConnection):
+            def __init__(self, **kwargs) -> None:
+                super().__init__(**kwargs)
+                self.room_id = "room-late"
+                self.handshake_complete = False
+
+            async def open(self) -> None:
+                type(self).attempts += 1
+                # open() vuelve sin handshake: la sala todavia no esta confirmada.
+                return
+
+            async def wait_closed(self) -> None:
+                # La sesion sigue abierta; la sala se confirma unos instantes
+                # despues (como el relay de tik.tools).
+                async def confirm_room_later() -> None:
+                    await asyncio.sleep(0.3)
+                    self.handshake_complete = True
+
+                flipper = asyncio.create_task(confirm_room_later())
+                try:
+                    await self._closed_event.wait()
+                finally:
+                    flipper.cancel()
+
+        LateHandshakeConnection.attempts = 0
+        config = bridge_config_with_api_key()
+        statuses: list[tuple[str, str]] = []
+
+        async def status_callback(status) -> None:
+            statuses.append((status.connection_state.value, status.phase))
+
+        manager = ConnectionManager(
+            config=config,
+            logger=configure_logger(
+                name="livepanel.bridge.test.connection.late_handshake",
+                log_path="tools/bridge_py/logs/test_connection_late_handshake.jsonl",
+            ),
+            metrics=MetricsRegistry(),
+            event_callback=accepted_event,
+            status_callback=status_callback,
+        )
+
+        loop = asyncio.get_running_loop()
+        with mock.patch("connection_manager.TikToolsConnection", LateHandshakeConnection):
+            run_task = asyncio.create_task(manager.run(target_user="alice", max_events=1))
+            deadline = loop.time() + 10
+            while not any(state == "connected" for state, _ in statuses) and loop.time() < deadline:
+                await asyncio.sleep(0.05)
+            manager.stop()
+            await asyncio.wait_for(run_task, timeout=10)
+
+        self.assertIn("connecting", [state for state, _ in statuses])
+        self.assertIn(("connected", "connected"), statuses)
+
     async def test_selects_direct_tiktoklive_provider(self) -> None:
         FakeConnection.attempts = 0
         FakeConnection.fail_first = False

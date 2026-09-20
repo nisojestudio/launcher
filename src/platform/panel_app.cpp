@@ -1502,8 +1502,15 @@ bool PanelApp::submit_external_session_status(const bridge::TikTokExternalSessio
     external_bridge_last_status_message_ = status.message;
     external_bridge_last_status_timestamp_ms_ = status.timestamp_ms;
     external_bridge_last_phase_ = status.phase;
-    external_bridge_last_alert_code_ = status.alert_code;
-    external_bridge_last_alert_severity_ = status.severity;
+    // El latido no trae codigo de alerta: se conserva el ultimo aviso real para
+    // que el monitor no lo pierda, y se limpia solo cuando la sesion conecta.
+    if (!status.alert_code.empty()) {
+        external_bridge_last_alert_code_ = status.alert_code;
+        external_bridge_last_alert_severity_ = status.severity;
+    } else if (status.phase == "connected") {
+        external_bridge_last_alert_code_.clear();
+        external_bridge_last_alert_severity_.clear();
+    }
     external_bridge_retry_in_sec_ = status.retry_in_sec;
     if (!status.room_id.empty()) {
         external_bridge_current_room_id_ = status.room_id;

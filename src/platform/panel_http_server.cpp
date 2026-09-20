@@ -1411,6 +1411,7 @@ std::string handle_bridge_connect(PanelApp* app, std::string_view body) {
     }
 
     // 1. Guardar en config persistente (siempre, sin importar bridge mode)
+    const auto previous_provider = app->config().tiktok_provider;
     app->config().external_target_user = target_user;
     // La clave se conserva al alternar temporalmente al adaptador directo, de
     // modo que el usuario pueda volver a TikTools sin reingresarla.
@@ -1449,6 +1450,16 @@ std::string handle_bridge_connect(PanelApp* app, std::string_view body) {
 
     // 3. Iniciar runner (lanza Python bridge)
     auto runner = app->external_runner_status();
+    // Rotar de cuenta o de proveedor exige reiniciar el runner: si sigue vivo
+    // con el usuario anterior, el panel mostraba "conectado" al usuario viejo.
+    const auto provider_changed = previous_provider != provider;
+    const auto target_changed = runner.running
+        && !runner.target_user.empty()
+        && runner.target_user != target_user;
+    if (runner.running && (target_changed || provider_changed)) {
+        app->stop_external_runner();
+        runner = app->external_runner_status();
+    }
     if (!runner.running) {
         if (!app->start_external_runner(target_user, 0)) {
             const auto failed_runner = app->external_runner_status();

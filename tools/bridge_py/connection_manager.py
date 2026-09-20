@@ -148,6 +148,8 @@ class ConnectionManager:
         exit_code = 0
         # Momento en que empezo la espera por el vivo (0 = no estamos esperando).
         waiting_for_live_since = 0.0
+        # Ultima fase emitida: el latido la reutiliza para no pisar "waiting".
+        current_phase = "starting"
         heartbeat_monitor = HeartbeatMonitor(
             warning_after_sec=self._config.connection.heartbeat_warning_after_sec,
             interval_sec=self._config.connection.heartbeat_interval_sec,
@@ -156,6 +158,9 @@ class ConnectionManager:
         supervisor = SessionSupervisor(heartbeat_monitor=heartbeat_monitor)
 
         async def emit_status(status: SessionStatus) -> None:
+            nonlocal current_phase
+            if status.phase:
+                current_phase = status.phase
             # Play sound on meaningful state transitions
             state_key = status.connection_state.value
             if state_key != self._last_played_state and self._sound.should_alert(state_key):
@@ -313,7 +318,9 @@ class ConnectionManager:
                             timestamp_ms=utc_now_ms(),
                             retry_count=attempt,
                             severity="info",
-                            phase="connecting",
+                            alert_code="WAITING_ROOM",
+                            alert_action=ACTION_WAIT_FOR_LIVE,
+                            phase="waiting",
                             provider=self._config.connection_mode,
                         )
                     )
@@ -321,9 +328,14 @@ class ConnectionManager:
                     target_user=target_user,
                     room_id_provider=lambda: connection.room_id,
                     status_callback=emit_status,
+                    phase_provider=lambda: current_phase,
                 )
                 wait_task = asyncio.create_task(connection.wait_closed(), name="bridge-connection-wait")
                 try:
+                    # El relay del proveedor puede confirmar la sala DESPUES del
+                    # timeout del handshake: hay que declarar la conexion cuando
+                    # llega, o el panel se queda mostrando "Conectando".
+                    late_connect_declared = handshake_ok
                     while True:
                         remaining_seconds = remaining_runtime_seconds(started_at, max_seconds)
                         if remaining_seconds is not None and remaining_seconds <= 0:
@@ -332,6 +344,37 @@ class ConnectionManager:
                             await connection.close()
                         if self._stop_requested or supervisor.stop_requested:
                             await connection.close()
+
+                        if not late_connect_declared and bool(
+                            getattr(connection, "handshake_complete", False)
+                        ):
+                            late_connect_declared = True
+                            heartbeat_monitor.set_state(ConnectionState.CONNECTED, retry_count=attempt)
+                            self._metrics.increment("session_starts_total")
+                            self._metrics.set_gauge("connected", 1)
+                            log_json(
+                                self._logger,
+                                "info",
+                                "connection_manager",
+                                "session connected after delayed room confirmation",
+                                target_user=target_user,
+                                provider=self._config.connection_mode,
+                                attempt=attempt,
+                            )
+                            await emit_status(
+                                SessionStatus(
+                                    target_user=target_user,
+                                    connection_state=ConnectionState.CONNECTED,
+                                    room_id=connection.room_id,
+                                    message="Conectado al live de TikTok.",
+                                    timestamp_ms=utc_now_ms(),
+                                    retry_count=attempt,
+                                    severity="info",
+                                    phase="connected",
+                                    provider=self._config.connection_mode,
+                                )
+                            )
+
                         if wait_task.done():
                             await wait_task
                             break
