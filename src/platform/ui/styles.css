@@ -2190,6 +2190,151 @@ body::-webkit-scrollbar-corner,
   color: #bae6fd;
 }
 
+/* Cuentas / API keys del proveedor: se administran desde el panel de conexion. */
+.key-pool {
+  border-radius: 16px;
+  border: 1px solid rgba(148, 163, 184, 0.2);
+  background: rgba(10, 18, 31, 0.72);
+  padding: 10px 12px;
+}
+
+.key-pool > summary {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  cursor: pointer;
+  font-size: 12px;
+  color: var(--text-soft);
+  list-style: none;
+}
+
+.key-pool > summary::-webkit-details-marker {
+  display: none;
+}
+
+.key-pool-count {
+  padding: 2px 8px;
+  border-radius: 999px;
+  background: rgba(56, 189, 248, 0.16);
+  color: #bae6fd;
+  font-size: 11px;
+}
+
+.key-pool-body {
+  display: grid;
+  gap: 10px;
+  padding-top: 10px;
+}
+
+.key-pool-help {
+  margin: 0;
+  font-size: 11px;
+  color: var(--text-soft);
+  line-height: 1.4;
+}
+
+.key-pool-list {
+  display: grid;
+  gap: 6px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  max-height: 150px;
+  overflow: auto;
+}
+
+.key-pool-item {
+  display: grid;
+  grid-template-columns: 1fr auto auto auto;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 10px;
+  border-radius: 12px;
+  border: 1px solid rgba(148, 163, 184, 0.16);
+  background: rgba(3, 7, 18, 0.72);
+  font-size: 12px;
+}
+
+.key-pool-label {
+  color: #e2e8f0;
+  font-weight: 600;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.key-pool-fingerprint {
+  font-size: 11px;
+  color: var(--text-soft);
+}
+
+.key-pool-state {
+  font-size: 11px;
+  color: var(--text-soft);
+}
+
+.key-pool-live {
+  border-color: rgba(34, 197, 94, 0.32);
+}
+
+.key-pool-live .key-pool-state {
+  color: #86efac;
+}
+
+.key-pool-warn {
+  border-color: rgba(245, 158, 11, 0.3);
+}
+
+.key-pool-warn .key-pool-state {
+  color: #fde68a;
+}
+
+.key-pool-remove {
+  border: 0;
+  background: transparent;
+  color: var(--text-soft);
+  cursor: pointer;
+  font-size: 12px;
+  line-height: 1;
+  padding: 4px;
+}
+
+.key-pool-remove:hover {
+  color: #fecaca;
+}
+
+.key-pool-empty {
+  font-size: 11px;
+  color: var(--text-soft);
+}
+
+.key-pool-add {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) auto;
+  gap: 6px;
+}
+
+.key-pool-add input {
+  min-width: 0;
+  padding: 6px 8px;
+  border-radius: 10px;
+  border: 1px solid rgba(148, 163, 184, 0.24);
+  background: rgba(3, 7, 18, 0.9);
+  color: #e2e8f0;
+  font-size: 12px;
+}
+
+.key-pool-feedback {
+  margin: 0;
+  font-size: 11px;
+  color: #fde68a;
+}
+
+.key-pool-feedback[data-tone="info"] {
+  color: #bae6fd;
+}
+
 .activity-feed-meta {
   display: flex;
   align-items: center;

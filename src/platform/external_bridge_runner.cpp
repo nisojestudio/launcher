@@ -171,7 +171,10 @@ std::wstring build_command_line(
     command_line += quote_windows_argument(widen(request.ws_url));
     command_line += L" --provider ";
     command_line += quote_windows_argument(widen(request.provider));
-    if (!request.api_key.empty()) {
+    if (!request.api_keys_file.empty()) {
+        command_line += L" --api-keys-file ";
+        command_line += quote_windows_argument(widen(request.api_keys_file));
+    } else if (!request.api_key.empty()) {
         command_line += L" --api-key ";
         command_line += quote_windows_argument(widen(request.api_key));
     }

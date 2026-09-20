@@ -447,6 +447,107 @@ std::string make_bridge_result(
     bool ok,
     std::string_view error_code,
     std::string_view message,
+    const nlp3::platform::ExternalBridgeRunnerStatus* runner);
+
+std::string make_bridge_keys_result(PanelApp* app) {
+    if (app == nullptr) {
+        return nlp3::platform::build_panel_http_error_json("panel unavailable");
+    }
+
+    const auto now_ms = static_cast<std::int64_t>(std::chrono::duration_cast<std::chrono::milliseconds>(
+        std::chrono::system_clock::now().time_since_epoch()).count());
+    const auto& entries = app->bridge_key_vault().entries();
+
+    std::string output = "{\"ok\":true,\"keys\":[";
+    for (std::size_t index = 0; index < entries.size(); ++index) {
+        if (index > 0) {
+            output += ",";
+        }
+        const auto& entry = entries[index];
+        const bool available = entry.cooldown_until_ms <= now_ms;
+        output += "{";
+        output += "\"index\":" + std::to_string(index) + ",";
+        output += "\"label\":" + json_quote(entry.label) + ",";
+        output += "\"fingerprint\":" + json_quote(nlp3::platform::BridgeKeyVault::fingerprint(entry.secret)) + ",";
+        output += "\"available\":" + bool_json(available) + ",";
+        output += "\"inUse\":" + bool_json(available && static_cast<int>(index) == app->bridge_key_vault().first_available(now_ms)) + ",";
+        output += "\"cooldownUntilMs\":" + std::to_string(entry.cooldown_until_ms);
+        output += "}";
+    }
+    output += "],\"count\":" + std::to_string(entries.size()) + "}";
+    return output;
+}
+
+std::string handle_bridge_key_add(PanelApp* app, std::string_view body) {
+    if (app == nullptr) {
+        return nlp3::platform::build_panel_http_error_json("panel unavailable");
+    }
+
+    const auto api_key = parse_json_string(body, "api_key").value_or("");
+    if (api_key.empty()) {
+        return make_bridge_result(false, "invalid_api_key", "Escribi la API key antes de agregarla.", nullptr);
+    }
+
+    const auto label = parse_json_string(body, "label").value_or("");
+    auto& vault = app->bridge_key_vault();
+    const auto& entries = vault.entries();
+    for (std::size_t index = 0; index < entries.size(); ++index) {
+        if (entries[index].secret == api_key) {
+            vault.replace(index, label.empty() ? entries[index].label : label, api_key);
+            app->save_bridge_key_vault();
+            return make_bridge_result(true, "bridge_key_updated", "La credencial ya estaba guardada: se actualizo su etiqueta.", nullptr);
+        }
+    }
+
+    if (!vault.add(label, api_key)) {
+        return make_bridge_result(false, "invalid_api_key", "No se pudo guardar esa API key.", nullptr);
+    }
+    if (!app->save_bridge_key_vault()) {
+        return make_bridge_result(false, "key_vault_write_failed", "No se pudo cifrar y guardar la credencial en disco.", nullptr);
+    }
+    return make_bridge_result(true, "bridge_key_added", "Credencial guardada y cifrada correctamente.", nullptr);
+}
+
+std::string handle_bridge_key_remove(PanelApp* app, std::string_view body) {
+    if (app == nullptr) {
+        return nlp3::platform::build_panel_http_error_json("panel unavailable");
+    }
+
+    const auto index_text = parse_json_string(body, "fingerprint").value_or("");
+    auto& vault = app->bridge_key_vault();
+    const auto& entries = vault.entries();
+
+    std::size_t target_index = entries.size();
+    if (!index_text.empty()) {
+        for (std::size_t index = 0; index < entries.size(); ++index) {
+            if (nlp3::platform::BridgeKeyVault::fingerprint(entries[index].secret) == index_text) {
+                target_index = index;
+                break;
+            }
+        }
+    } else {
+        const auto parsed_index = parse_json_uint64(body, "index");
+        if (parsed_index.has_value() && parsed_index.value() < entries.size()) {
+            target_index = static_cast<std::size_t>(parsed_index.value());
+        }
+    }
+
+    if (target_index >= entries.size()) {
+        return make_bridge_result(false, "key_not_found", "No se encontro esa credencial.", nullptr);
+    }
+    if (vault.size() <= 1) {
+        return make_bridge_result(false, "key_is_last", "No se puede borrar la unica credencial guardada.", nullptr);
+    }
+
+    vault.remove_at(target_index);
+    app->save_bridge_key_vault();
+    return make_bridge_result(true, "bridge_key_removed", "Credencial eliminada.", nullptr);
+}
+
+std::string make_bridge_result(
+    bool ok,
+    std::string_view error_code,
+    std::string_view message,
     const nlp3::platform::ExternalBridgeRunnerStatus* runner) {
     std::string payload = "{"
         "\"ok\":" + bool_json(ok) + ","
@@ -1413,11 +1514,28 @@ std::string handle_bridge_connect(PanelApp* app, std::string_view body) {
     // 1. Guardar en config persistente (siempre, sin importar bridge mode)
     const auto previous_provider = app->config().tiktok_provider;
     app->config().external_target_user = target_user;
-    // La clave se conserva al alternar temporalmente al adaptador directo, de
-    // modo que el usuario pueda volver a TikTools sin reingresarla.
-    if (provider == "tiktools" || provider == "euler") {
-        app->config().provider_api_key = api_key;
+
+    // Credenciales: la key de la UI se guarda cifrada en la boveda (DPAPI) y el
+    // pool se entrega al runner por archivo transitorio, nunca por argv.
+    if (!api_key.empty() && (provider == "tiktools" || provider == "euler")) {
+        auto& vault = app->bridge_key_vault();
+        const auto key_label = parse_json_string(body, "key_label").value_or("");
+        bool stored = false;
+        const auto& entries = vault.entries();
+        for (std::size_t index = 0; index < entries.size(); ++index) {
+            if (entries[index].secret == api_key) {
+                stored = vault.replace(index, key_label.empty() ? entries[index].label : key_label, api_key);
+                break;
+            }
+        }
+        if (!stored) {
+            stored = vault.add(key_label, api_key);
+        }
+        if (stored) {
+            app->save_bridge_key_vault();
+        }
     }
+
     app->config().tiktok_provider = provider;
 
     // Si no está en modo external, forzarlo y pedir reinicio
@@ -1658,6 +1776,15 @@ std::string build_route_response(
     }
     if (app != nullptr && app->auth_required() && !app->access_granted() && request_requires_access(request)) {
         return make_http_response("403 Forbidden", "application/json; charset=utf-8", make_auth_required_result());
+    }
+    if (request.method == "GET" && request.path == "/api/bridge/keys") {
+        return make_http_response("200 OK", "application/json; charset=utf-8", make_bridge_keys_result(app));
+    }
+    if (request.method == "POST" && request.path == "/api/bridge/keys/add") {
+        return make_http_response("200 OK", "application/json; charset=utf-8", handle_bridge_key_add(app, request.body));
+    }
+    if (request.method == "POST" && request.path == "/api/bridge/keys/remove") {
+        return make_http_response("200 OK", "application/json; charset=utf-8", handle_bridge_key_remove(app, request.body));
     }
     if (request.method == "POST" && request.path == "/api/metrics/reset") {
         return make_http_response("200 OK", "application/json; charset=utf-8", handle_metrics_reset(app));

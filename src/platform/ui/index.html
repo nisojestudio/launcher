@@ -127,6 +127,26 @@
             </div>
             <ul class="live-alerts-list" id="live-alerts-list"></ul>
           </div>
+
+          <details class="key-pool" id="key-pool">
+            <summary>
+              <span>Cuentas y API keys</span>
+              <strong class="key-pool-count" id="key-pool-count">0</strong>
+            </summary>
+            <div class="key-pool-body">
+              <p class="key-pool-help">
+                Se usan en orden y rotan solas cuando tik.tools agota la cuota de una.
+                Quedan cifradas en este equipo (DPAPI).
+              </p>
+              <ul class="key-pool-list" id="key-pool-list"></ul>
+              <div class="key-pool-add">
+                <input id="key-pool-label" type="text" autocomplete="off" spellcheck="false" placeholder="Etiqueta (ej: cuenta de Musito)">
+                <input id="key-pool-secret" type="password" autocomplete="off" spellcheck="false" placeholder="tk_...">
+                <button class="secondary-button" id="key-pool-add-button" type="button">Agregar</button>
+              </div>
+              <p class="key-pool-feedback" id="key-pool-feedback" hidden></p>
+            </div>
+          </details>
         </section>
 
         <section class="panel activity-panel" aria-labelledby="activity-title">

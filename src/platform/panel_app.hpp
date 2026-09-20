@@ -2,6 +2,7 @@
 
 #include <cstddef>
 #include <cstdint>
+#include <filesystem>
 #include <memory>
 #include <string>
 #include <vector>
@@ -14,6 +15,7 @@
 #include "host/session_state.hpp"
 #include "bridge/tiktok_external_inbox_adapter.hpp"
 #include "bridge/tiktok_external_ws_server.hpp"
+#include "platform/bridge_key_vault.hpp"
 #include "platform/external_bridge_manifest.hpp"
 #include "platform/external_game_manifest.hpp"
 #include "platform/external_game_state.hpp"
@@ -103,6 +105,16 @@ public:
     bool start_external_runner(const std::string& target_user = {}, std::uint64_t max_seconds = 0);
     void stop_external_runner();
     ExternalBridgeRunnerStatus external_runner_status() const;
+    /// Boveda de credenciales (cifrada con DPAPI) que usa el bridge TikTok.
+    BridgeKeyVault& bridge_key_vault() noexcept;
+    const BridgeKeyVault& bridge_key_vault() const noexcept;
+    /// Migra la key en texto plano de panel_config.json a la boveda y la borra
+    /// del archivo de configuracion.
+    bool migrate_legacy_api_key();
+    /// Persiste la boveda cifrada en disco.
+    bool save_bridge_key_vault();
+    /// Escribe el pool disponible en un archivo transitorio para el runner.
+    std::filesystem::path write_bridge_key_pool_file() const;
     bool start_http_ui(std::uint16_t port = 8080);
     void stop_http_ui();
     PanelHttpServerStatus http_ui_status() const;
@@ -194,6 +206,8 @@ private:
     std::string timer_save_path_{};
     std::uint64_t last_timer_save_ms_ = 0;
     std::int64_t last_saved_event_counter_ = -1;  // B7: skip auto-save if no new events
+    BridgeKeyVault bridge_key_vault_{};
+    std::filesystem::path bridge_key_vault_path_{};
     std::vector<ExternalGameManifest> external_game_manifests_{};
     std::string active_external_game_id_{};
     PanelExternalGameStatus external_game_status_cache_{};

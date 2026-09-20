@@ -60,6 +60,7 @@ add_library(nlp3_platform
     local_game_catalog_source.cpp
     local_license_service.cpp
     cloudflare_tunnel_service.cpp
+    bridge_key_vault.cpp
     external_bridge_runner.cpp
     external_game_bridge_runner.cpp
     external_game_manifest.cpp

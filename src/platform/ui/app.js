@@ -174,6 +174,7 @@
     liveStatusSinceMs: 0,
     liveStatusUser: "",
     lastBridgeAlertKey: "",
+    keyPool: [],
     activityClearBeforeMs: 0,
     selectedGiftValue: ACTIVITY_GIFT_PRESETS[0].value,
     terminalLines: [
@@ -201,6 +202,13 @@
     liveAlertsTitle: $("#live-alerts-title"),
     liveAlertsList: $("#live-alerts-list"),
     liveAlertsClear: $("#live-alerts-clear"),
+    keyPool: $("#key-pool"),
+    keyPoolCount: $("#key-pool-count"),
+    keyPoolList: $("#key-pool-list"),
+    keyPoolLabel: $("#key-pool-label"),
+    keyPoolSecret: $("#key-pool-secret"),
+    keyPoolAddButton: $("#key-pool-add-button"),
+    keyPoolFeedback: $("#key-pool-feedback"),
     tiktokUser: $("#tiktok-user"),
     tiktoolsApiKey: $("#tiktools-api-key"),
     tiktokProvider: $("#tiktok-provider"),
@@ -848,6 +856,97 @@
   function clearLiveAlerts() {
     state.liveAlerts = [];
     renderLiveAlerts();
+  }
+
+  // Cuentas / API keys: se listan, se agregan y se borran sin exponer la key.
+  async function refreshKeyPool() {
+    if (!els.keyPoolList) {
+      return;
+    }
+    try {
+      const payload = await apiGetJson("/api/bridge/keys");
+      state.keyPool = Array.isArray(payload?.keys) ? payload.keys : [];
+    } catch (error) {
+      state.keyPool = [];
+    }
+    renderKeyPool();
+  }
+
+  function renderKeyPool() {
+    if (!els.keyPoolList) {
+      return;
+    }
+    const keys = state.keyPool || [];
+    setText(els.keyPoolCount, `${keys.length}`);
+    const markup = keys.length
+      ? keys
+          .map((entry) => {
+            const status = entry.available
+              ? (entry.inUse ? "en uso" : "disponible")
+              : "cuota agotada";
+            const tone = entry.available ? (entry.inUse ? "live" : "info") : "warn";
+            return (
+              `<li class="key-pool-item key-pool-${escapeHtml(tone)}" data-fingerprint="${escapeHtml(entry.fingerprint || "")}">` +
+              `<span class="key-pool-label">${escapeHtml(entry.label || "cuenta")}</span>` +
+              `<span class="key-pool-fingerprint mono">${escapeHtml(entry.fingerprint || "")}</span>` +
+              `<span class="key-pool-state">${escapeHtml(status)}</span>` +
+              `<button class="key-pool-remove" type="button" data-remove="${escapeHtml(entry.fingerprint || "")}" title="Eliminar">&#10005;</button>` +
+              `</li>`
+            );
+          })
+          .join("")
+      : `<li class="key-pool-empty">Todavia no hay credenciales guardadas. Ingresala arriba y presiona Conectar, o agregala aca.</li>`;
+    els.keyPoolList.innerHTML = markup;
+  }
+
+  function showKeyPoolFeedback(message, tone = "warn") {
+    if (!els.keyPoolFeedback) {
+      return;
+    }
+    const text = String(message || "").trim();
+    els.keyPoolFeedback.hidden = !text;
+    els.keyPoolFeedback.textContent = text;
+    els.keyPoolFeedback.dataset.tone = tone;
+  }
+
+  async function addKeyToPool() {
+    const label = String(els.keyPoolLabel?.value || "").trim();
+    const secret = String(els.keyPoolSecret?.value || "").trim();
+    if (!secret) {
+      showKeyPoolFeedback("Escribi la API key antes de agregarla.", "warn");
+      return;
+    }
+    try {
+      const response = await postJsonAction("/api/bridge/keys/add", { label, api_key: secret }, "agregar credencial");
+      showKeyPoolFeedback(response?.message || "", response?.ok ? "info" : "warn");
+      if (response?.ok) {
+        if (els.keyPoolLabel) els.keyPoolLabel.value = "";
+        if (els.keyPoolSecret) els.keyPoolSecret.value = "";
+        if (els.tiktoolsApiKey) els.tiktoolsApiKey.value = secret;
+        await refreshKeyPool();
+      }
+    } catch (error) {
+      showKeyPoolFeedback(`No se pudo guardar la credencial: ${error}`, "warn");
+    }
+  }
+
+  async function removeKeyFromPool(fingerprint) {
+    if (!fingerprint) {
+      return;
+    }
+    try {
+      const response = await postJsonAction(
+        "/api/bridge/keys/remove",
+        { fingerprint },
+        "eliminar credencial"
+      );
+      showKeyPoolFeedback(response?.message || "", response?.ok ? "info" : "warn");
+      if (response?.ok) {
+        await refreshKeyPool();
+      }
+    } catch (error) {
+      showKeyPoolFeedback(`No se pudo eliminar: ${error}`, "warn");
+    }
   }
 
   function livePhaseFromSnapshot(external) {
@@ -2880,6 +2979,7 @@
           pushLiveAlert("info", String(warning), "");
         }
         setLivePhase("launching", user);
+        void refreshKeyPool();
         return;
       }
 
@@ -3326,6 +3426,18 @@
 
     els.liveAlertsClear?.addEventListener("click", () => {
       clearLiveAlerts();
+    });
+
+    els.keyPoolAddButton?.addEventListener("click", () => {
+      void addKeyToPool();
+    });
+
+    els.keyPoolList?.addEventListener("click", (event) => {
+      const button = event.target.closest("[data-remove]");
+      if (!button) {
+        return;
+      }
+      void removeKeyFromPool(button.dataset.remove || "");
     });
 
     els.activityGiftMenu?.addEventListener("click", (event) => {
@@ -4195,6 +4307,7 @@
       // Step 2: If the panel is locked, attempt auto-login with saved credentials.
       attemptAutoLogin();
     });
+    void refreshKeyPool();
 
     restartPollingLoops(false);
     window.setInterval(updateTitlebarClock, 1000);

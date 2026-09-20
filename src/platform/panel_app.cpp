@@ -691,6 +691,14 @@ bool PanelApp::initialize(const std::string& config_path) {
 
         activity_log_ = std::make_unique<PanelActivityLog>(256);
 
+        // Boveda de credenciales del bridge (cifrada con DPAPI) y migracion de
+        // la key en texto plano que quedaba en panel_config.json.
+        bridge_key_vault_path_ = BridgeKeyVault::default_path();
+        if (!bridge_key_vault_path_.empty()) {
+            bridge_key_vault_.load(bridge_key_vault_path_);
+        }
+        migrate_legacy_api_key();
+
         // FASE 4: Limpieza agresiva del puerto 8765 al inicio (test isolation)
         // Fuerza liberación si un test anterior no limpió correctamente
         PortZombieDetector::force_cleanup_owned_ports();
@@ -1319,6 +1327,73 @@ const PanelConfig& PanelApp::config() const noexcept {
     return config_;
 }
 
+BridgeKeyVault& PanelApp::bridge_key_vault() noexcept {
+    return bridge_key_vault_;
+}
+
+const BridgeKeyVault& PanelApp::bridge_key_vault() const noexcept {
+    return bridge_key_vault_;
+}
+
+bool PanelApp::migrate_legacy_api_key() {
+    const auto legacy_key = config_.provider_api_key;
+    if (legacy_key.empty() || bridge_key_vault_path_.empty()) {
+        return false;
+    }
+
+    // Si la boveda ya tiene esa credencial, solo se limpia el texto plano.
+    const auto& entries = bridge_key_vault_.entries();
+    const bool already_stored = std::any_of(
+        entries.begin(),
+        entries.end(),
+        [&legacy_key](const BridgeKeyEntry& entry) { return entry.secret == legacy_key; });
+    if (!already_stored) {
+        bridge_key_vault_.add("cuenta principal", legacy_key);
+        bridge_key_vault_.save(bridge_key_vault_path_);
+    }
+
+    config_.provider_api_key.clear();
+    if (config_storage_ != nullptr) {
+        config_storage_->save_to_file(config_, config_path_);
+    }
+    if (activity_log_ != nullptr) {
+        activity_log_->push({PanelActivityKind::unknown, "bridge_api_key_migrated_to_vault", "system", "", "", now_wall_clock_ms()});
+    }
+    return true;
+}
+
+bool PanelApp::save_bridge_key_vault() {
+    if (bridge_key_vault_path_.empty()) {
+        return false;
+    }
+    return bridge_key_vault_.save(bridge_key_vault_path_);
+}
+
+std::filesystem::path PanelApp::write_bridge_key_pool_file() const {
+    const auto path = BridgeKeyVault::transient_pool_path();
+    if (path.empty()) {
+        return {};
+    }
+
+    std::error_code error;
+    if (path.has_parent_path()) {
+        std::filesystem::create_directories(path.parent_path(), error);
+        if (error) {
+            return {};
+        }
+    }
+
+    std::ofstream output(path, std::ios::binary | std::ios::trunc);
+    if (!output) {
+        return {};
+    }
+    output << bridge_key_vault_.to_pool_json(now_wall_clock_ms());
+    if (!output.good()) {
+        return {};
+    }
+    return path;
+}
+
 ExternalBridgeManifest PanelApp::external_bridge_manifest() const {
     const auto runner_status = external_runner_status();
     return ExternalBridgeManifest{
@@ -1570,14 +1645,25 @@ bool PanelApp::start_external_runner(const std::string& target_user, std::uint64
         external_runner_ = std::make_unique<ExternalBridgeRunner>();
     }
 
+    // El pool viaja por archivo transitorio (no en la linea de comandos): asi
+    // la credencial no queda visible en el listado de procesos.
+    std::string api_keys_file{};
+    if (!bridge_key_vault_.empty()) {
+        const auto pool_path = write_bridge_key_pool_file();
+        if (!pool_path.empty()) {
+            api_keys_file = pool_path.string();
+        }
+    }
+
     const auto started = external_runner_->start(ExternalBridgeRunnerStartRequest{
         resolved_target_user,
         "ws://127.0.0.1:" + std::to_string(configured_port),
-        config_.provider_api_key,
+        api_keys_file.empty() ? config_.provider_api_key : std::string{},
         resolve_runner_control_port(configured_port),
         max_seconds,
         true,
         config_.tiktok_provider,
+        api_keys_file,
     });
     if (started) {
         external_bridge_connection_state_ = "starting";

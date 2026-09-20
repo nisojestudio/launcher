@@ -14,6 +14,9 @@ struct ExternalBridgeRunnerStartRequest {
     std::uint64_t max_seconds = 0;
     bool enable_broadcast_ws = true;  // Default: enabled
     std::string provider = "tiktools";
+    // Pool de credenciales (JSON {keys:[{label,value}]}). Se prefiere al
+    // --api-key porque no expone secretos en la linea de comandos.
+    std::string api_keys_file{};
 };
 
 struct ExternalBridgeRunnerStatus {
