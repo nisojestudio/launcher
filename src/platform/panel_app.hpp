@@ -120,6 +120,8 @@ public:
     bool migrate_legacy_api_key();
     /// Persiste la boveda cifrada en disco.
     bool save_bridge_key_vault();
+    /// Borra el archivo transitorio con el pool que usa el runner.
+    void remove_bridge_key_pool_file() const;
     /// Escribe el pool disponible en un archivo transitorio para el runner.
     std::filesystem::path write_bridge_key_pool_file() const;
     bool start_http_ui(std::uint16_t port = 8080);

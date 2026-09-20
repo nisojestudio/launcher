@@ -4,6 +4,39 @@ All notable Panel Live changes should be recorded here.
 
 Format follows a lightweight Keep a Changelog style. Versions use SemVer.
 
+## 0.3.0 - 2026-09-20
+
+### Added
+
+- **Rotación de cuentas / API keys de tik.tools**: el bridge recibe un pool de credenciales (`--api-keys-file`) y, cuando el proveedor agota la cuota de la key en uso (`4429` / `4555 "Daily Demo Limit"`), la pone en cuarentena y reconecta con la siguiente **sin reiniciar el proceso**. Rotar no consume `max_attempts` ni el límite de reconexiones por hora. Si todas están en cuarentena, el panel informa cuánto falta.
+- **Bóveda de credenciales cifrada (DPAPI)**: las API keys se guardan cifradas con `CryptProtectData` en `%LOCALAPPDATA%\NisojeStudio\credentials.dat` (solo el usuario que las guardó puede leerlas). Se **migra y borra** la key en texto plano que quedaba en `panel_config.json`, y el pool viaja al runner por archivo transitorio, nunca en la línea de comandos.
+- **Gestión de cuentas en el panel**: bloque "Cuentas y API keys" en el panel de conexión, con etiqueta, huella (`tk_73c3…9a9a`), estado (en uso / disponible / cuota agotada) y alta/baja. Endpoints `GET /api/bridge/keys`, `POST /api/bridge/keys/add`, `POST /api/bridge/keys/remove`.
+- **Monitor del live con estados y alertas**: franja de estado (`Iniciando` / `Conectando` / `Esperando el vivo` / `Conectado` / `Error`) con cronómetro y banner de alertas con severidad, contador y limpieza manual, ubicados en el panel **Conexión TikTok** debajo del botón Conectar.
+- `error_catalog.py`: catálogo único de errores del bridge (código, mensaje para el usuario, severidad y acción: `wait_for_live`, `rotate_key`, `fix_user`, `check_key`, `wait_provider`).
+- **Puerto automático del bridge**: se acabó el 8765 fijo. El panel usa el configurado si está libre, si no el primer libre de 8765–8795 y como último recurso uno efímero asignado por Windows. El puerto efectivo se propaga al runner, al puerto de control y a la UI.
+
+### Fixed
+
+- **El bridge ya no arranca bloqueado por falta de API key**: el sondeo de entorno trata la credencial faltante como aviso (no como error), y `/api/bridge/connect` devuelve el motivo real (`error` + `message` + `runtimeSummary/Warnings/Alerts`) en vez de un `runner_start_failed` genérico. Esto resolvía el incidente documentado en `docs/PENDING_2026-09-18_dist-0.2.29-apikey-workaround.md`.
+- **Zombie de puertos (causa raíz)**: Winsock crea sockets heredables y el panel lanzaba sus hijos (python del bridge, cloudflared) con `bInheritHandles=TRUE`; al morir el panel, el hijo mantenía 8765 y 18913 en `LISTEN` con un PID ya inexistente y el panel nuevo no podía volver a bindear. Los listeners del WS, HTTP y overlay ahora se marcan como **no heredables** (verificado: al cerrar el panel los puertos se liberan al instante aunque los hijos sigan vivos).
+- **Detección real de puerto ocupado**: en Windows un `bind` puede tener éxito aunque otro proceso escuche el mismo puerto, y entonces las conexiones nuevas llegan al socket ajeno (caso típico de "no conecta"). La ocupación ahora se consulta en la tabla TCP (`PortZombieDetector::is_port_listening`).
+- **La limpieza forzada de puertos ya no mata procesos ajenos**: solo restos del panel (python del bridge, cloudflared, Nisoje). Antes podía terminar un proceso de terceros que escuchara en 8765.
+- **`4555` (Daily Demo Limit) ya no se reporta como "el usuario no está en vivo"**: se clasifica como cuota agotada y dispara rotación de credencial. Se agregaron además `4556` (relay), `1012` (service restart) y `502`/handshake.
+- **`NOT_LIVE` vuelve a ser transitorio**: `not_live_delay_sec` era código muerto porque `NOT_LIVE` salía por la lista de errores no reintentables; el bridge abandonaba en 6 s. Ahora espera a que la cuenta empiece el vivo, con presupuesto configurable (`waiting_for_live_max_minutes`).
+- **"Conectado" ya no se declara antes del handshake**: la sesión espera la confirmación de sala (`roomInfo`); si el relay tarda más que el timeout y confirma después, la sesión se declara conectada igual (antes el panel quedaba en "Conectando" para siempre aunque los eventos ya llegaran).
+- **Cambiar de cuenta o proveedor con el runner activo ahora reinicia el runner**: antes devolvía `ok` dejando la sesión del usuario anterior, lo que rompía la rotación de cuentas.
+- **Se eliminó el falso aviso "never reached connected state"** que aparecía en 43 de 43 sesiones, incluidas sesiones de 2 horas con 5022 eventos.
+- **El codec C++ acepta los estados `reconnecting`, `stopped` e `idle`** que el bridge ya emitía: antes descartaba el mensaje `session_status` completo, por lo que los reintentos y sus alertas nunca llegaban al panel. El parser también acepta números decimales (`retry_in_sec: 4.72`).
+- **El broadcast interno del bridge ya no choca con el puerto del panel**: se deriva del puerto efectivo (bound + 1) en lugar del 8766 fijo.
+
+### Changed
+
+- El latido de sesión dejó de pisar el estado visible: reutiliza la fase real del `connection_manager` y envía mensajes legibles ("Escuchando el live de TikTok") en vez de `heartbeat`.
+
+### Notes
+
+- El paquete incluye la sincronización de `tools/bridge_py/*.py` hacia el instalador, que era el desfase que provocó el incidente de la API key en 0.2.28/0.2.29.
+
 ## 0.2.29 - 2026-09-18
 
 ### Fixed

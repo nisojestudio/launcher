@@ -1464,6 +1464,15 @@ bool PanelApp::save_bridge_key_vault() {
     return bridge_key_vault_.save(bridge_key_vault_path_);
 }
 
+void PanelApp::remove_bridge_key_pool_file() const {
+    const auto path = BridgeKeyVault::transient_pool_path();
+    if (path.empty()) {
+        return;
+    }
+    std::error_code error;
+    std::filesystem::remove(path, error);
+}
+
 std::filesystem::path PanelApp::write_bridge_key_pool_file() const {
     const auto path = BridgeKeyVault::transient_pool_path();
     if (path.empty()) {
@@ -1803,6 +1812,9 @@ void PanelApp::stop_external_runner() {
     if (external_runner_ != nullptr) {
         external_runner_->stop();
     }
+    // El pool de credenciales solo vive lo que vive el runner: se borra al
+    // detenerlo para no dejar secretos en un archivo transitorio.
+    remove_bridge_key_pool_file();
     if (is_external_bridge_mode() && bridge_controller_ != nullptr) {
         bridge_controller_->reset();
         bridge_controller_->start();
