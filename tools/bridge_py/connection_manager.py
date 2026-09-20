@@ -3,6 +3,7 @@ from __future__ import annotations
 import asyncio
 import random
 import time
+from datetime import datetime, timedelta, timezone
 from typing import Any, Awaitable, Callable
 
 from bridge_config import BridgeConfig
@@ -136,6 +137,58 @@ class ConnectionManager:
         )
         self._sound = SoundAlerts(enabled=True)
         self._last_played_state = ""
+        # Pool de credenciales: se rota cuando el proveedor agota la cuota.
+        self._api_keys = self._config.connection.effective_api_keys()
+        self._key_index = 0
+        # Indice de key -> instante (monotonic) hasta el que queda en cuarentena.
+        self._key_cooldown_until: dict[int, float] = {}
+
+    def _key_cooldown_seconds(self) -> float:
+        configured_minutes = float(getattr(self._config.retry_policy, "key_cooldown_minutes", 0) or 0)
+        if configured_minutes > 0:
+            return configured_minutes * 60.0
+        # Sin configuracion: esperar al reinicio diario del proveedor.
+        now = datetime.now(timezone.utc)
+        tomorrow = (now + timedelta(days=1)).replace(hour=0, minute=0, second=0, microsecond=0)
+        return max(60.0, (tomorrow - now).total_seconds())
+
+    def _select_api_key(self) -> str:
+        """Primera key disponible del pool (respeta cuarentenas)."""
+        if not self._api_keys:
+            return ""
+        now = time.monotonic()
+        for offset in range(len(self._api_keys)):
+            index = (self._key_index + offset) % len(self._api_keys)
+            if self._key_cooldown_until.get(index, 0.0) <= now:
+                self._key_index = index
+                return self._api_keys[index]
+        return ""
+
+    def _quarantine_current_key(self) -> None:
+        if not self._api_keys:
+            return
+        self._key_cooldown_until[self._key_index] = time.monotonic() + self._key_cooldown_seconds()
+
+    def _next_available_key_delay(self) -> float | None:
+        """Segundos hasta que alguna key salga de cuarentena (None = ninguna)."""
+        if not self._api_keys:
+            return None
+        now = time.monotonic()
+        pending = [
+            self._key_cooldown_until.get(index, 0.0)
+            for index in range(len(self._api_keys))
+            if self._key_cooldown_until.get(index, 0.0) > now
+        ]
+        if len(pending) < len(self._api_keys):
+            return 0.0
+        if not pending:
+            return 0.0
+        return max(0.0, min(pending) - now)
+
+    def _current_key_label(self) -> str:
+        if not self._api_keys:
+            return ""
+        return self._config.connection.label_for_key(self._api_keys[self._key_index])
 
     def stop(self) -> None:
         self._stop_requested = True
@@ -235,33 +288,43 @@ class ConnectionManager:
                     "room_id": room_id,
                     "session_id": utc_now_ms(),
                 }
+                # Credencial de este intento: la primera key no agotada del pool.
+                selected_api_key = self._select_api_key()
                 if self._config.connection_mode == "direct":
                     connection = TikTokConnection(**connection_args)
                 elif self._config.connection_mode == "euler":
                     from euler_connection import EulerConnection
-                    api_key = self._config.connection.api_key
-                    if not api_key:
+                    if not selected_api_key:
                         raise EulerConnectionError(
                             "INVALID_API_KEY",
                             "Euler requiere API key (JWT). Proporcione --api-key o LIVEPANEL_BRIDGE_API_KEY.",
                         )
                     connection = EulerConnection(
                         **connection_args,
-                        api_key=api_key,
+                        api_key=selected_api_key,
                         heartbeat_interval_sec=self._config.connection.heartbeat_interval_sec,
                         heartbeat_warning_after_sec=self._config.connection.heartbeat_warning_after_sec,
                         silence_timeout_sec=self._config.connection.silence_timeout_sec,
                     )
                 else:
-                    api_key = self._config.connection.api_key
-                    if not api_key:
+                    if not selected_api_key:
                         raise TikToolsConnectionError(
                             "INVALID_API_KEY",
                             "tik.tools requiere API key. Proporcione --api-key o LIVEPANEL_BRIDGE_API_KEY.",
                         )
                     connection = TikToolsConnection(
                         **connection_args,
-                        api_key=api_key,
+                        api_key=selected_api_key,
+                    )
+                if selected_api_key:
+                    log_json(
+                        self._logger,
+                        "info",
+                        "connection_manager",
+                        "using api key from pool",
+                        key_label=self._current_key_label(),
+                        pool_size=len(self._api_keys),
+                        target_user=target_user,
                     )
 
                 heartbeat_monitor.set_state(ConnectionState.CONNECTING, retry_count=attempt)
@@ -416,19 +479,53 @@ class ConnectionManager:
                     time.monotonic() - waiting_for_live_since if waiting_for_live_since > 0 else 0.0
                 )
 
+                # Cuota agotada: la key actual entra en cuarentena y se sigue con
+                # la proxima del pool, sin reiniciar el proceso.
+                rotating_key = error_action == ACTION_ROTATE_KEY and len(self._api_keys) > 1
+                key_delay: float | None = None
+                key_label = self._current_key_label()
+                if rotating_key:
+                    self._quarantine_current_key()
+                    key_delay = self._next_available_key_delay()
+                    key_label = self._current_key_label()
+                    log_json(
+                        self._logger,
+                        "warning",
+                        "connection_manager",
+                        "api key quota exhausted, rotating",
+                        exhausted_key_label=key_label,
+                        pool_size=len(self._api_keys),
+                        next_key_delay_sec=None if key_delay is None else round(key_delay, 1),
+                        target_user=target_user,
+                    )
+
+                error_message = exc.message
+                if rotating_key:
+                    if key_delay is not None and key_delay > 0:
+                        error_message = (
+                            "Se agoto la cuota de todas las API keys configuradas. "
+                            f"Se reintenta cuando alguna se libere (en {key_delay / 60.0:.0f} min)."
+                        )
+                    else:
+                        error_message = (
+                            f"Se agoto la cuota de la credencial en uso ({key_label}). "
+                            "Se rota automaticamente a la siguiente."
+                        )
+
                 await emit_status(
                     SessionStatus(
                         target_user=target_user,
                         connection_state=ConnectionState.FAULTED,
                         room_id=connection.room_id if connection is not None else room_id,
-                        message=exc.message,
+                        message=error_message,
                         timestamp_ms=utc_now_ms(),
                         retry_count=attempt,
                         severity=severity_for(exc.code),
                         alert_code=exc.code,
                         alert_action=error_action,
-                        phase="waiting" if waiting_for_live else "error",
+                        phase="waiting" if (waiting_for_live or rotating_key) else "error",
                         provider=provider,
+                        key_label=key_label,
                     )
                 )
                 log_json(
@@ -437,12 +534,13 @@ class ConnectionManager:
                     "connection_manager",
                     "session failed",
                     code=exc.code,
-                    error_message=exc.message,
+                    error_message=error_message,
                     error_action=error_action,
                     retry_count=attempt,
                     target_user=target_user,
                     raw_error=exc.raw_error,
                     provider=provider,
+                    key_label=key_label,
                     waiting_for_live_seconds=round(waiting_for_live_seconds, 1),
                     reconnects_remaining=self._reconnect_limiter.remaining(provider),
                 )
@@ -454,6 +552,17 @@ class ConnectionManager:
                     attempt,
                     waiting_for_live_seconds=waiting_for_live_seconds,
                 )
+                if rotating_key and key_delay is not None:
+                    # Rotar de credencial no es un fallo: se reintenta enseguida
+                    # (o cuando la cuota se libere) sin gastar el presupuesto de
+                    # intentos ni el limite de reconexiones por hora.
+                    max_wait_minutes = float(
+                        getattr(self._config.retry_policy, "all_keys_cooldown_max_minutes", 30) or 0
+                    )
+                    if max_wait_minutes > 0 and key_delay > max_wait_minutes * 60.0:
+                        retry_delay = None
+                    else:
+                        retry_delay = max(1.0, key_delay)
                 if retry_delay is None:
                     log_json(
                         self._logger,
@@ -469,8 +578,9 @@ class ConnectionManager:
                     break
 
                 # El limite de reconexiones por hora protege la cuota del
-                # proveedor, pero esperar a que empiece el vivo no la consume.
-                if not waiting_for_live and not self._reconnect_limiter.can_reconnect(provider):
+                # proveedor, pero esperar el vivo o rotar de credencial no la
+                # consumen.
+                if not waiting_for_live and not rotating_key and not self._reconnect_limiter.can_reconnect(provider):
                     log_json(
                         self._logger,
                         "warning",
@@ -490,12 +600,18 @@ class ConnectionManager:
                     break
 
                 attempt += 1
-                if not waiting_for_live:
+                if not waiting_for_live and not rotating_key:
                     self._reconnect_limiter.record_reconnect(provider)
                 self._metrics.increment("reconnect_total")
                 self._metrics.set_gauge("reconnects_remaining", float(self._reconnect_limiter.remaining(provider)))
                 heartbeat_monitor.set_state(ConnectionState.RECONNECTING, retry_count=attempt, error=exc.message)
-                if waiting_for_live:
+                if rotating_key:
+                    retry_message = (
+                        f"Rotando de API key ({self._current_key_label()}). "
+                        f"Reconectando en {retry_delay:.0f}s."
+                    )
+                    retry_phase = "waiting"
+                elif waiting_for_live:
                     retry_message = (
                         f"Esperando a que @{target_user} empiece el vivo. "
                         f"Nuevo intento en {retry_delay:.0f}s."
@@ -518,6 +634,7 @@ class ConnectionManager:
                         phase=retry_phase,
                         provider=provider,
                         retry_in_sec=retry_delay,
+                        key_label=self._current_key_label(),
                     )
                 )
                 log_json(

@@ -320,6 +320,70 @@ class ConnectionManagerTests(unittest.IsolatedAsyncioTestCase):
         self.assertIn("connecting", [state for state, _ in statuses])
         self.assertIn(("connected", "connected"), statuses)
 
+    async def test_quota_exhausted_rotates_to_the_next_api_key(self) -> None:
+        """4429/4555 deben rotar de credencial en vez de morir."""
+
+        used_keys: list[str] = []
+
+        class QuotaConnection(FakeConnection):
+            def __init__(self, **kwargs) -> None:
+                super().__init__(**kwargs)
+                used_keys.append(str(kwargs.get("api_key") or ""))
+                self.handshake_complete = False
+                self.room_id = "room-quota"
+
+            async def open(self) -> None:
+                type(self).attempts += 1
+                if type(self).attempts <= 2:
+                    raise TikToolsConnectionError(
+                        "API_SESSION_ENDED",
+                        "tik.tools corto la sesion por limite del plan.",
+                    )
+                return
+
+            async def wait_closed(self) -> None:
+                await self._closed_event.wait()
+
+        QuotaConnection.attempts = 0
+        config = bridge_config_with_api_key()
+        config.connection.api_keys = ["key-uno", "key-dos", "key-tres"]
+        config.connection.api_key = ""
+        config.connection.api_key_labels = ["cuenta-1", "cuenta-2", "cuenta-3"]
+        config.retry_policy.max_attempts = 1  # la rotacion no debe consumirlo
+
+        statuses: list[tuple[str, str]] = []
+        key_labels: list[str] = []
+
+        async def status_callback(status) -> None:
+            statuses.append((status.connection_state.value, status.phase))
+            if status.key_label:
+                key_labels.append(status.key_label)
+
+        manager = ConnectionManager(
+            config=config,
+            logger=configure_logger(
+                name="livepanel.bridge.test.connection.rotate",
+                log_path="tools/bridge_py/logs/test_connection_rotate.jsonl",
+            ),
+            metrics=MetricsRegistry(),
+            event_callback=accepted_event,
+            status_callback=status_callback,
+        )
+
+        loop = asyncio.get_running_loop()
+        with mock.patch("connection_manager.TikToolsConnection", QuotaConnection):
+            run_task = asyncio.create_task(manager.run(target_user="alice", max_events=1))
+            deadline = loop.time() + 15
+            while QuotaConnection.attempts < 3 and loop.time() < deadline:
+                await asyncio.sleep(0.05)
+            manager.stop()
+            await asyncio.wait_for(run_task, timeout=10)
+
+        # Tres intentos: dos con cuota agotada y el tercero con otra key.
+        self.assertGreaterEqual(QuotaConnection.attempts, 3)
+        self.assertEqual(used_keys[:3], ["key-uno", "key-dos", "key-tres"])
+        self.assertTrue(any("cuenta-" in label for label in key_labels))
+
     async def test_selects_direct_tiktoklive_provider(self) -> None:
         FakeConnection.attempts = 0
         FakeConnection.fail_first = False

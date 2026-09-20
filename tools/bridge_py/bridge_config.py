@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 import os
+import re
 from dataclasses import asdict, dataclass, field
 from pathlib import Path
 from typing import Any
@@ -81,6 +82,11 @@ class RetryPolicyConfig:
     # Cuanto tiempo esperar a que la cuenta empiece el vivo antes de rendirse.
     # 0 = esperar indefinidamente.
     waiting_for_live_max_minutes: int = 30
+    # Cuanto tiempo dejar en cuarentena una API key cuando el proveedor avisa
+    # que agoto su cuota (0 = usar el reinicio diario, 24h).
+    key_cooldown_minutes: int = 0
+    # Tope de espera cuando TODAS las keys estan en cuarentena (0 = sin tope).
+    all_keys_cooldown_max_minutes: int = 30
 
 
 @dataclass(slots=True)
@@ -88,10 +94,33 @@ class ConnectionConfig:
     username: str = ""
     room_id: str = ""
     api_key: str = ""
+    # Pool de credenciales para rotar: se usa la primera disponible y se pasa a
+    # la siguiente cuando el proveedor agota la cuota de la actual.
+    api_keys: list[str] = field(default_factory=list)
+    api_key_labels: list[str] = field(default_factory=list)
     connect_timeout_sec: float = 20.0
     heartbeat_interval_sec: float = 15.0
     heartbeat_warning_after_sec: float = 60.0
     silence_timeout_sec: float = 0.0  # 0 = auto (warning * 2)
+
+    def effective_api_keys(self) -> list[str]:
+        """Pool activo: la lista configurada mas la key unica como respaldo."""
+        keys = [key for key in self.api_keys if str(key or "").strip()]
+        if not keys and self.api_key:
+            keys = [self.api_key]
+        return keys
+
+    def label_for_key(self, key: str) -> str:
+        keys = self.effective_api_keys()
+        try:
+            index = keys.index(key)
+        except ValueError:
+            return ""
+        if index < len(self.api_key_labels) and self.api_key_labels[index]:
+            return self.api_key_labels[index]
+        if len(keys) <= 1:
+            return "key unica"
+        return f"key {index + 1}/{len(keys)}"
 
 
 @dataclass(slots=True)
@@ -155,6 +184,32 @@ class BridgeConfig:
         return result
 
 
+def _parse_text_list(value: Any) -> list[str]:
+    if value is None:
+        return []
+    if isinstance(value, str):
+        raw_items = re.split(r"[;,\n]", value)
+    elif isinstance(value, (list, tuple)):
+        raw_items = list(value)
+    else:
+        return []
+    parsed: list[str] = []
+    for item in raw_items:
+        text = str(item or "").strip()
+        if text:
+            parsed.append(text)
+    return parsed
+
+
+def _load_key_pool(connection: dict[str, Any]) -> tuple[list[str], list[str]]:
+    """Pool de keys desde env o yaml, con sus etiquetas opcionales."""
+    env_pool = _env("LIVEPANEL_BRIDGE_API_KEYS")
+    keys = _parse_text_list(env_pool) if env_pool else _parse_text_list(connection.get("api_keys"))
+    labels_raw = connection.get("api_key_labels")
+    labels = [str(item or "").strip() for item in labels_raw] if isinstance(labels_raw, (list, tuple)) else []
+    return keys, labels
+
+
 def load_bridge_config(path: str | Path | None = None) -> BridgeConfig:
     config_path = Path(path) if path else Path("tools/bridge_py/bridge_config.yaml")
     data = _load_yaml_if_available(config_path)
@@ -165,6 +220,8 @@ def load_bridge_config(path: str | Path | None = None) -> BridgeConfig:
     output = data.get("output", {}) if isinstance(data.get("output"), dict) else {}
     replay = data.get("replay", {}) if isinstance(data.get("replay"), dict) else {}
     logging = data.get("logging", {}) if isinstance(data.get("logging"), dict) else {}
+
+    pool_keys, pool_labels = _load_key_pool(connection)
 
     connection_mode = _parse_text(_env("LIVEPANEL_TIKTOK_PROVIDER") or data.get("connection_mode"), "tiktools").lower()
     if connection_mode in {"direct", "tiktoklive", "tiktok_live"}:
@@ -186,6 +243,8 @@ def load_bridge_config(path: str | Path | None = None) -> BridgeConfig:
                 or connection.get("api_key"),
                 "",
             ),
+            api_keys=pool_keys,
+            api_key_labels=pool_labels,
             connect_timeout_sec=_parse_float(
                 _env("LIVEPANEL_TIKTOK_CONNECT_TIMEOUT_SEC") or connection.get("connect_timeout_sec"),
                 20.0,
@@ -257,6 +316,19 @@ def load_bridge_config(path: str | Path | None = None) -> BridgeConfig:
             waiting_for_live_max_minutes=_parse_int(
                 _env("LIVEPANEL_TIKTOK_WAIT_FOR_LIVE_MINUTES")
                 or retry_policy.get("waiting_for_live_max_minutes"),
+                30,
+                min_value=0,
+                max_value=1440,
+            ),
+            key_cooldown_minutes=_parse_int(
+                _env("LIVEPANEL_TIKTOK_KEY_COOLDOWN_MINUTES")
+                or retry_policy.get("key_cooldown_minutes"),
+                0,
+                min_value=0,
+                max_value=1440,
+            ),
+            all_keys_cooldown_max_minutes=_parse_int(
+                retry_policy.get("all_keys_cooldown_max_minutes"),
                 30,
                 min_value=0,
                 max_value=1440,

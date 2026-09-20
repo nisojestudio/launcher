@@ -3,7 +3,9 @@ from __future__ import annotations
 import argparse
 import asyncio
 import importlib
+import json
 import sys
+from pathlib import Path
 
 from bridge_config import BridgeConfig, load_bridge_config
 from event_stream import TikTokBridgeService
@@ -22,6 +24,12 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--user", default="", help="TikTok username, @username or TikTok profile URL.")
     parser.add_argument("--room-id", default="", help="Optional numeric room id override.")
     parser.add_argument("--api-key", default="", help="tik.tools API key.")
+    parser.add_argument(
+        "--api-keys-file",
+        default="",
+        help="JSON con el pool de credenciales ({\"keys\": [{\"label\":..., \"value\":...}]}). "
+             "Se usa para rotar sin exponer la key en la linea de comandos.",
+    )
     parser.add_argument("--provider", choices=("tiktools", "direct", "euler"), default="", help="TikTok provider to use.")
     parser.add_argument("--output", default="", help="Optional JSONL output path.")
     parser.add_argument("--inbox", default="", help="Optional inbox directory with one JSON file per event.")
@@ -40,6 +48,35 @@ def parse_args() -> argparse.Namespace:
     return parser.parse_args()
 
 
+def load_api_key_pool(path: str) -> tuple[list[str], list[str]]:
+    """Lee el pool de credenciales escrito por el panel (JSON)."""
+    file_path = str(path or "").strip()
+    if not file_path:
+        return [], []
+    try:
+        payload = json.loads(Path(file_path).read_text(encoding="utf-8"))
+    except Exception:
+        return [], []
+
+    entries = payload.get("keys") if isinstance(payload, dict) else payload
+    if not isinstance(entries, list):
+        return [], []
+
+    keys: list[str] = []
+    labels: list[str] = []
+    for entry in entries:
+        if isinstance(entry, dict):
+            value = str(entry.get("value") or "").strip()
+            label = str(entry.get("label") or "").strip()
+        else:
+            value = str(entry or "").strip()
+            label = ""
+        if value:
+            keys.append(value)
+            labels.append(label)
+    return keys, labels
+
+
 def apply_cli_overrides(config: BridgeConfig, args: argparse.Namespace) -> BridgeConfig:
     output_destination_overridden = False
     if args.user:
@@ -48,6 +85,11 @@ def apply_cli_overrides(config: BridgeConfig, args: argparse.Namespace) -> Bridg
         config.connection.room_id = str(args.room_id).strip()
     if args.api_key:
         config.connection.api_key = str(args.api_key).strip()
+    if args.api_keys_file:
+        pool_keys, pool_labels = load_api_key_pool(args.api_keys_file)
+        if pool_keys:
+            config.connection.api_keys = pool_keys
+            config.connection.api_key_labels = pool_labels
     if args.provider:
         config.connection_mode = args.provider
     if args.output:
