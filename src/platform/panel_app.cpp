@@ -62,6 +62,8 @@
 #include "platform/panel_snapshot_builder.hpp"
 #include "platform/remote_game_distribution_service.hpp"
 #include "platform/server_license_service.hpp"
+#include "platform/webview_host.hpp"
+#include "platform/win_http_client.hpp"
 #include "tts/real_tts_backend.hpp"
 #include "tts/tts_service.hpp"
 
@@ -423,6 +425,12 @@ void apply_embedded_ui_env_overrides(nlp3::platform::PanelConfig& config) {
         const auto trimmed = trim_copy(*value);
         if (!trimmed.empty()) {
             config.embedded_ui_url = trimmed;
+            // Fase 3: mantener el campo del puerto coherente con el override,
+            // para que un save_config no revierta la URL al puerto antiguo.
+            const auto parsed = nlp3::platform::parse_embedded_ui_url(trimmed);
+            if (parsed.valid && parsed.loopback && parsed.port != 0) {
+                config.embedded_ui_port = parsed.port;
+            }
         }
     }
     if (const auto value = parse_env_unsigned<std::uint64_t>("NLP3_EMBEDDED_UI_STARTUP_TIMEOUT_MS");
@@ -455,6 +463,33 @@ namespace {
 
 constexpr std::uint16_t kBridgePortRangeStart = 8765;
 constexpr std::uint16_t kBridgePortRangeEnd = 8795;
+
+// === Fase 3: publicacion del overlay =========================================
+// URL permanente que el operador configura UNA sola vez en TikTok LIVE Studio.
+// Sustituye a la URL del quick tunnel, que cambiaba en cada arranque del panel.
+constexpr std::string_view kPublicOverlayUrl = "https://nisoje.com/overlay/live-timer";
+// Ruta del Worker donde el panel publica la URL de su tunel vigente.
+constexpr std::string_view kOverlaySessionPath = "/api/overlay/session";
+// Caducidad de la publicacion. Corta a proposito: una URL de tunel muerta no
+// debe seguir sirviendose. El panel republica en cada arranque.
+constexpr int kOverlaySessionTtlSeconds = 900;
+
+/// El panel solo publica URLs https limpias: rechaza cualquier caracter que no
+/// pertenezca a una URL, para no poder inyectar nada en el JSON del Worker.
+bool is_publishable_base_url(std::string_view url) {
+    if (url.rfind("https://", 0) != 0) {
+        return false;
+    }
+    for (const auto ch : url) {
+        const bool allowed =
+            (ch >= 'a' && ch <= 'z') || (ch >= 'A' && ch <= 'Z') || (ch >= '0' && ch <= '9')
+            || ch == ':' || ch == '/' || ch == '.' || ch == '-' || ch == '_';
+        if (!allowed) {
+            return false;
+        }
+    }
+    return url.size() > 8;
+}
 
 #ifdef _WIN32
 /// Inicializa Winsock una sola vez para el sondeo de puertos.
@@ -718,6 +753,12 @@ PanelApp::PanelApp() = default;
 
 PanelApp::~PanelApp() {
     try {
+        // V2: guardar el timer ANTES de desmontar nada. Es la garantia de que
+        // cerrar el panel a mitad de cuenta conserva el valor exacto, sin
+        // depender de que el autosave periodico haya llegado a tiempo. Va
+        // primero para que no lo impida un fallo al apagar el tunel o el
+        // servidor HTTP.
+        save_timer_state();
         stop_http_ui();
         stop_external_game();
         stop_external_runner();
@@ -862,11 +903,38 @@ bool PanelApp::initialize(const std::string& config_path) {
         live_timer_game_ = std::make_unique<games::LiveTimerGame>();
         live_timer_game_->apply_config(live_timer_game_->default_config());
 
-        // Derive timer save path in %TEMP%\NisojeStudio\ (never leaks into releases)
+        // V2: el estado del timer se guarda en %LOCALAPPDATA%, NO en %TEMP%.
+        // Windows limpia los temporales, y ahi vivian tanto la configuracion
+        // como el progreso del operador: se perdian en silencio. Si existe el
+        // save viejo de %TEMP% se migra una sola vez para no perder nada.
+        // NLP3_TIMER_STATE_DIR permite aislar el directorio en tests para no
+        // tocar el estado real del usuario.
         {
-            auto state_dir = std::filesystem::temp_directory_path() / "NisojeStudio";
+            const char* state_dir_override = std::getenv("NLP3_TIMER_STATE_DIR");
+            const char* local_app_data = std::getenv("LOCALAPPDATA");
+            std::filesystem::path state_dir;
+            if (state_dir_override != nullptr && *state_dir_override != '\0') {
+                state_dir = std::filesystem::path(state_dir_override);
+            } else if (local_app_data != nullptr && *local_app_data != '\0') {
+                state_dir = std::filesystem::path(local_app_data) / "NisojeStudio" / "timer";
+            } else {
+                state_dir = std::filesystem::temp_directory_path() / "NisojeStudio";
+            }
             std::filesystem::create_directories(state_dir);
-            timer_save_path_ = (state_dir / "live_timer_save.json").string();
+            timer_save_path_ = (state_dir / "live-timer.json").string();
+
+            // Solo se migra desde %TEMP% cuando se usa la ubicacion real: en un
+            // test con directorio aislado no queremos arrastrar estado ajeno.
+            if (state_dir_override == nullptr || *state_dir_override == '\0') {
+                const auto legacy_path =
+                    std::filesystem::temp_directory_path() / "NisojeStudio" / "live_timer_save.json";
+                std::error_code migration_ec;
+                if (!std::filesystem::exists(timer_save_path_, migration_ec)
+                    && std::filesystem::exists(legacy_path, migration_ec)) {
+                    std::filesystem::copy_file(legacy_path, timer_save_path_,
+                        std::filesystem::copy_options::overwrite_existing, migration_ec);
+                }
+            }
         }
 
         // Restore saved timer config + state if available
@@ -943,7 +1011,11 @@ bool PanelApp::save_timer_state() {
     try {
         using nlohmann::ordered_json;
         ordered_json root;
-        root["version"] = 2;
+        // V2: version 3. El significado del fichero cambio: el tiempo se congela
+        // al cerrar y `running` guardado ya no se usa para auto-reanudar (se
+        // ignora al cargar), y desaparece la compensacion de reloj de pared.
+        // No hace falta migrar datos: v2 sigue cargando bien.
+        root["version"] = 3;
 
         // Serialize GameConfig
         ordered_json config_json = ordered_json::object();
@@ -1086,7 +1158,6 @@ bool PanelApp::load_timer_state() {
             if (it_st != root.end() && it_st->is_object()) {
                 const auto& s = *it_st;
                 double remaining = s.value("remaining_seconds", live_timer_game_->state().initial_seconds);
-                const bool running = s.value("running", false);
                 const bool paused = s.value("paused", false);
                 const bool completed = s.value("completed", false);
                 const bool enabled = s.value("enabled", true);
@@ -1097,20 +1168,25 @@ bool PanelApp::load_timer_state() {
                     s.value("session_id", static_cast<std::int64_t>(0));
                 const double total_time_added = s.value("total_time_added", 0.0);
 
-                // B4: compensar wall-clock transcurrido entre save y load.
-                // Si el timer estaba corriendo al guardar, restamos los segundos
-                // reales que pasaron para evitar que el timer "retroceda en el tiempo".
-                if (running && !completed && !paused) {
-                    const std::int64_t saved_at_ms =
-                        s.value("saved_at_ms", static_cast<std::int64_t>(0));
-                    if (saved_at_ms > 0) {
-                        auto now_sys_ms = std::chrono::duration_cast<std::chrono::milliseconds>(
-                            std::chrono::system_clock::now().time_since_epoch()).count();
-                        double elapsed_s = static_cast<double>(now_sys_ms - saved_at_ms) / 1000.0;
-                        if (elapsed_s > 0.0 && elapsed_s < 86400.0) {  // sanity: max 24h gap
-                            remaining = std::max(0.0, remaining - elapsed_s);
-                        }
-                    }
+                // V2: el tiempo se CONGELA al cerrar el panel. Se restaura el
+                // mismo valor que habia y el timer queda esperando a que el
+                // usuario pulse Iniciar: no se descuenta lo que estuvo el panel
+                // cerrado (requisito explicito) y no se auto-reanuda. Antes se
+                // restauraba running=true y ademas se restaba el tiempo de
+                // pared transcurrido, asi que el contador arrancaba solo y ya
+                // descontado.
+                const bool running = false;
+
+                // V2: clamp de cordura. Un save con un valor absurdo llegaba
+                // hasta format_time() y casteaba a int64 fuera de rango
+                // (comportamiento indefinido). El clamp del HTTP no cubre esta
+                // ruta porque el fichero no pasa por ahi.
+                constexpr double kMaxTimerSeconds = 31536000.0;  // 1 anio, igual que el HTTP
+                // NaN-safe: cualquier NaN o negativo cae en la primera rama.
+                if (!(remaining >= 0.0)) {
+                    remaining = 0.0;
+                } else if (remaining > kMaxTimerSeconds) {
+                    remaining = kMaxTimerSeconds;
                 }
 
                 live_timer_game_->restore_state(remaining, running, paused, completed,
@@ -1294,10 +1370,13 @@ PanelSnapshot PanelApp::snapshot() const {
         {
             auto host = config_.overlay_host.empty() ? "localhost" : config_.overlay_host;
             auto port = http_ui_server_ != nullptr ? http_ui_server_->status().port : 18913;
+            // Fase 3: `overlay_url` sigue siendo la URL LOCAL directa (fallback
+            // para OBS en la misma maquina, como pide el diseno). La URL que el
+            // operador pega en TikTok LIVE Studio es la permanente del sitio, no
+            // la del tunel efimero: por eso `overlay_tunnel_url` ya no contiene
+            // una URL de trycloudflare.
             snapshot.timer.overlay_url = "http://" + host + ":" + std::to_string(port) + "/overlay/live-timer";
-            if (tunnel_service_ != nullptr) {
-                snapshot.timer.overlay_tunnel_url = tunnel_service_->tunnel_url();
-            }
+            snapshot.timer.overlay_tunnel_url = std::string(kPublicOverlayUrl);
         }
     }
 
@@ -1355,6 +1434,12 @@ PanelTickResult PanelApp::tick(std::uint64_t now_ms) {
     if (http_ui_server_ != nullptr && http_ui_server_->running()) {
         http_ui_server_->poll();
     }
+    // Fase 3: el listener "solo overlay" que se publica por el tunel tambien hay
+    // que bombearlo. Sin esto el socket acepta la conexion pero nunca responde y
+    // Cloudflare devuelve 524 al overlay.
+    if (overlay_tunnel_server_ != nullptr && overlay_tunnel_server_->running()) {
+        overlay_tunnel_server_->poll();
+    }
     refresh_external_game_status();
 
     const auto observed_at_ms = now_wall_clock_ms();
@@ -1373,14 +1458,22 @@ PanelTickResult PanelApp::tick(std::uint64_t now_ms) {
         live_timer_game_->poll_completion_sound();
         live_timer_game_->poll_tick_sound();
 
-        // B7: auto-save timer state every 30s only if events or config changed
-        // since last save. Pure countdown progression doesn't need disk I/O.
-        if (now_ms > 0 && (now_ms - last_timer_save_ms_ >= 30000)) {
-            const auto current_counter = live_timer_game_->event_id_counter();
-            if (current_counter != last_saved_event_counter_) {
-                save_timer_state();
+        // V2: autosave cada 10s mientras el timer CORRE, o cada 30s si solo
+        // cambiaron los eventos (config, ajustes manuales). Antes solo se
+        // guardaba cuando cambiaba event_id_counter, asi que el avance puro de
+        // la cuenta no se persistia nunca: cerrar el panel a mitad de cuenta
+        // perdia todo el progreso. El intervalo corto acota ademas lo que se
+        // pierde si el panel muere de golpe, sin cierre ordenado.
+        if (now_ms > 0) {
+            const bool timer_running = live_timer_game_->is_running();
+            const std::uint64_t interval_ms = timer_running ? 10000ULL : 30000ULL;
+            if (now_ms - last_timer_save_ms_ >= interval_ms) {
+                const auto current_counter = live_timer_game_->event_id_counter();
+                if (timer_running || current_counter != last_saved_event_counter_) {
+                    save_timer_state();
+                }
+                last_timer_save_ms_ = now_ms;
             }
-            last_timer_save_ms_ = now_ms;
         }
     }
 
@@ -1847,14 +1940,34 @@ bool PanelApp::start_http_ui(std::uint16_t port) {
         return false;
     }
 
+    // Fase 3: el tunel NO apunta al puerto de la UI. Se levanta un segundo
+    // listener, loopback y en puerto efimero, que solo sirve `/api/overlay/*`
+    // (ver PanelHttpServer::overlay_only). Asi el tunel deja de exponer
+    // `/api/state`, la licencia, las metricas y la UI entera. Si este listener
+    // no arranca, no se abre tunel: es preferible perder el overlay remoto a
+    // publicar el panel completo.
+    if (overlay_tunnel_server_ == nullptr) {
+        overlay_tunnel_server_ = std::make_unique<PanelHttpServer>(this, /*overlay_only=*/true);
+    }
+    if (!overlay_tunnel_server_->start(0)) {
+        if (activity_log_ != nullptr) {
+            activity_log_->push({PanelActivityKind::unknown, "overlay_tunnel_listener_failed", "system", "", "", now_wall_clock_ms()});
+        }
+        return true;
+    }
+
+    const auto overlay_port = overlay_tunnel_server_->status().port;
+
     if (tunnel_service_ == nullptr) {
         tunnel_service_ = std::make_unique<CloudflareTunnelService>();
     }
-    // Tunnel expone el overlay HTTP (mismo puerto que panel HTTP) vía Cloudflare
-    // Callback actualiza config.embedded_ui_url con la URL del túnel
-    tunnel_service_->start_tunnel(port, [this](const std::string& url) {
-        config_.embedded_ui_url = url;
-        save_config();
+    // Fase 3: la URL del tunel ya no se escribe en embedded_ui_url ni se guarda
+    // como configuracion. Vive en `overlay_public_base_url_` (estado de
+    // ejecucion) y se publica en el Worker para que la pagina estatica publica
+    // sepa a que panel apuntar. Si la publicacion falla, el arranque continua.
+    tunnel_service_->start_tunnel(overlay_port, [this](const std::string& url) {
+        overlay_public_base_url_ = url;
+        publish_overlay_session(url);
     });
 
     return true;
@@ -1865,8 +1978,71 @@ void PanelApp::stop_http_ui() {
     if (tunnel_service_ != nullptr) {
         tunnel_service_->stop_tunnel();
     }
+    overlay_public_base_url_.clear();
+    if (overlay_tunnel_server_ != nullptr) {
+        overlay_tunnel_server_->stop();
+    }
     if (http_ui_server_ != nullptr) {
         http_ui_server_->stop();
+    }
+}
+
+std::uint16_t PanelApp::overlay_tunnel_status_port() const noexcept {
+    return overlay_tunnel_server_ != nullptr ? overlay_tunnel_server_->status().port : 0;
+}
+
+bool PanelApp::publish_overlay_session(const std::string& public_base_url) {
+    // Best-effort por diseno: esto corre en el hilo lector de cloudflared y no
+    // puede bloquear ni tumbar el arranque del panel. Si falla, la pagina
+    // estatica se queda en "esperando al panel" y queda el modo local directo.
+    try {
+        if (!is_publishable_base_url(public_base_url)) {
+            return false;
+        }
+        if (license_service_ == nullptr || !access_granted()) {
+            return false;
+        }
+
+        const auto auth = license_service_->auth_snapshot();
+        const auto license_key = trim_copy(auth.license_key);
+        if (license_key.empty()) {
+            return false;
+        }
+
+        auto base = trim_copy(config_.auth.nisoje_api_base);
+        while (!base.empty() && base.back() == '/') {
+            base.pop_back();
+        }
+        if (base.empty()) {
+            return false;
+        }
+
+        const auto endpoint = base + std::string(kOverlaySessionPath);
+        const auto body =
+            std::string("{\"tunnel_url\":\"") + public_base_url +
+            "\",\"ttl_seconds\":" + std::to_string(kOverlaySessionTtlSeconds) + "}";
+
+        const std::vector<nlp3::platform::HttpHeader> headers{
+            {"Authorization", "Bearer " + license_key},
+            {"Accept", "application/json"},
+        };
+
+        const auto response = nlp3::platform::http_request(
+            "POST", endpoint, body, "application/json", headers);
+
+        const bool ok = response.status_code >= 200 && response.status_code < 300;
+        if (activity_log_ != nullptr) {
+            activity_log_->push({
+                PanelActivityKind::unknown,
+                ok ? "overlay_session_published" : "overlay_session_publish_failed",
+                "system",
+                "",
+                ok ? std::string{} : ("HTTP " + std::to_string(response.status_code) + " " + response.error),
+                now_wall_clock_ms()});
+        }
+        return ok;
+    } catch (...) {
+        return false;
     }
 }
 

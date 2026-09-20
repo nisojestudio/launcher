@@ -37,6 +37,8 @@ __pycache__/
 
 # Local tool caches
 /.playwright-cli/
+# Salidas de investigacion del CLI de firecrawl (busquedas y paginas scrapeadas)
+/.firecrawl/
 
 # Temporary workspace outputs
 /tmp_*

@@ -68,6 +68,87 @@ constexpr std::string_view kPulseSpeed = "pulse_speed_s";
 constexpr std::string_view kDigitEffect = "digit_effect";
 constexpr std::string_view kColorPreset = "color_preset";
 
+// Fase 5 — motor visual: escala (M16), marco (V1/V2/V3) y contorno (V8).
+constexpr std::string_view kScaleMode = "scale_mode";
+constexpr std::string_view kCanvasWidth = "canvas_width";
+constexpr std::string_view kCanvasHeight = "canvas_height";
+constexpr std::string_view kFrameStyle = "frame_style";
+constexpr std::string_view kFrameColor = "frame_color";
+constexpr std::string_view kFrameOpacity = "frame_opacity";
+constexpr std::string_view kFrameBorderPx = "frame_border_px";
+constexpr std::string_view kFrameRadiusPx = "frame_radius_px";
+constexpr std::string_view kFramePaddingPx = "frame_padding_px";
+constexpr std::string_view kFrameBrackets = "frame_brackets";
+constexpr std::string_view kFrameGrid = "frame_grid";
+constexpr std::string_view kFrameScanlines = "frame_scanlines";
+constexpr std::string_view kTextOutlinePx = "text_outline_px";
+constexpr std::string_view kTextOutlineColor = "text_outline_color";
+
+// Fase 5 (incremento 2) — formato del tiempo (V6), estados (V13) y medidor (V5).
+constexpr std::string_view kTimeSeparator = "time_separator";
+constexpr std::string_view kShowHours = "show_hours";
+constexpr std::string_view kWarnSeconds = "warn_seconds";
+constexpr std::string_view kDangerSeconds = "danger_seconds";
+constexpr std::string_view kDangerEffect = "danger_effect";
+constexpr std::string_view kProgressStyle = "progress_style";
+constexpr std::string_view kProgressThicknessPx = "progress_thickness_px";
+constexpr std::string_view kProgressColor = "progress_color";
+
+// Fase 5 (incremento 3) — particulas (V11).
+constexpr std::string_view kParticlesEnabled = "particles_enabled";
+constexpr std::string_view kParticlesStyle = "particles_style";
+constexpr std::string_view kParticlesBudget = "particles_budget";
+constexpr std::string_view kParticlesDensity = "particles_density";
+constexpr std::string_view kParticlesForce = "particles_force";
+
+constexpr int kMinParticlesBudget = 10;
+constexpr int kMaxParticlesBudget = 300;
+constexpr double kMinParticlesDensity = 0.25;
+constexpr double kMaxParticlesDensity = 2.0;
+
+constexpr int kMaxThresholdSeconds = 3600;
+constexpr int kMinProgressThicknessPx = 1;
+constexpr int kMaxProgressThicknessPx = 40;
+
+// Limites del motor visual. El servidor HTTP ya valida, pero el motor no puede
+// fiarse: un lienzo de 0 deja la escala en division por cero y una opacidad de
+// 500 pintaria un marco opaco tapando el directo.
+constexpr int kMinCanvasSide = 320;
+constexpr int kMaxCanvasSide = 7680;
+constexpr int kMinFrameOpacity = 0;
+constexpr int kMaxFrameOpacity = 100;
+constexpr int kMaxFrameBorderPx = 12;
+constexpr int kMaxFrameRadiusPx = 64;
+constexpr int kMaxFramePaddingPx = 120;
+constexpr int kMaxTextOutlinePx = 8;
+
+int clamp_int(int value, int lo, int hi) noexcept {
+    if (value < lo) return lo;
+    if (value > hi) return hi;
+    return value;
+}
+
+/// Lee una clave entera de la config venga como entero o como decimal.
+///
+/// Hace falta porque `GameConfig::get_double` SOLO lee variantes `double`: una
+/// clave guardada como entero y leida con get_double devuelve el fallback en
+/// silencio. Ese fallo silencioso ya estaba en el producto: `on_complete_text_size`
+/// y `glow_intensity_px` se guardaban como enteros y se leian con get_double, asi
+/// que el operador los configuraba y no pasaba nada.
+int read_config_int(const gamesdk::GameConfig& config, std::string_view key, int fallback) {
+    const auto* value = config.find(key);
+    if (value == nullptr) {
+        return fallback;
+    }
+    if (const auto* as_int = std::get_if<std::int64_t>(value); as_int != nullptr) {
+        return static_cast<int>(*as_int);
+    }
+    if (const auto* as_double = std::get_if<double>(value); as_double != nullptr) {
+        return static_cast<int>(*as_double);
+    }
+    return fallback;
+}
+
 constexpr double kMaxRecentEventsAgeS = 4.0;
 constexpr std::size_t kMaxRecentEvents = 6;
 
@@ -189,7 +270,7 @@ gamesdk::GameManifest LiveTimerGame::manifest() const {
 
 gamesdk::GameConfig LiveTimerGame::default_config() const {
     gamesdk::GameConfig config;
-    config.set(std::string(kInitialTimeS), 300.0);
+    config.set(std::string(kInitialTimeS), 0.0);
     config.set(std::string(kTimePerLikeS), 0.0);
     config.set(std::string(kTimePerShareS), 0.0);
     config.set(std::string(kTimePerFollowS), 0.0);
@@ -235,6 +316,34 @@ gamesdk::GameConfig LiveTimerGame::default_config() const {
     config.set(std::string(kTitleEffect), std::string("none"));
     config.set(std::string(kCounterEffect), std::string("none"));
     config.set(std::string(kSubtitleEffect), std::string("none"));
+    // Fase 5 — motor visual: defaults neutros (el overlay se ve como antes).
+    config.set(std::string(kScaleMode), std::string("auto"));
+    config.set(std::string(kCanvasWidth), std::int64_t{1920});
+    config.set(std::string(kCanvasHeight), std::int64_t{1080});
+    config.set(std::string(kFrameStyle), std::string("none"));
+    config.set(std::string(kFrameColor), std::string("#00FFFF"));
+    config.set(std::string(kFrameOpacity), std::int64_t{55});
+    config.set(std::string(kFrameBorderPx), std::int64_t{1});
+    config.set(std::string(kFrameRadiusPx), std::int64_t{4});
+    config.set(std::string(kFramePaddingPx), std::int64_t{28});
+    config.set(std::string(kFrameBrackets), false);
+    config.set(std::string(kFrameGrid), false);
+    config.set(std::string(kFrameScanlines), false);
+    config.set(std::string(kTextOutlinePx), std::int64_t{0});
+    config.set(std::string(kTextOutlineColor), std::string("#000000"));
+    config.set(std::string(kTimeSeparator), std::string(":"));
+    config.set(std::string(kShowHours), true);
+    config.set(std::string(kWarnSeconds), std::int64_t{60});
+    config.set(std::string(kDangerSeconds), std::int64_t{10});
+    config.set(std::string(kDangerEffect), std::string("pulse"));
+    config.set(std::string(kProgressStyle), std::string("none"));
+    config.set(std::string(kProgressThicknessPx), std::int64_t{6});
+    config.set(std::string(kProgressColor), std::string(""));
+    config.set(std::string(kParticlesEnabled), false);
+    config.set(std::string(kParticlesStyle), std::string("none"));
+    config.set(std::string(kParticlesBudget), std::int64_t{120});
+    config.set(std::string(kParticlesDensity), 1.0);
+    config.set(std::string(kParticlesForce), false);
     config.set(std::string(kTitleGlow), false);
     config.set(std::string(kCounterGlow), false);
     config.set(std::string(kSubtitleGlow), false);
@@ -356,6 +465,37 @@ void LiveTimerGame::apply_config(const gamesdk::GameConfig& config) {
     apply_string(kDigitEffect);
     apply_string(kColorPreset);
 
+    // Fase 5 — motor visual. Hay que copiar las claves entrantes a `effective`
+    // como las demas: sin esto se leen los defaults y el operador configura en
+    // balde (lo cazo el test del contrato).
+    apply_string(kScaleMode);
+    apply_int(kCanvasWidth);
+    apply_int(kCanvasHeight);
+    apply_string(kFrameStyle);
+    apply_string(kFrameColor);
+    apply_int(kFrameOpacity);
+    apply_int(kFrameBorderPx);
+    apply_int(kFrameRadiusPx);
+    apply_int(kFramePaddingPx);
+    apply_bool(kFrameBrackets);
+    apply_bool(kFrameGrid);
+    apply_bool(kFrameScanlines);
+    apply_int(kTextOutlinePx);
+    apply_string(kTextOutlineColor);
+    apply_string(kTimeSeparator);
+    apply_bool(kShowHours);
+    apply_int(kWarnSeconds);
+    apply_int(kDangerSeconds);
+    apply_string(kDangerEffect);
+    apply_string(kProgressStyle);
+    apply_int(kProgressThicknessPx);
+    apply_string(kProgressColor);
+    apply_bool(kParticlesEnabled);
+    apply_string(kParticlesStyle);
+    apply_int(kParticlesBudget);
+    apply_double(kParticlesDensity);
+    apply_bool(kParticlesForce);
+
     config_ = std::move(effective);
 
     state_.time_per_like = config_.get_double(kTimePerLikeS, 0.0);
@@ -367,17 +507,26 @@ void LiveTimerGame::apply_config(const gamesdk::GameConfig& config) {
 
     double new_initial = config_.get_double(kInitialTimeS, 300.0);
     state_.initial_seconds = new_initial;
-    // T2.1: only adjust remaining when the timer is actively running. When
-    // completed or paused the runtime is the SSOT and apply_config must NOT
-    // re-inflate remaining_seconds from the new initial value.
-    if (state_.running && !state_.paused && !state_.completed) {
-        double diff = new_initial - old_initial;
-        state_.remaining_seconds = std::max(0.0, state_.remaining_seconds + diff);
+    // V2 (Fase 2): apply_config solo toca el reloj en la fase de PREPARACION, y
+    // solo si el tiempo inicial cambio de verdad.
+    //
+    // - Si el timer esta CORRIENDO, no se toca nunca: cambiar el diseno (o el
+    //   propio initial_time_s) no puede mover una cuenta en vivo. Para sumar o
+    //   restar en caliente estan los botones de ajuste (- / +).
+    // - Si esta pausado o completado, tampoco: el runtime es el SSOT.
+    // - Si esta en reposo (sin cuenta en curso) y el initial cambio, se adopta
+    //   el valor nuevo: es la fase de configuracion, antes de pulsar Iniciar.
+    //   La condicion "cambio de verdad" es la que protege el requisito de
+    //   conservar el tiempo: tras restaurar, cambiar solo el diseno NO puede
+    //   reescribir el tiempo restaurado.
+    const bool idle = !state_.running && !state_.paused && !state_.completed;
+    if (idle && new_initial != old_initial) {
+        state_.remaining_seconds = std::max(0.0, new_initial);
     }
-    // T2.2: clamp caliente — keep remaining within max_time_s even after live edits.
-    if (state_.max_time_s > 0.0 && state_.remaining_seconds > state_.max_time_s) {
-        state_.remaining_seconds = state_.max_time_s;
-    }
+    // V2 (Fase 2): aqui NO se aplica el tope de max_time_s. El clamp vive en las
+    // rutas que si cambian el tiempo en vivo (on_game_input_event y adjust_time),
+    // que es donde tiene sentido y donde se reporta el delta real. Aplicarlo
+    // tambien aqui recortaba el valor recien configurado antes de arrancar.
 
     state_.title_text = config_.get_string(kTitleText, "\xf0\x9f\x8e\xaf Extiende el Live");
     state_.subtitle_text = config_.get_string(kSubtitleText, "\xf0\x9f\x93\x8c Cada coin suma {time_per_gift_coin}s");
@@ -388,16 +537,27 @@ void LiveTimerGame::apply_config(const gamesdk::GameConfig& config) {
     state_.popup_style.subtract_color = config_.get_string(kPopupSubtractColor, "#FF4444");
     state_.on_complete_text = config_.get_string(kOnCompleteText, "TIEMPO CUMPLIDO");
     state_.on_complete_text_color = config_.get_string(kOnCompleteTextColor, "#FFD700");
-    state_.on_complete_text_size = static_cast<int>(config_.get_double(kOnCompleteTextSize, 48.0));
+    // Bugfix Fase 5: esta clave se guarda como entero y se leia con get_double, asi
+    // que el valor configurado nunca llegaba al overlay (siempre 48). Se acota al
+    // mismo rango que valida el HTTP (8..400) para que un config importado a mano
+    // no pueda pintar texto invisible.
+    state_.on_complete_text_size = clamp_int(read_config_int(config_, kOnCompleteTextSize, 48), 8, 400);
     state_.tick_sound_path = config_.get_string(kTickSoundPath, "");
     state_.tick_sound_volume = config_.get_double(kTickSoundVolume, 1.0);
     state_.add_sound_path = config_.get_string(kAddSoundPath, "");
     state_.add_sound_volume = config_.get_double(kAddSoundVolume, 1.0);
 
-    // Validate effect names — only "none" | "glow" | "pulse"
+    // Validate effect names — Fase 5 anade efectos ambientales (V9). La lista
+    // blanca vive aqui porque el overlay pinta por clase CSS: un nombre que no
+    // exista seria una clase muerta y un efecto que no pasa nada.
+    auto is_valid_effect = [](std::string_view value) {
+        return value == "none" || value == "glow" || value == "pulse"
+            || value == "heartbeat" || value == "float" || value == "flicker"
+            || value == "shake";
+    };
     auto validate_effect = [&](std::string_view key, std::string fallback) {
         auto raw = config_.get_string(key, fallback);
-        if (raw != "none" && raw != "glow" && raw != "pulse") {
+        if (!is_valid_effect(raw)) {
             raw = fallback;
             config_.set(std::string(key), raw);
         }
@@ -410,12 +570,15 @@ void LiveTimerGame::apply_config(const gamesdk::GameConfig& config) {
     state_.counter_glow_enabled = config_.get_bool(kCounterGlow, false);
     state_.subtitle_glow_enabled = config_.get_bool(kSubtitleGlow, false);
     state_.glow_color = config_.get_string(kGlowColor, "#FFD700");
-    state_.glow_intensity_px = static_cast<int>(config_.get_double(kGlowIntensity, 8.0));
+    // Bugfix Fase 5: misma causa que on_complete_text_size — entero leido como
+    // double. El overlay ya acotaba 1..60; ahora el valor configurado llega de verdad.
+    state_.glow_intensity_px = clamp_int(read_config_int(config_, kGlowIntensity, 8), 1, 60);
     state_.pulse_speed_s = config_.get_double(kPulseSpeed, 1.5);
     // V3: validate digit_effect, color_preset
     {
         auto raw = config_.get_string(kDigitEffect, "none");
-        if (raw != "none" && raw != "flip" && raw != "roll" && raw != "pop" && raw != "fade") {
+        if (raw != "none" && raw != "flip" && raw != "roll" && raw != "pop" && raw != "fade"
+            && raw != "odometer" && raw != "typewriter" && raw != "blur") {
             raw = "none";
             config_.set(std::string(kDigitEffect), raw);
         }
@@ -428,6 +591,122 @@ void LiveTimerGame::apply_config(const gamesdk::GameConfig& config) {
             config_.set(std::string(kColorPreset), raw);
         }
         state_.color_preset = raw;
+    }
+
+    // Fase 5 — motor visual. Todo con default neutro y acotado: el motor nunca
+    // confia en lo que llega, ni del HTTP ni de un JSON importado a mano.
+    auto apply_clamped_int = [&](std::string_view key, int fallback, int lo, int hi) {
+        const auto raw = read_config_int(config_, key, fallback);
+        const auto clamped = clamp_int(raw, lo, hi);
+        if (clamped != raw) {
+            config_.set(std::string(key), std::int64_t{clamped});
+        }
+        return clamped;
+    };
+
+    {
+        auto raw = config_.get_string(kScaleMode, "auto");
+        if (raw != "auto" && raw != "off") {
+            raw = "auto";
+            config_.set(std::string(kScaleMode), raw);
+        }
+        state_.scale_mode = raw;
+    }
+    state_.canvas_width = apply_clamped_int(kCanvasWidth, 1920, kMinCanvasSide, kMaxCanvasSide);
+    state_.canvas_height = apply_clamped_int(kCanvasHeight, 1080, kMinCanvasSide, kMaxCanvasSide);
+    {
+        auto raw = config_.get_string(kFrameStyle, "none");
+        if (raw != "none" && raw != "card" && raw != "glass" && raw != "neon"
+            && raw != "ribbon" && raw != "badge") {
+            raw = "none";
+            config_.set(std::string(kFrameStyle), raw);
+        }
+        state_.frame_style = raw;
+    }
+    state_.frame_color = config_.get_string(kFrameColor, "#00FFFF");
+    state_.frame_opacity = apply_clamped_int(kFrameOpacity, 55, kMinFrameOpacity, kMaxFrameOpacity);
+    state_.frame_border_px = apply_clamped_int(kFrameBorderPx, 1, 0, kMaxFrameBorderPx);
+    state_.frame_radius_px = apply_clamped_int(kFrameRadiusPx, 4, 0, kMaxFrameRadiusPx);
+    state_.frame_padding_px = apply_clamped_int(kFramePaddingPx, 28, 0, kMaxFramePaddingPx);
+    state_.frame_brackets = config_.get_bool(kFrameBrackets, false);
+    state_.frame_grid = config_.get_bool(kFrameGrid, false);
+    state_.frame_scanlines = config_.get_bool(kFrameScanlines, false);
+    state_.text_outline_px = apply_clamped_int(kTextOutlinePx, 0, 0, kMaxTextOutlinePx);
+    state_.text_outline_color = config_.get_string(kTextOutlineColor, "#000000");
+
+    // V6 — formato del tiempo.
+    {
+        auto raw = config_.get_string(kTimeSeparator, ":");
+        const bool allowed = raw == ":" || raw == "\xc2\xb7" /* · */ || raw == "."
+            || raw == " " || raw == "-" || raw == "|";
+        if (!allowed) {
+            raw = ":";
+            config_.set(std::string(kTimeSeparator), raw);
+        }
+        state_.time_separator = raw;
+    }
+    state_.show_hours = config_.get_bool(kShowHours, true);
+
+    // V13 — estados. Los umbrales se acotan y se ordenan: si peligro quedara por
+    // encima de aviso, el overlay nunca pintaria el estado de aviso y el operador
+    // no entenderia por que.
+    state_.warn_seconds = apply_clamped_int(kWarnSeconds, 60, 0, kMaxThresholdSeconds);
+    state_.danger_seconds = apply_clamped_int(kDangerSeconds, 10, 0, kMaxThresholdSeconds);
+    if (state_.danger_seconds > state_.warn_seconds) {
+        state_.danger_seconds = state_.warn_seconds;
+        config_.set(std::string(kDangerSeconds), std::int64_t{state_.danger_seconds});
+    }
+    {
+        auto raw = config_.get_string(kDangerEffect, "pulse");
+        if (raw != "none" && raw != "pulse" && raw != "glitch" && raw != "flash") {
+            raw = "pulse";
+            config_.set(std::string(kDangerEffect), raw);
+        }
+        state_.danger_effect = raw;
+    }
+
+    // V5 — medidor de progreso.
+    {
+        auto raw = config_.get_string(kProgressStyle, "none");
+        if (raw != "none" && raw != "bar" && raw != "ring") {
+            raw = "none";
+            config_.set(std::string(kProgressStyle), raw);
+        }
+        state_.progress_style = raw;
+    }
+    state_.progress_thickness_px = apply_clamped_int(
+        kProgressThicknessPx, 6, kMinProgressThicknessPx, kMaxProgressThicknessPx);
+    state_.progress_color = config_.get_string(kProgressColor, "");
+
+    // V11 — particulas. El estilo se valida igual que los efectos: el overlay pinta
+    // por tipo, asi que un nombre que no exista seria decoracion que no ocurre.
+    {
+        auto raw = config_.get_string(kParticlesStyle, "none");
+        if (raw != "none" && raw != "confetti" && raw != "sparks" && raw != "stars") {
+            raw = "none";
+            config_.set(std::string(kParticlesStyle), raw);
+        }
+        state_.particles_style = raw;
+    }
+    state_.particles_enabled = config_.get_bool(kParticlesEnabled, false);
+    state_.particles_budget = apply_clamped_int(
+        kParticlesBudget, 120, kMinParticlesBudget, kMaxParticlesBudget);
+    {
+        auto density = config_.get_double(kParticlesDensity, 1.0);
+        if (!std::isfinite(density)) {
+            density = 1.0;
+        }
+        if (density < kMinParticlesDensity) density = kMinParticlesDensity;
+        if (density > kMaxParticlesDensity) density = kMaxParticlesDensity;
+        state_.particles_density = density;
+        config_.set(std::string(kParticlesDensity), density);
+    }
+    state_.particles_force = config_.get_bool(kParticlesForce, false);
+    // Coherencia: con el estilo en "none" no hay nada que emitir, asi que enabled
+    // se apaga. Evita el estado "activado pero sin tipo", que no hace nada y
+    // confunde al operador que lo mira en la interfaz.
+    if (state_.particles_style == "none") {
+        state_.particles_enabled = false;
     }
 
     apply_visual_style(config_, state_.title_style,
@@ -445,8 +724,27 @@ void LiveTimerGame::on_activated() {
     completion_sound_triggered_ = false;
     state_.completed = false;
     state_.paused = false;
-    state_.running = true;
-    state_.remaining_seconds = state_.initial_seconds;
+    // V2: Iniciar CONTINUA desde el tiempo que ya haya, en vez de resetear al
+    // tiempo inicial. Es lo que pide el requisito: al reiniciar el panel el
+    // tiempo se conserva y arranca al pulsar Iniciar. Antes esto hacia
+    // `remaining = initial_seconds`, con lo que pulsar Iniciar tiraba el
+    // progreso restaurado y las coins acumuladas mientras esperaba. Solo se cae
+    // al tiempo inicial cuando no hay nada que continuar (arranque en limpio).
+    double start_from = state_.remaining_seconds;
+    if (!(start_from > 0.0)) {        // NaN-safe: NaN y negativos caen aqui
+        start_from = state_.initial_seconds;
+    }
+    const bool has_time = start_from > 0.0;
+    state_.running = has_time;
+    state_.remaining_seconds = has_time ? start_from : 0.0;
+    // V2: pulsar Iniciar tambien DES-OCULTA el timer. Tras restaurar, arm()
+    // deja hidden_=true (el overlay muestra "--:--:--" y se bloquea el input);
+    // sin esto, Iniciar ponia running=true pero el overlay seguia mostrando
+    // guiones porque `enabled` seguia en false. Solo se habilita si hay tiempo
+    // que contar: sin tiempo configurado no hay nada que mostrar.
+    if (has_time) {
+        hidden_ = false;
+    }
     state_.recent_events.clear();
     total_time_added_ = 0.0;
     // T1.3: session id is regenerated on each activation so the overlay resets
@@ -554,7 +852,13 @@ void LiveTimerGame::on_game_input_event(
     (void)session_snapshot;
 
     // T2.6: hidden_ blocks event input while preserving runtime counters.
-    if (hidden_ || state_.completed || !state_.running || state_.paused) return;
+    // V2: tambien se ACUMULA cuando el timer esta armado y espera a que el
+    // usuario pulse Iniciar (running=false, paused=false). Antes se
+    // descartaban esos eventos, asi que al restaurar tras cerrar el panel las
+    // coins que llegaron mientras estaba cerrado se perdian en silencio, y en
+    // un arranque sin tiempo configurado tampoco contaba nada. Se sigue
+    // bloqueando si esta pausado a proposito, completado u oculto.
+    if (hidden_ || state_.completed || state_.paused) return;
     // T1.1f-r2: no tick() here — remaining_seconds() computes dynamically.
     // Events add delta directly to state_.remaining_seconds; the SSOT baseline
     // (start_time_) stays stable, preserving the countdown integrity.

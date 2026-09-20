@@ -11,6 +11,7 @@
 
 #include <nlohmann/json.hpp>
 
+#include "platform/webview_host.hpp"
 #include "tts/voice_catalog.hpp"
 
 namespace nlp3::platform {
@@ -18,6 +19,51 @@ namespace nlp3::platform {
 namespace {
 
 using ordered_json = nlohmann::ordered_json;
+
+// Fase 3: puerto por defecto de la UI embebida y reparacion de la config.
+constexpr std::uint16_t kDefaultEmbeddedUiPort = 18913;
+
+std::string loopback_ui_url(std::uint16_t port) {
+    return "http://127.0.0.1:" + std::to_string(port) + "/";
+}
+
+/// Fase 3 — invariantes del bloque `embedded_ui`:
+///  * `embedded_ui_port` es la autoridad sobre el puerto local y sobrevive a los
+///    reinicios, incluso si `embedded_ui_url` se corrompe.
+///  * `embedded_ui_url` significa solo "URL de la UI embebida", asi que debe
+///    apuntar a loopback. Versiones anteriores escribian ahi la URL del quick
+///    tunnel (`https://xxx.trycloudflare.com`), lo que en el arranque siguiente
+///    hacia caer el puerto local a 18913 y corrompia la configuracion sola.
+///  * Una URL loopback con puerto explicito sigue mandando (y sincroniza el
+///    campo), para no cambiar el significado de configs legitimas ya guardadas.
+///  * Configs antiguas sin `embedded_ui_port` migran desde la URL.
+void normalize_embedded_ui_settings(PanelConfig& config) {
+    const auto parsed = parse_embedded_ui_url(config.embedded_ui_url);
+    const bool loopback_url = parsed.valid && parsed.loopback;
+
+    // 1. URL de tunel (o basura): se repara desde el campo del puerto. Si el
+    //    campo tampoco sabe nada, se cae al default.
+    if (!loopback_url) {
+        if (config.embedded_ui_port == 0) {
+            config.embedded_ui_port = kDefaultEmbeddedUiPort;
+        }
+        config.embedded_ui_url = loopback_ui_url(config.embedded_ui_port);
+        return;
+    }
+
+    // 2. URL loopback: el puerto explicito de la URL es la verdad mas concreta
+    //    que hay en el fichero; el campo se sincroniza con ella.
+    if (parsed.port != 0) {
+        config.embedded_ui_port = parsed.port;
+        return;
+    }
+
+    // 3. Loopback sin puerto explicito (http://localhost/): manda el campo.
+    if (config.embedded_ui_port == 0) {
+        config.embedded_ui_port = kDefaultEmbeddedUiPort;
+    }
+    config.embedded_ui_url = loopback_ui_url(config.embedded_ui_port);
+}
 
 std::string trim_copy(std::string_view value) {
     const auto begin = value.find_first_not_of(" \t\r\n");
@@ -355,6 +401,11 @@ bool PanelConfigStorage::save_to_file(const PanelConfig& input_config, const std
         auto normalized_bridge = input_config.bridge;
         normalized_bridge.stub_mode = normalized_bridge_mode_value != "external";
 
+        // Fase 3: nunca persistir un embedded_ui_url no-loopback ni un puerto 0,
+        // venga de donde venga la config en memoria.
+        auto normalized_config = input_config;
+        normalize_embedded_ui_settings(normalized_config);
+
         auto source_name = trim_copy(normalized_bridge.source_name);
         if (normalized_bridge_mode_value == "external") {
             if (source_name.empty() || source_name == "tiktok" || source_name == "tiktok-stub") {
@@ -387,7 +438,8 @@ bool PanelConfigStorage::save_to_file(const PanelConfig& input_config, const std
         root["embedded_ui_enabled"] = input_config.embedded_ui_enabled;
         root["embedded_ui_fallback_to_browser"] = input_config.embedded_ui_fallback_to_browser;
         root["embedded_ui_devtools"] = input_config.embedded_ui_devtools;
-        root["embedded_ui_url"] = input_config.embedded_ui_url;
+        root["embedded_ui_url"] = normalized_config.embedded_ui_url;
+        root["embedded_ui_port"] = normalized_config.embedded_ui_port;
         root["embedded_ui_startup_timeout_ms"] = input_config.embedded_ui_startup_timeout_ms;
         root["host_energy_level"] = input_config.host_energy_level;
         root["host_tone_style"] = input_config.host_tone_style;
@@ -457,6 +509,15 @@ bool PanelConfigStorage::load_from_file(const std::string& path, PanelConfig& ou
             try_read_string(parsed, "tiktools_api_key", config.provider_api_key);
         }
 
+        // Fase 3: `embedded_ui_port` es nuevo. Si falta (config antigua) se marca
+        // con 0 para que normalize_embedded_ui_settings lo migre desde la URL
+        // loopback en lugar de pisar el puerto real del usuario con el default.
+        if (parsed.find("embedded_ui_port") == parsed.end() || parsed["embedded_ui_port"].is_null()) {
+            config.embedded_ui_port = 0;
+        } else if (!try_read_unsigned(parsed, "embedded_ui_port", config.embedded_ui_port)) {
+            return false;
+        }
+
         const ordered_json* bridge = nullptr;
         const ordered_json* tts_runtime = nullptr;
         const ordered_json* tts_policy = nullptr;
@@ -482,6 +543,7 @@ bool PanelConfigStorage::load_from_file(const std::string& path, PanelConfig& ou
         }
 
         normalize_bridge_settings(config);
+        normalize_embedded_ui_settings(config);
         if (config.tiktok_provider == "tiktok_live" || config.tiktok_provider == "tiktoklive") {
             config.tiktok_provider = "direct";
         } else if (config.tiktok_provider != "direct" && config.tiktok_provider != "euler") {

@@ -18,6 +18,31 @@ async def accepted_event(_event) -> bool:
     return True
 
 
+async def ignored_status(_status) -> None:
+    return None
+
+
+class RecordingSoundAlerts:
+    """Sustituye a SoundAlerts para observar que suena y que no."""
+
+    played: list[str] = []
+
+    def __init__(self, **_kwargs) -> None:
+        pass
+
+    def should_alert(self, _new_state: str) -> bool:
+        return True
+
+    async def play_connected(self) -> None:
+        type(self).played.append("connected")
+
+    async def play_disconnected(self) -> None:
+        type(self).played.append("disconnected")
+
+    async def play_reconnecting(self) -> None:
+        type(self).played.append("reconnecting")
+
+
 class FakeConnection:
     attempts = 0
     fail_first = False
@@ -411,6 +436,84 @@ class ConnectionManagerTests(unittest.IsolatedAsyncioTestCase):
 
         self.assertEqual(exit_code, 0)
         self.assertEqual(FakeConnection.attempts, 1)
+
+
+    async def test_sound_alerts_are_suppressed_when_panel_is_not_connected(self) -> None:
+        """El bug reportado: el bridge sobrevive al panel y seguia pitando."""
+        metrics = MetricsRegistry()
+
+        await self._run_session_recording_sounds(
+            panel_attached=lambda: False,
+            metrics=metrics,
+        )
+
+        self.assertEqual(RecordingSoundAlerts.played, [])
+        self.assertGreaterEqual(
+            metrics.snapshot().counters.get("sound_alerts_suppressed_total", 0), 1
+        )
+
+    async def test_sound_alerts_play_when_panel_is_connected(self) -> None:
+        """Control positivo: con panel presente las alertas siguen sonando."""
+        metrics = MetricsRegistry()
+
+        await self._run_session_recording_sounds(
+            panel_attached=lambda: True,
+            metrics=metrics,
+        )
+
+        self.assertIn("reconnecting", RecordingSoundAlerts.played)
+        self.assertEqual(metrics.snapshot().counters.get("sound_alerts_suppressed_total", 0), 0)
+
+    async def test_sound_alerts_play_without_predicate_for_legacy_callers(self) -> None:
+        """Sin predicado se conserva el comportamiento anterior."""
+        await self._run_session_recording_sounds(panel_attached=None, metrics=MetricsRegistry())
+
+        self.assertIn("reconnecting", RecordingSoundAlerts.played)
+
+    async def test_sound_alerts_play_when_predicate_raises(self) -> None:
+        """Ante la duda no se silencia: un predicado roto no debe comer la alerta."""
+
+        def broken_predicate() -> bool:
+            raise RuntimeError("panel ws sink unavailable")
+
+        await self._run_session_recording_sounds(
+            panel_attached=broken_predicate,
+            metrics=MetricsRegistry(),
+        )
+
+        self.assertIn("reconnecting", RecordingSoundAlerts.played)
+
+    async def _run_session_recording_sounds(self, *, panel_attached, metrics: MetricsRegistry) -> None:
+        """Sesion con un fallo transitorio: produce la transicion a 'reconnecting'."""
+        FakeConnection.attempts = 0
+        FakeConnection.fail_first = True
+        FakeConnection.user_not_found = False
+        FakeConnection.hang_until_closed = False
+
+        config = bridge_config_with_api_key()
+        config.retry_policy.max_attempts = 3
+
+        async def fast_sleep(_seconds: float) -> None:
+            return None
+
+        RecordingSoundAlerts.played = []
+        # El manager debe construirse DENTRO del patch: SoundAlerts se instancia
+        # en __init__, asi que parchearlo despues no tendria efecto.
+        with mock.patch("connection_manager.TikToolsConnection", FakeConnection), mock.patch(
+            "connection_manager.SoundAlerts", RecordingSoundAlerts
+        ), mock.patch("connection_manager.asyncio.sleep", side_effect=fast_sleep):
+            manager = ConnectionManager(
+                config=config,
+                logger=configure_logger(
+                    name="livepanel.bridge.test.connection.sound",
+                    log_path="tools/bridge_py/logs/test_connection_sound.jsonl",
+                ),
+                metrics=metrics,
+                event_callback=accepted_event,
+                status_callback=ignored_status,
+                panel_attached=panel_attached,
+            )
+            await manager.run(target_user="alice", max_events=1, max_seconds=0)
 
 
 if __name__ == "__main__":

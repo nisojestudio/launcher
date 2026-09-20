@@ -45,6 +45,16 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--replay-loop", action="store_true", help="Loop replay until stopped.")
     parser.add_argument("--simulate-burst", type=int, default=0, help="Emit a synthetic burst of chat events.")
     parser.add_argument("--no-broadcast-ws", action="store_true", help="Disable the bridge broadcast WebSocket server.")
+    parser.add_argument(
+        "--no-sound-alerts",
+        action="store_true",
+        help="Desactiva por completo las alertas sonoras de conexion/desconexion.",
+    )
+    parser.add_argument(
+        "--sound-alerts-without-panel",
+        action="store_true",
+        help="Emite las alertas sonoras aunque el panel no este conectado (comportamiento anterior).",
+    )
     return parser.parse_args()
 
 
@@ -124,6 +134,10 @@ def apply_cli_overrides(config: BridgeConfig, args: argparse.Namespace) -> Bridg
         config.replay.loop = True
     if args.no_broadcast_ws:
         config.output.broadcast_ws_enabled = False
+    if args.no_sound_alerts:
+        config.sound_alerts.enabled = False
+    if args.sound_alerts_without_panel:
+        config.sound_alerts.require_panel = False
     if not config.output.panel_ws_url and not config.output.output_jsonl and not config.output.inbox_dir:
         config.output.panel_ws_url = DEFAULT_PANEL_WS_URL
     return config

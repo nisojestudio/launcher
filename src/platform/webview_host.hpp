@@ -32,6 +32,20 @@ struct EmbeddedUiUrl {
 
 EmbeddedUiUrl parse_embedded_ui_url(std::string_view url);
 std::string build_loopback_ui_url(std::uint16_t port, std::string_view path = "/");
+
+/// Fase 3: destino local de la UI embebida (puerto + URL).
+struct EmbeddedUiTarget {
+    std::uint16_t port = 18913;
+    std::string url{};
+};
+
+/// Fase 3: resuelve el destino loopback de la UI embebida sin depender del
+/// proceso. El puerto lo manda `embedded_ui_port` (campo propio); la URL solo
+/// aporta el puerto cuando apunta a loopback, porque versiones anteriores
+/// guardaban ahi la URL efimera del quick tunnel que cambiaba en cada arranque.
+EmbeddedUiTarget resolve_embedded_ui_target(
+    std::string_view embedded_ui_url,
+    std::uint16_t embedded_ui_port);
 bool wait_for_embedded_ui_server_ready(
     std::string_view url,
     std::uint64_t timeout_ms,

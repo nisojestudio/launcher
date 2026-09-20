@@ -147,6 +147,14 @@ target_link_libraries(nlp3_panel_config_storage_test PRIVATE nlp3_platform)
 
 add_test(NAME nlp3_panel_config_storage_test COMMAND nlp3_panel_config_storage_test)
 
+add_executable(nlp3_panel_embedded_ui_port_test
+    panel_embedded_ui_port_test.cpp
+)
+
+target_link_libraries(nlp3_panel_embedded_ui_port_test PRIVATE nlp3_platform)
+
+add_test(NAME nlp3_panel_embedded_ui_port_test COMMAND nlp3_panel_embedded_ui_port_test)
+
 add_executable(nlp3_remote_game_distribution_test
     remote_game_distribution_test.cpp
 )
@@ -227,6 +235,14 @@ target_link_libraries(nlp3_live_timer_api_smoke_test PRIVATE nlp3_platform)
 
 add_test(NAME nlp3_live_timer_api_smoke_test COMMAND nlp3_live_timer_api_smoke_test)
 
+add_executable(nlp3_live_timer_visual_config_test
+    live_timer_visual_config_test.cpp
+)
+
+target_link_libraries(nlp3_live_timer_visual_config_test PRIVATE nlp3_platform)
+
+add_test(NAME nlp3_live_timer_visual_config_test COMMAND nlp3_live_timer_visual_config_test)
+
 add_executable(nlp3_tiktok_external_event_codec_test
     tiktok_external_event_codec_test.cpp
 )
@@ -274,4 +290,16 @@ add_test(
         -s "${PROJECT_SOURCE_DIR}/tools/game_bridge_py/tests"
         -t "${PROJECT_SOURCE_DIR}/tools/game_bridge_py"
         -v
+)
+
+# V2: el estado del Live Timer vive en %LOCALAPPDATA%\NisojeStudio\timer. Los
+# tests NO deben leerlo ni pisarlo: es el estado real del usuario, y ademas su
+# resultado no puede depender de lo que tenga guardado. Sin esto, cualquier test
+# que construya un PanelApp lee y sobrescribe ese fichero, porque el destructor
+# guarda el timer. Se aisla por entorno para TODOS los tests de este directorio.
+get_property(_nlp3_all_tests DIRECTORY PROPERTY TESTS)
+set_tests_properties(
+    ${_nlp3_all_tests}
+    PROPERTIES ENVIRONMENT
+        "NLP3_TIMER_STATE_DIR=${CMAKE_CURRENT_BINARY_DIR}/test_timer_state"
 )

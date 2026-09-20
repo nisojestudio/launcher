@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; connect-src 'self'; media-src 'self' blob:;">
 <title>Live Timer</title>
-<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;700&family=Space+Mono:wght@400;700&family=Share+Tech+Mono&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;700&family=Space+Mono:wght@400;700&family=Share+Tech+Mono&family=Chakra+Petch:wght@600;700&family=Rajdhani:wght@600;700&display=swap" rel="stylesheet">
 <style>
 * { margin: 0; padding: 0; box-sizing: border-box; }
 body {
@@ -13,7 +13,6 @@ body {
   width: 100vw;
   height: 100vh;
   display: flex;
-  flex-direction: column;
   align-items: center;
   justify-content: center;
   font-family: 'Segoe UI', sans-serif;
@@ -26,7 +25,8 @@ body.preview-mode #title     { font-size: 22px; margin-bottom: 2px; }
 body.preview-mode #counter   { font-size: 52px; }
 body.preview-mode #subtitle  { font-size: 14px; margin-top: 2px; }
 body.preview-mode #completed-banner { font-size: 20px; margin-top: 4px; }
-body.preview-mode #days-label   { font-size: 18px; margin-top: 2px; }
+body.preview-mode #days-label   { font-size: 14px; margin-bottom: 4px; letter-spacing: 2px; }
+body.preview-mode #event-container { right: 6px; max-width: 45%; max-height: 80%; gap: 3px; }
 
 /* ---- Effect: Pulse ---- */
 .effect-pulse {
@@ -97,7 +97,7 @@ body.preview-mode #days-label   { font-size: 18px; margin-top: 2px; }
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-  max-width: 90vw;
+  max-width: calc(var(--stage-w, 100vw) * 0.9);
 }
 #counter {
   font-size: 120px;
@@ -109,7 +109,7 @@ body.preview-mode #days-label   { font-size: 18px; margin-top: 2px; }
   z-index: 10;
   perspective: 400px;
   backface-visibility: hidden;
-  max-width: 100vw;
+  max-width: var(--stage-w, 100vw);
   overflow: hidden;
   /* color se setea via JS (applyColorPreset o applyStyles). CSS var como fallback. */
   color: var(--counter-color, #00FF88);
@@ -137,12 +137,16 @@ body.preview-mode #days-label   { font-size: 18px; margin-top: 2px; }
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-  max-width: 90vw;
+  max-width: calc(var(--stage-w, 100vw) * 0.9);
 }
+/* V2: el dia va SOBRE el reloj. Antes quedaba despues del contador en el DOM,
+   asi que se leia al reves ("00:00:00" y debajo "2 dias"). Distintivo en
+   mayusculas, mas pequeno que el reloj para no competir con el. */
 #days-label {
-  font-size: 36px;
+  font-size: 30px;
   font-weight: bold;
-  margin-top: 4px;
+  letter-spacing: 3px;
+  margin-bottom: 8px;
   text-align: center;
   position: relative;
   z-index: 10;
@@ -150,22 +154,42 @@ body.preview-mode #days-label   { font-size: 18px; margin-top: 2px; }
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-  max-width: 90vw;
+  max-width: calc(var(--stage-w, 100vw) * 0.9);
+  opacity: 0.9;
 }
 @keyframes pulse {
   50% { transform: scale(1.05); }
 }
-.event-popup {
-  position: fixed;
-  left: 0;
-  right: 0;
-  text-align: center;
-  font-weight: bold;
-  text-shadow: 0 0 15px rgba(0,0,0,0.9), 0 0 30px rgba(0,0,0,0.7);
-  opacity: 1;
-  animation: none;
+/* V2: los popups ocupaban todo el ancho por debajo del reloj y la animacion
+   los hacia subir 40px, asi que cruzaban por delante del contador y ensuciaban
+   la lectura. Ahora viven en una lane lateral derecha y NO se mueven en
+   vertical: entran desde el borde y se desvanecen en el sitio. */
+#event-container {
+  position: absolute;
+  right: 3%;
+  top: 50%;
+  transform: translateY(-50%);
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  justify-content: flex-end;
+  gap: 6px;
+  max-width: 32%;
+  max-height: 72%;
+  overflow: hidden;
   pointer-events: none;
   z-index: 50;
+}
+.event-popup {
+  position: static;
+  text-align: right;
+  font-weight: bold;
+  text-shadow: 0 2px 10px rgba(0,0,0,0.95), 0 0 24px rgba(0,0,0,0.8);
+  max-width: var(--stage-w, 100vw);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  opacity: 0;
 }
 .event-popup.add { color: #00AAFF; }
 .event-popup.subtract { color: #FF4444; }
@@ -173,9 +197,10 @@ body.preview-mode #days-label   { font-size: 18px; margin-top: 2px; }
   animation: popFade 3s ease-out forwards;
 }
 @keyframes popFade {
-  0% { opacity: 1; transform: translateY(0) scale(1); }
-  20% { opacity: 1; transform: translateY(-10px) scale(1.1); }
-  100% { opacity: 0; transform: translateY(-40px) scale(0.9); }
+  0%   { opacity: 0; transform: translateX(28px); }
+  10%  { opacity: 1; transform: translateX(0); }
+  72%  { opacity: 1; transform: translateX(0); }
+  100% { opacity: 0; transform: translateX(0); }
 }
 #completed-banner {
   display: none;
@@ -203,29 +228,381 @@ body.preview-mode #days-label   { font-size: 18px; margin-top: 2px; }
 }
 #preview-badge.visible { display: block; }
 #subtitle.preview { opacity: 0.5; }
+
+/* ============================================================================
+   Fase 5 — motor visual (specs/live-timer-mejoras/visual.md)
+   Todo esto es opt-in: con los defaults (frame_style="none", adornos off,
+   contorno 0) el overlay se ve EXACTAMENTE como antes.
+   ============================================================================ */
+
+/* M16 — lienzo de referencia escalado.
+   El diseño se compone a un tamaño fijo (1920x1080 por defecto) y el bloque
+   entero se escala al tamaño real del browser source. Sin esto, el overlay se
+   desarma a cualquier resolucion que no sea la de diseño: el reloj sale enorme
+   o minusculo y hay que reconfigurar los tres tamaños a mano. */
+#stage {
+  --stage-w: 100vw;
+  position: relative;
+  width: 100%;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  transform-origin: center center;
+}
+#stage.scaled {
+  --stage-w: var(--canvas-w, 1920px);
+  width: var(--canvas-w, 1920px);
+  height: var(--canvas-h, 1080px);
+  flex: 0 0 auto;
+}
+
+/* V1/V2/V3 — marco del overlay.
+   `frame_style="none"` usa display:contents en el marco y su capa de contenido,
+   de modo que desaparecen la caja, el relleno y el borde: el layout queda
+   exactamente como estaba antes de la fase. */
+#frame {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: var(--frame-padding, 28px);
+  border-radius: var(--frame-radius, 4px);
+  border: var(--frame-border, 1px) solid transparent;
+  background: transparent;
+  max-width: 94%;
+  max-height: 94%;
+}
+#frame.f-none,
+#frame.f-none > #frame-content {
+  display: contents;
+}
+#frame-content {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  /* Ancho definido (max-content) para que los porcentajes de `max-width` de
+     titulo/subtitulo resuelvan contra algo real. Sin esto, dentro del marco el
+     subtitulo entraba en dependencia circular y salia recortado con puntos
+     suspensivos aunque hubiera sitio de sobra. */
+  width: max-content;
+  max-width: 100%;
+}
+#frame.f-card {
+  background: var(--frame-bg, rgba(255, 255, 255, 0.08));
+  border-color: var(--frame-bg-strong, rgba(255, 255, 255, 0.22));
+}
+#frame.f-glass {
+  background: var(--frame-bg, rgba(255, 255, 255, 0.10));
+  border-color: var(--frame-bg-strong, rgba(255, 255, 255, 0.22));
+  backdrop-filter: blur(24px) saturate(140%);
+  -webkit-backdrop-filter: blur(24px) saturate(140%);
+}
+#frame.f-neon {
+  background: var(--frame-bg-soft, rgba(13, 13, 13, 0.35));
+  border-color: var(--frame-color, #00FFFF);
+  box-shadow:
+    0 0 18px var(--frame-bg-strong, rgba(0, 255, 255, 0.45)),
+    inset 0 0 24px var(--frame-bg-soft, rgba(0, 255, 255, 0.08));
+}
+#frame.f-ribbon {
+  background: var(--frame-bg-soft, rgba(13, 13, 13, 0.35));
+  border-left: calc(var(--frame-border, 1px) * 6) solid var(--frame-color, #00FFFF);
+}
+#frame.f-badge {
+  background: var(--frame-bg, rgba(255, 255, 255, 0.10));
+  border-color: var(--frame-bg-strong, rgba(255, 255, 255, 0.22));
+  border-radius: 999px;
+  padding: calc(var(--frame-padding, 28px) * 0.5) var(--frame-padding, 28px);
+}
+
+/* Capas decorativas del marco: rejilla tecnica, scanlines y esquinas. */
+#frame-fx,
+#frame-brackets {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  border-radius: inherit;
+}
+#frame-fx {
+  display: none;
+}
+#frame.frame-grid #frame-fx {
+  display: block;
+  background-image:
+    repeating-linear-gradient(0deg, var(--frame-color-faint, rgba(0,255,255,0.07)) 0 1px, transparent 1px 24px),
+    repeating-linear-gradient(90deg, var(--frame-color-faint, rgba(0,255,255,0.07)) 0 1px, transparent 1px 24px);
+}
+#frame.frame-scanlines #frame-fx {
+  display: block;
+  background-image:
+    repeating-linear-gradient(0deg, var(--frame-color-faint, rgba(0,255,255,0.07)) 0 1px, transparent 1px 4px);
+}
+#frame.frame-grid.frame-scanlines #frame-fx {
+  background-image:
+    repeating-linear-gradient(0deg, var(--frame-color-faint, rgba(0,255,255,0.07)) 0 1px, transparent 1px 4px),
+    repeating-linear-gradient(90deg, var(--frame-color-faint, rgba(0,255,255,0.05)) 0 1px, transparent 1px 24px);
+}
+/* V2 — esquinas de bracket: 8 trazos dibujados como capas de fondo, sin SVG ni
+   elementos extra. Es lo que hace que el marco parezca un HUD y no un borde. */
+#frame-brackets {
+  display: none;
+}
+#frame.frame-brackets #frame-brackets {
+  display: block;
+  --bl: 26px;
+  --bt: 3px;
+  background-image:
+    linear-gradient(var(--frame-color, #00FFFF) 0 0), linear-gradient(var(--frame-color, #00FFFF) 0 0),
+    linear-gradient(var(--frame-color, #00FFFF) 0 0), linear-gradient(var(--frame-color, #00FFFF) 0 0),
+    linear-gradient(var(--frame-color, #00FFFF) 0 0), linear-gradient(var(--frame-color, #00FFFF) 0 0),
+    linear-gradient(var(--frame-color, #00FFFF) 0 0), linear-gradient(var(--frame-color, #00FFFF) 0 0);
+  background-repeat: no-repeat;
+  background-size:
+    var(--bl) var(--bt), var(--bt) var(--bl),
+    var(--bl) var(--bt), var(--bt) var(--bl),
+    var(--bl) var(--bt), var(--bt) var(--bl),
+    var(--bl) var(--bt), var(--bt) var(--bl);
+  background-position:
+    left top, left top,
+    right top, right top,
+    left bottom, left bottom,
+    right bottom, right bottom;
+}
+
+/* V8 — contorno del texto. `paint-order: stroke fill` dibuja el trazo DETRAS del
+   relleno, que es lo que evita que el contorno se coma los trazos finos. */
+body.has-outline #title,
+body.has-outline #counter,
+body.has-outline #subtitle,
+body.has-outline #days-label,
+body.has-outline #completed-banner {
+  -webkit-text-stroke: var(--outline-px, 0px) var(--outline-color, #000000);
+  paint-order: stroke fill;
+}
+
+/* V9 — efectos ambientales. Todos animan solo transform/opacity/filter para no
+   disparar layout: el overlay se compone sobre video en vivo. */
+.effect-heartbeat {
+  animation: heartbeatEffect var(--pulse-speed, 1.5s) ease-in-out infinite;
+}
+@keyframes heartbeatEffect {
+  0%, 100% { transform: scale(1); }
+  14%      { transform: scale(1.08); }
+  28%      { transform: scale(1); }
+  42%      { transform: scale(1.05); }
+  56%      { transform: scale(1); }
+}
+.effect-float {
+  animation: floatEffect calc(var(--pulse-speed, 1.5s) * 4) ease-in-out infinite;
+}
+@keyframes floatEffect {
+  0%, 100% { transform: translateY(0); }
+  50%      { transform: translateY(-4%); }
+}
+.effect-flicker {
+  animation: flickerEffect calc(var(--pulse-speed, 1.5s) * 3) steps(1, end) infinite;
+}
+@keyframes flickerEffect {
+  0%, 100% { opacity: 1; }
+  42%      { opacity: 1; }
+  45%      { opacity: 0.35; }
+  48%      { opacity: 1; }
+  70%      { opacity: 1; }
+  73%      { opacity: 0.5; }
+  76%      { opacity: 1; }
+}
+.effect-shake {
+  animation: shakeEffect calc(var(--pulse-speed, 1.5s) * 4) ease-in-out infinite;
+}
+@keyframes shakeEffect {
+  0%, 100% { transform: translateX(0); }
+  10%      { transform: translateX(-1.5%); }
+  20%      { transform: translateX(1.5%); }
+  30%      { transform: translateX(-1%); }
+  40%      { transform: translateX(0); }
+}
+
+/* V12 — efectos de digito nuevos. Se disparan una vez por cambio de digito. */
+.digit-odometer { animation: odometerDigit 0.35s cubic-bezier(0.2, 0.8, 0.2, 1); }
+@keyframes odometerDigit {
+  /* El digito no se desvanece a cero: en un reloj que cambia cada segundo eso es
+     un parpadeo (la verificacion visual pillo dos digitos invisibles a la vez).
+     Se desliza manteniendo opacidad. */
+  0%   { transform: translateY(-45%); opacity: 0.45; }
+  100% { transform: translateY(0); opacity: 1; }
+}
+.digit-typewriter { animation: typewriterDigit 0.16s steps(2, end); }
+@keyframes typewriterDigit {
+  0%   { opacity: 0; }
+  100% { opacity: 1; }
+}
+.digit-blur { animation: blurDigit 0.25s ease-out; }
+@keyframes blurDigit {
+  0%   { filter: blur(4px); opacity: 0.3; }
+  100% { filter: blur(0); opacity: 1; }
+}
+
+/* V13 — efecto del estado de peligro, configurable. Sustituye al pulso fijo. */
+.counter-glitch {
+  animation: glitchEffect 2s steps(2, end) infinite;
+}
+@keyframes glitchEffect {
+  0%, 86%, 100% { transform: translateX(0); }
+  88%           { transform: translateX(-3px); }
+  91%           { transform: translateX(3px); }
+  94%           { transform: translateX(-2px); }
+  97%           { transform: translateX(1px); }
+}
+.counter-flash {
+  animation: flashEffect 0.5s steps(1, end) infinite;
+}
+@keyframes flashEffect {
+  0%, 100% { opacity: 1; }
+  50%      { opacity: 0.3; }
+}
+
+/* V6 — bloques de hora ocultos cuando no hay horas que mostrar. La clase la pone
+   el render segun el valor real: con 01:12:00 las horas SI se ven, porque
+   ocultarlas pintaria "12:00" para algo que dura mas de una hora. */
+#counter.hide-hours > span:nth-child(1),
+#counter.hide-hours > span:nth-child(2) {
+  display: none;
+}
+
+/* V11 — particulas. Un solo canvas a tamaño del lienzo, dibujado con rectangulos
+   y lineas (sin imagenes). `will-change` solo aqui: es el unico elemento que se
+   repinta en cada frame, y las capas de composicion extra cuestan memoria. */
+#particles {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+  will-change: transform;
+}
+
+/* Aviso de rendimiento: SOLO en la preview del panel. Nunca en el directo, porque
+   taparia el overlay para la audiencia. */
+#perf-notice {
+  display: none;
+  position: fixed;
+  top: 34px;
+  right: 12px;
+  background: rgba(255, 176, 32, 0.22);
+  color: rgba(255, 220, 160, 0.95);
+  font-size: 12px;
+  font-weight: bold;
+  padding: 3px 10px;
+  border-radius: 10px;
+  letter-spacing: 0.5px;
+  text-shadow: none;
+  pointer-events: none;
+  z-index: 998;
+}
+body.preview-mode #perf-notice.visible { display: block; }
+
+/* V5 — medidor de progreso, en dos formas porque cada una vive en un sitio:
+   la barra va DEBAJO del bloque; el anillo va ALREDEDOR del contador. Un anillo
+   circular alrededor de todo el bloque cruzaba los digitos (lo vio la
+   verificacion visual); envolviendo solo el contador queda eliptico y no pisa
+   el texto. Las dos leen las mismas variables, que se ponen en #frame-content. */
+#counter-wrap {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+#progress-bar,
+#progress-ring {
+  display: none;
+}
+#progress-bar {
+  position: relative;
+  width: 100%;
+  height: var(--progress-thickness, 6px);
+  margin-top: 10px;
+  border-radius: 999px;
+  background: var(--progress-track, rgba(255, 255, 255, 0.18));
+  overflow: hidden;
+}
+#frame-content.has-bar #progress-bar {
+  display: block;
+}
+#progress-fill {
+  position: absolute;
+  inset: 0 auto 0 0;
+  width: var(--progress-pct, 0%);
+  border-radius: 999px;
+  background: var(--progress-color, #00FF88);
+}
+#progress-ring {
+  position: absolute;
+  /* 28 px de aire alrededor del contador: con menos, el arco pasa por encima de
+     los digitos de los extremos (lo vio la verificacion visual). */
+  inset: -28px;
+  border-radius: 50%;
+  background: conic-gradient(
+    var(--progress-color, #00FF88) var(--progress-angle, 0deg),
+    var(--progress-track, rgba(255, 255, 255, 0.18)) 0
+  );
+  -webkit-mask: radial-gradient(
+    closest-side,
+    transparent calc(100% - var(--progress-thickness, 6px) * 2),
+    #000 calc(100% - var(--progress-thickness, 6px) * 2)
+  );
+  mask: radial-gradient(
+    closest-side,
+    transparent calc(100% - var(--progress-thickness, 6px) * 2),
+    #000 calc(100% - var(--progress-thickness, 6px) * 2)
+  );
+}
+#frame-content.has-ring #progress-ring {
+  display: block;
+}
 </style>
 </head>
 <body>
 
-<div id="title" role="heading" aria-level="1"></div>
-<div id="counter" role="region" aria-live="polite" aria-atomic="true" aria-label="Tiempo restante del temporizador">
-  <span class="digit-group"><span class="digit" data-pos="0">0</span><span class="digit" data-pos="1">0</span></span>
-  <span class="digit-sep">:</span>
-  <span class="digit-group"><span class="digit" data-pos="2">0</span><span class="digit" data-pos="3">0</span></span>
-  <span class="digit-sep">:</span>
-  <span class="digit-group"><span class="digit" data-pos="4">0</span><span class="digit" data-pos="5">0</span></span>
+<div id="stage">
+  <div id="frame" class="f-none">
+    <div id="frame-fx" aria-hidden="true"></div>
+    <div id="frame-brackets" aria-hidden="true"></div>
+    <div id="frame-content">
+
+      <div id="title" role="heading" aria-level="1"></div>
+      <div id="days-label" aria-live="polite"></div>
+      <div id="counter-wrap">
+        <div id="progress-ring" aria-hidden="true"></div>
+        <div id="counter" role="region" aria-live="polite" aria-atomic="true" aria-label="Tiempo restante del temporizador">
+          <span class="digit-group"><span class="digit" data-pos="0">0</span><span class="digit" data-pos="1">0</span></span>
+          <span class="digit-sep">:</span>
+          <span class="digit-group"><span class="digit" data-pos="2">0</span><span class="digit" data-pos="3">0</span></span>
+          <span class="digit-sep">:</span>
+          <span class="digit-group"><span class="digit" data-pos="4">0</span><span class="digit" data-pos="5">0</span></span>
+        </div>
+      </div>
+      <div id="subtitle" aria-live="polite"></div>
+      <div id="progress-bar" aria-hidden="true"><div id="progress-fill"></div></div>
+      <div id="completed-banner" role="alert" aria-live="assertive" aria-atomic="true"></div>
+
+    </div>
+  </div>
+  <div id="event-container" role="log" aria-live="polite" aria-relevant="additions" aria-label="Eventos recientes del temporizador"></div>
+  <canvas id="particles" aria-hidden="true"></canvas>
 </div>
-<div id="days-label" aria-live="polite"></div>
-<div id="subtitle" aria-live="polite"></div>
-<div id="completed-banner" role="alert" aria-live="assertive" aria-atomic="true"></div>
-<div id="event-container" role="log" aria-live="polite" aria-relevant="additions" aria-label="Eventos recientes del temporizador"></div>
 <div id="connection-error" role="alert" style="display:none;position:fixed;top:10px;left:50%;transform:translateX(-50%);background:rgba(255,0,0,0.7);color:#fff;padding:6px 16px;border-radius:8px;font-size:16px;font-weight:bold;z-index:999;">Desconectado del panel</div>
 <div id="preview-badge" aria-hidden="true">PREVIEW</div>
+<div id="perf-notice" role="status" aria-live="polite"></div>
 
 <script>
 // Detect preview mode (shown in panel iframe)
+const previewMode = window.location.search.includes('preview=1');
 (function() {
-  if (window.location.search.includes('preview=1')) {
+  if (previewMode) {
     document.body.classList.add('preview-mode');
   }
 })();
@@ -389,7 +766,8 @@ function formatTime(seconds) {
 
 function splitDaysFromTime(formatted) {
   var m = formatted.match(/^(\d+)\s+(dias?)\s+(.+)$/);
-  if (m) return { days: m[1] + ' ' + m[2], time: m[3] };
+  // V2: "DIA 2" en vez de "2 dias" — se pinta como distintivo SOBRE el reloj.
+  if (m) return { days: 'DÍA ' + m[1], time: m[3] };
   return { days: '', time: formatted };
 }
 
@@ -408,10 +786,11 @@ function formatCompactDelta(d) {
 
 function showPopup(icon, label, delta) {
   const container = document.getElementById('event-container');
+  if (!container) return;
   // T3.4: keep the popup stack bounded so rapid event bursts don't pile up
   // DOM nodes and starve the layout.
   const MAX_POPUPS = 5;
-  if (container && container.children.length >= MAX_POPUPS) {
+  if (container.children.length >= MAX_POPUPS) {
     container.removeChild(container.firstChild);
   }
   const el = document.createElement('div');
@@ -426,12 +805,11 @@ function showPopup(icon, label, delta) {
   const labelText = showLabel ? icon + ' ' + label + ' ' + deltaText : icon + ' ' + deltaText;
   el.textContent = labelText;
   el.setAttribute('aria-label', (label || 'evento') + ' ' + deltaText);
+  // V2: la lane lateral apila los popups por flex. Ya no se calcula `top` ni
+  // offsets por indice, y el tamano se acota para que la cola no desborde.
   const counterSize = (styles.counter && styles.counter.font_size_px) || 120;
-  el.style.fontSize = Math.max(28, Math.round(counterSize * 0.45)) + 'px';
-  const existing = container.querySelectorAll('.event-popup');
-  const step = Math.max(36, Math.round(counterSize * 0.45)) + 8;
-  const offset = existing.length * step;
-  el.style.top = 'calc(50% + ' + (counterSize * 0.55) + 'px + ' + offset + 'px)';
+  const popupScale = previewMode ? 0.26 : 0.4;
+  el.style.fontSize = Math.max(16, Math.min(48, Math.round(counterSize * popupScale))) + 'px';
   container.appendChild(el);
   requestAnimationFrame(() => { el.classList.add('fade'); });
   setTimeout(() => { if (el.parentNode) el.parentNode.removeChild(el); }, 3000);
@@ -454,10 +832,18 @@ function styleEqual(a, b) {
 function setCounterState(counterEl, state, effectName) {
   counterEl.classList.remove('danger', 'warning', 'completed', 'paused-state');
   var noEffect = !effectName || effectName === 'none';
-  var wantPulse = (state === 'danger' || state === 'completed') && noEffect;
+  var dangerState = (state === 'danger' || state === 'completed');
+  // Fase 5 (V13): el efecto del estado de peligro es configurable. Se conserva la
+  // regla de siempre — si el contador ya tiene un efecto propio activo no se le
+  // suma otro encima, porque pulso + glitch a la vez es ruido, no enfasis.
+  var dangerEffect = visualState.dangerEffect || 'pulse';
+  var wantPulse = dangerState && noEffect && dangerEffect === 'pulse';
+  var wantGlitch = dangerState && noEffect && dangerEffect === 'glitch';
+  var wantFlash = dangerState && noEffect && dangerEffect === 'flash';
   if (state) counterEl.classList.add(state);
-  if (wantPulse) counterEl.classList.add('counter-danger-pulse');
-  else counterEl.classList.remove('counter-danger-pulse');
+  counterEl.classList.toggle('counter-danger-pulse', wantPulse);
+  counterEl.classList.toggle('counter-glitch', wantGlitch);
+  counterEl.classList.toggle('counter-flash', wantFlash);
   // No setear inline color — el CSS con clases + variables lo maneja:
   //   #counter.danger { color: var(--danger-color) }  (definido por .preset-*)
   //   #counter { color: var(--counter-color) }
@@ -513,13 +899,15 @@ function tickLocalClock(timestamp) {
   var parsed = splitDaysFromTime(formatted);
   showDaysLabel(parsed.days);
   renderDigits(parsed.time.replace(/:/g, ''), currentDigitEffect);
+  updateProgress(localRemainingSeconds, lastStateData);
 
-  // Danger / warning segun el tiempo local
+  // Danger / warning segun el tiempo local. Fase 5: los umbrales los configura
+  // el operador (antes 60 y 10 estaban escritos aqui dentro).
   var counterEl = document.getElementById('counter');
   if (counterEl) {
-    if (localRemainingSeconds <= 10) {
+    if (localRemainingSeconds <= visualState.dangerSeconds) {
       setCounterState(counterEl, 'danger', localCounterEffectName);
-    } else if (localRemainingSeconds <= 60) {
+    } else if (localRemainingSeconds <= visualState.warnSeconds) {
       setCounterState(counterEl, 'warning', localCounterEffectName);
     } else {
       setCounterState(counterEl, null, localCounterEffectName);
@@ -600,6 +988,443 @@ var pollDelay = 1000;
 var abortController = null;
 var pollGeneration = 0;
 
+/* === Fase 5: motor visual ===================================================
+   Convierte las claves nuevas del estado en CSS. Todo es opt-in: si el estado no
+   trae las claves (panel antiguo) o trae los defaults, el overlay queda igual que
+   antes. El sistema de escala se recalcula solo al redimensionar. */
+var FRAME_CLASSES = ['f-none', 'f-card', 'f-glass', 'f-neon', 'f-ribbon', 'f-badge'];
+var visualSignature = '';
+var visualState = {
+  scaleMode: 'auto', canvasWidth: 1920, canvasHeight: 1080,
+  warnSeconds: 60, dangerSeconds: 10, dangerEffect: 'pulse',
+  timeSeparator: ':', showHours: true,
+  progressStyle: 'none', progressThicknessPx: 6, progressColor: ''
+};
+var lastStateData = null;
+
+function hexToRgb(hex) {
+  var h = String(hex || '').trim().replace('#', '');
+  if (h.length === 3) { h = h[0] + h[0] + h[1] + h[1] + h[2] + h[2]; }
+  if (!/^[0-9a-fA-F]{6}$/.test(h)) return null;
+  return {
+    r: parseInt(h.slice(0, 2), 16),
+    g: parseInt(h.slice(2, 4), 16),
+    b: parseInt(h.slice(4, 6), 16)
+  };
+}
+
+function rgbaOf(color, alpha) {
+  var rgb = hexToRgb(color);
+  if (!rgb) return 'rgba(0,255,255,' + alpha + ')';
+  return 'rgba(' + rgb.r + ',' + rgb.g + ',' + rgb.b + ',' + alpha + ')';
+}
+
+// M16: el diseño se compone a un lienzo de referencia y se escala entero.
+function applyScale() {
+  var stage = document.getElementById('stage');
+  if (!stage) return;
+  var refW = Number(visualState.canvasWidth) || 1920;
+  var refH = Number(visualState.canvasHeight) || 1080;
+  if (visualState.scaleMode !== 'auto') {
+    stage.classList.remove('scaled');
+    stage.style.removeProperty('--canvas-w');
+    stage.style.removeProperty('--canvas-h');
+    stage.style.transform = '';
+    return;
+  }
+  stage.classList.add('scaled');
+  stage.style.setProperty('--canvas-w', refW + 'px');
+  stage.style.setProperty('--canvas-h', refH + 'px');
+  var k = Math.min(window.innerWidth / refW, window.innerHeight / refH);
+  if (!isFinite(k) || k <= 0) k = 1;
+  stage.style.transform = 'scale(' + k + ')';
+  // El canvas de particulas se redimensiona al vuelo: si no, al cambiar el
+  // tamaño de la ventana las particulas saldrian con coordenadas viejas.
+  particleCanvas = null;
+  particleCtx = null;
+  particleList = [];
+  stopParticleLoop();
+}
+
+function applyVisualEngine(data) {
+  // Las particulas se refrescan siempre (fuera del guard de firma): su estado
+  // depende de claves que no cambian el aspecto del marco, y quedarse con una
+  // lista de particulas viva tras apagarlas seria un gasto invisible.
+  particleStateFrom(data);
+  var next = {
+    scaleMode: data.scale_mode || 'auto',
+    canvasWidth: Number(data.canvas_width) || 1920,
+    canvasHeight: Number(data.canvas_height) || 1080,
+    frameStyle: data.frame_style || 'none',
+    frameColor: data.frame_color || '#00FFFF',
+    frameOpacity: isFinite(Number(data.frame_opacity)) ? Number(data.frame_opacity) : 55,
+    frameBorderPx: isFinite(Number(data.frame_border_px)) ? Number(data.frame_border_px) : 1,
+    frameRadiusPx: isFinite(Number(data.frame_radius_px)) ? Number(data.frame_radius_px) : 4,
+    framePaddingPx: isFinite(Number(data.frame_padding_px)) ? Number(data.frame_padding_px) : 28,
+    frameBrackets: !!data.frame_brackets,
+    frameGrid: !!data.frame_grid,
+    frameScanlines: !!data.frame_scanlines,
+    outlinePx: isFinite(Number(data.text_outline_px)) ? Number(data.text_outline_px) : 0,
+    outlineColor: data.text_outline_color || '#000000',
+    timeSeparator: data.time_separator || ':',
+    showHours: data.show_hours !== false,
+    warnSeconds: isFinite(Number(data.warn_seconds)) ? Number(data.warn_seconds) : 60,
+    dangerSeconds: isFinite(Number(data.danger_seconds)) ? Number(data.danger_seconds) : 10,
+    dangerEffect: data.danger_effect || 'pulse',
+    progressStyle: data.progress_style || 'none',
+    progressThicknessPx: isFinite(Number(data.progress_thickness_px)) ? Number(data.progress_thickness_px) : 6,
+    progressColor: data.progress_color || '',
+    // El color del contador entra en la firma: si no, con progress_color vacio el
+    // medidor se quedaba con el color de reserva para siempre, porque el motor
+    // solo refresca cuando la firma cambia (lo cazo la verificacion visual).
+    counterColor: (data.counterStyle && data.counterStyle.font_color) || ''
+  };
+
+  // El motor solo toca el DOM cuando algo cambia de verdad: el estado se refresca
+  // cada segundo y no tiene sentido reescribir estilos 3600 veces por hora.
+  var signature = JSON.stringify(next);
+  if (signature === visualSignature) return;
+  visualSignature = signature;
+  visualState = next;
+
+  var stage = document.getElementById('stage');
+  var frame = document.getElementById('frame');
+  if (stage) {
+    applyScale();
+  }
+  if (frame) {
+    var style = FRAME_CLASSES.indexOf('f-' + next.frameStyle) >= 0 ? next.frameStyle : 'none';
+    for (var i = 0; i < FRAME_CLASSES.length; i++) {
+      frame.classList.toggle(FRAME_CLASSES[i], FRAME_CLASSES[i] === 'f-' + style);
+    }
+    frame.classList.toggle('frame-brackets', next.frameBrackets);
+    frame.classList.toggle('frame-grid', next.frameGrid);
+    frame.classList.toggle('frame-scanlines', next.frameScanlines);
+
+    // Fase 5: `frame_opacity` es LITERAL, la opacidad del relleno del marco. Antes
+    // estaba escalada (opacity * 0.16), lo que hacia que el control no significara
+    // nada: con el mismo valor no se podia pedir un neon translucido ni una
+    // tarjeta de papel opaca. De aqui salen el relleno y, derivados, el brillo del
+    // borde y la rejilla.
+    var alpha = Math.max(0, Math.min(100, next.frameOpacity)) / 100;
+    frame.style.setProperty('--frame-color', next.frameColor);
+    frame.style.setProperty('--frame-color-faint', rgbaOf(next.frameColor, Math.min(0.3, 0.06 + alpha * 0.15)));
+    frame.style.setProperty('--frame-bg', rgbaOf(next.frameColor, alpha));
+    frame.style.setProperty('--frame-bg-strong', rgbaOf(next.frameColor, Math.min(0.95, alpha + 0.28)));
+    frame.style.setProperty('--frame-bg-soft', rgbaOf(next.frameColor, Math.min(0.5, alpha * 0.5)));
+    frame.style.setProperty('--frame-padding', next.framePaddingPx + 'px');
+    frame.style.setProperty('--frame-radius', next.frameRadiusPx + 'px');
+    frame.style.setProperty('--frame-border', next.frameBorderPx + 'px');
+  }
+
+  // V8: el contorno se activa solo cuando hay grosor, para no dejar una clase
+  // muerta en el DOM (que es como se cuelan las regresiones visuales).
+  var hasOutline = next.outlinePx > 0;
+  document.body.classList.toggle('has-outline', hasOutline);
+  if (hasOutline) {
+    document.body.style.setProperty('--outline-px', next.outlinePx + 'px');
+    document.body.style.setProperty('--outline-color', next.outlineColor);
+  } else {
+    document.body.style.removeProperty('--outline-px');
+    document.body.style.removeProperty('--outline-color');
+  }
+
+  // V6: separador del tiempo. Se escribe en los separadores existentes en vez de
+  // rehacer el DOM, para no perder las animaciones de digito en curso.
+  var separators = document.querySelectorAll('#counter .digit-sep');
+  if (separators.length > 0 && separators[0].textContent !== next.timeSeparator) {
+    for (var s = 0; s < separators.length; s++) {
+      separators[s].textContent = next.timeSeparator;
+    }
+  }
+
+  // V5: medidor de progreso. El color vacio significa "el del contador", que es
+  // lo que hace que un cambio de look arrastre el medidor sin tocar nada mas.
+  var content = document.getElementById('frame-content');
+  if (content) {
+    content.classList.toggle('has-bar', next.progressStyle === 'bar');
+    content.classList.toggle('has-ring', next.progressStyle === 'ring');
+    {
+      content.style.setProperty('--progress-thickness', next.progressThicknessPx + 'px');
+      var ringColor = next.progressColor || next.counterColor || '#00FF88';
+      content.style.setProperty('--progress-color', ringColor);
+    }
+  }
+}
+
+window.addEventListener('resize', applyScale);
+
+/* === V11: particulas ========================================================
+   Un solo canvas, dibujado con rectangulos y lineas (sin imagenes), y un bucle
+   que se CANCELA cuando no hay particulas vivas: en reposo el coste es cero, no
+   un canvas vacio repintandose 60 veces por segundo.
+
+   Presupuesto duro y auto-apagado por FPS porque el entorno es hostil: OBS pone
+   sus procesos de browser source en «Efficiency Mode» y Windows los frena cuando
+   OBS pierde el foco (~80 % menos rendimiento, con reportes de 1-2 fps en
+   overlays transparentes). Las particulas son decoracion: si estorban, se apagan
+   y el reloj sigue siendo correcto. */
+var PARTICLE_STYLES = ['none', 'confetti', 'sparks', 'stars'];
+var BIG_EVENT_SECONDS = 50;    // umbral de "regalo grande"
+var FPS_WINDOW_MS = 3000;
+var FPS_LOW_THRESHOLD = 45;    // 75 % de 60
+var particleCanvas = null;
+var particleCtx = null;
+var particleRaf = null;
+var particleList = [];
+var particleLastTs = 0;
+var particleFrames = 0;
+var particleWindowStart = 0;
+var particleLowWindows = 0;
+var particleDensityStep = 0;
+var particleState = {
+  enabled: false, style: 'none', budget: 120, density: 1,
+  force: false, autoDisabled: false, counterColor: '#00FF88'
+};
+var sessionCompletedBurst = false;
+
+function particlePalette() {
+  var colors = [particleState.counterColor || '#00FF88'];
+  if (popupColors && popupColors.add) colors.push(popupColors.add);
+  if (popupColors && popupColors.subtract) colors.push(popupColors.subtract);
+  colors.push('#FFFFFF');
+  return colors;
+}
+
+function ensureParticleCanvas() {
+  var canvas = document.getElementById('particles');
+  if (canvas === null) return null;
+  if (canvas === particleCanvas && particleCtx !== null) return canvas;
+  // Tamaño en px de DISEÑO: el canvas vive dentro del lienzo escalado, asi que se
+  // escala con el y no hay que hacer cuentas de factor en cada particula.
+  var w = visualState.scaleMode === 'auto' ? (Number(visualState.canvasWidth) || 1920) : window.innerWidth;
+  var h = visualState.scaleMode === 'auto' ? (Number(visualState.canvasHeight) || 1080) : window.innerHeight;
+  canvas.width = Math.max(1, Math.round(w));
+  canvas.height = Math.max(1, Math.round(h));
+  particleCanvas = canvas;
+  particleCtx = canvas.getContext('2d');
+  return canvas;
+}
+
+function particleStateFrom(data) {
+  var style = data.particles_style || 'none';
+  if (PARTICLE_STYLES.indexOf(style) < 0) style = 'none';
+  var budget = isFinite(Number(data.particles_budget)) ? Number(data.particles_budget) : 120;
+  var density = isFinite(Number(data.particles_density)) ? Number(data.particles_density) : 1;
+  var enabled = data.particles_enabled === true && style !== 'none' && !particleState.autoDisabled;
+  if (!enabled && particleList.length > 0) {
+    particleList = [];
+    stopParticleLoop();
+  }
+  particleState.style = style;
+  particleState.budget = Math.max(10, Math.min(300, budget));
+  particleState.density = Math.max(0.25, Math.min(2, density)) * (particleDensityStep > 0 ? 0.5 : 1);
+  particleState.force = data.particles_force === true;
+  particleState.enabled = enabled;
+  particleState.counterColor = (data.counterStyle && data.counterStyle.font_color) || '#00FF88';
+}
+
+function counterBox() {
+  var el = document.getElementById('counter-wrap') || document.getElementById('counter');
+  if (el === null) return { x: 960, y: 540, w: 400, h: 160 };
+  var r = el.getBoundingClientRect();
+  var stage = document.getElementById('stage');
+  var sr = stage ? stage.getBoundingClientRect() : { left: 0, top: 0 };
+  var k = visualState.scaleMode === 'auto' && sr.width > 0
+    ? (Number(visualState.canvasWidth) || 1920) / sr.width
+    : 1;
+  return {
+    x: (r.left + r.width / 2 - sr.left) * k,
+    y: (r.top + r.height / 2 - sr.top) * k,
+    w: r.width * k,
+    h: r.height * k
+  };
+}
+
+function pushParticle(p) {
+  if (particleList.length >= particleState.budget) return;
+  particleList.push(p);
+}
+
+function emitParticles(kind) {
+  if (!particleState.enabled) return;
+  if (ensureParticleCanvas() === null || particleCtx === null) return;
+  var style = particleState.style;
+  if (style === 'none') return;
+  var box = counterBox();
+  var palette = particlePalette();
+  var big = kind === 'complete';
+  var count = Math.round((big ? 60 : 18) * particleState.density);
+  var i;
+  if (style === 'confetti') {
+    // Cae desde arriba del bloque: es la lectura clasica de "ha pasado algo bueno".
+    for (i = 0; i < count; i++) {
+      pushParticle({
+        kind: 'confetti',
+        x: box.x + (Math.random() - 0.5) * Math.max(box.w, 320) * 1.6,
+        y: box.y - box.h * (1.2 + Math.random() * 0.8),
+        vx: (Math.random() - 0.5) * 90,
+        vy: 60 + Math.random() * 120,
+        size: 7 + Math.random() * 7,
+        rot: Math.random() * Math.PI,
+        spin: (Math.random() - 0.5) * 8,
+        life: 1.1 + Math.random() * 0.7,
+        maxLife: 1.8,
+        color: palette[i % palette.length]
+      });
+    }
+  } else if (style === 'sparks') {
+    // Sale disparado desde el borde del contador hacia fuera.
+    for (i = 0; i < count; i++) {
+      var angle = -Math.PI + Math.random() * Math.PI;
+      var speed = 180 + Math.random() * 320;
+      pushParticle({
+        kind: 'spark',
+        x: box.x + Math.cos(angle) * box.w * 0.5,
+        y: box.y + Math.sin(angle) * box.h * 0.5,
+        vx: Math.cos(angle) * speed,
+        vy: Math.sin(angle) * speed * 0.6,
+        size: 8 + Math.random() * 14,
+        life: 0.5 + Math.random() * 0.4,
+        maxLife: 0.9,
+        color: palette[i % Math.max(1, palette.length - 1)]
+      });
+    }
+  } else if (style === 'stars') {
+    for (i = 0; i < count; i++) {
+      var a2 = Math.random() * Math.PI * 2;
+      var r2 = (0.5 + Math.random() * 0.8) * Math.max(box.w, box.h);
+      pushParticle({
+        kind: 'star',
+        x: box.x + Math.cos(a2) * box.w * 0.5,
+        y: box.y + Math.sin(a2) * box.h * 0.5,
+        vx: Math.cos(a2) * r2 * 0.6,
+        vy: Math.sin(a2) * r2 * 0.4,
+        size: 2 + Math.random() * 3,
+        life: 0.7 + Math.random() * 0.5,
+        maxLife: 1.2,
+        color: palette[i % palette.length]
+      });
+    }
+  }
+  startParticleLoop();
+}
+
+function drawParticle(ctx, p) {
+  var alpha = Math.max(0, Math.min(1, p.life / p.maxLife));
+  ctx.globalAlpha = alpha;
+  ctx.fillStyle = p.color;
+  ctx.strokeStyle = p.color;
+  if (p.kind === 'confetti') {
+    ctx.save();
+    ctx.translate(p.x, p.y);
+    ctx.rotate(p.rot);
+    ctx.fillRect(-p.size / 2, -p.size * 0.3, p.size, p.size * 0.6);
+    ctx.restore();
+  } else if (p.kind === 'spark') {
+    var len = Math.max(6, p.size);
+    var mag = Math.max(1, Math.sqrt(p.vx * p.vx + p.vy * p.vy));
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    ctx.moveTo(p.x, p.y);
+    ctx.lineTo(p.x - (p.vx / mag) * len, p.y - (p.vy / mag) * len);
+    ctx.stroke();
+  } else {
+    ctx.beginPath();
+    ctx.arc(p.x, p.y, p.size, 0, Math.PI * 2);
+    ctx.fill();
+  }
+}
+
+function stepParticles(ts) {
+  particleRaf = null;
+  if (particleCtx === null || particleCanvas === null) return;
+  var dt = particleLastTs > 0 ? Math.min(64, ts - particleLastTs) / 1000 : 0.016;
+  particleLastTs = ts;
+  particleCtx.clearRect(0, 0, particleCanvas.width, particleCanvas.height);
+  var alive = [];
+  for (var i = 0; i < particleList.length; i++) {
+    var p = particleList[i];
+    p.life -= dt;
+    if (p.life <= 0) continue;
+    p.x += p.vx * dt;
+    p.y += p.vy * dt;
+    if (p.kind === 'confetti') {
+      p.vy += 260 * dt;              // gravedad
+      p.rot += p.spin * dt;
+    } else {
+      p.vx *= (1 - 1.6 * dt);
+      p.vy *= (1 - 1.6 * dt);
+    }
+    drawParticle(particleCtx, p);
+    alive.push(p);
+  }
+  particleList = alive;
+  particleCtx.globalAlpha = 1;
+  measureParticleFps(ts);
+  if (particleList.length > 0) {
+    particleRaf = requestAnimationFrame(stepParticles);
+  } else {
+    particleLastTs = 0;
+    particleCtx.clearRect(0, 0, particleCanvas.width, particleCanvas.height);
+  }
+}
+
+function startParticleLoop() {
+  if (particleRaf !== null) return;
+  particleRaf = requestAnimationFrame(stepParticles);
+}
+
+function stopParticleLoop() {
+  if (particleRaf !== null) {
+    cancelAnimationFrame(particleRaf);
+    particleRaf = null;
+  }
+  particleLastTs = 0;
+  if (particleCtx !== null && particleCanvas !== null) {
+    particleCtx.clearRect(0, 0, particleCanvas.width, particleCanvas.height);
+  }
+}
+
+// Auto-apagado: primero baja un escalon la densidad, y si sigue sin dar, apaga.
+function measureParticleFps(ts) {
+  if (particleWindowStart === 0) {
+    particleWindowStart = ts;
+    particleFrames = 0;
+    return;
+  }
+  particleFrames++;
+  var elapsed = ts - particleWindowStart;
+  if (elapsed < FPS_WINDOW_MS) return;
+  var fps = (particleFrames * 1000) / elapsed;
+  particleWindowStart = ts;
+  particleFrames = 0;
+  if (particleState.force) return;   // el operador las ha forzado: no se tocan
+  if (fps >= FPS_LOW_THRESHOLD) {
+    particleLowWindows = 0;
+    return;
+  }
+  particleLowWindows++;
+  if (particleLowWindows >= 2 && particleDensityStep === 0) {
+    particleDensityStep = 1;
+    particleState.density = Math.max(0.25, particleState.density * 0.5);
+  } else if (particleLowWindows >= 4) {
+    particleState.autoDisabled = true;
+    particleState.enabled = false;
+    stopParticleLoop();
+    showPerfNotice(Math.round(fps));
+    console.warn('[overlay] particulas desactivadas por rendimiento: ' + Math.round(fps) + ' fps');
+  }
+}
+
+function showPerfNotice(fps) {
+  var el = document.getElementById('perf-notice');
+  if (el === null) return;
+  el.textContent = 'Particulas off por rendimiento (' + fps + ' fps)';
+  el.classList.add('visible');
+}
+
+
 // F3.1: schedulePoll se llama SOLO dentro de finally() para evitar el bug
 // autodestructivo donde cada fetch es abortado por el siguiente antes de
 // completarse. El backoff adaptativo asi toma efecto real en el siguiente poll.
@@ -667,6 +1492,39 @@ function schedulePoll() { setTimeout(updateOverlay, pollDelay); }
 
 schedulePoll();
 
+// V5: pinta el medidor. La referencia es el tope configurado y, si no hay tope,
+// el tiempo inicial: es lo que hace que una barra signifique algo.
+function updateProgress(remaining, data) {
+  var progress = document.getElementById('progress-bar');
+  var ring = document.getElementById('progress-ring');
+  if (!progress || !ring || visualState.progressStyle === 'none') return;
+  var max = Number(data && data.max_time_s) || 0;
+  if (!(max > 0)) {
+    max = Number(data && data.initial_seconds) || 0;
+  }
+  if (!(max > 0)) {
+    progress.style.setProperty('--progress-pct', '0%');
+    ring.style.setProperty('--progress-angle', '0deg');
+    return;
+  }
+  var ratio = Math.max(0, Math.min(1, Number(remaining) / max));
+  progress.style.setProperty('--progress-pct', (ratio * 100).toFixed(2) + '%');
+  ring.style.setProperty('--progress-angle', (ratio * 360).toFixed(2) + 'deg');
+}
+
+// V6: las horas se ocultan SOLO mientras valgan 00. Si el reloj pasa de una hora,
+// vuelven: ocultarlas pintaria "12:00" para algo que dura mas de una hora.
+function applyHoursVisibility(digitStr) {
+  var counterEl = document.getElementById('counter');
+  if (!counterEl) return;
+  if (visualState.showHours) {
+    counterEl.classList.remove('hide-hours');
+    return;
+  }
+  var hours = String(digitStr || '').slice(0, 2);
+  counterEl.classList.toggle('hide-hours', hours === '00');
+}
+
 function updateOverlay() {
   if (abortController) { abortController.abort(); }
   abortController = new AbortController();
@@ -686,6 +1544,11 @@ function updateOverlay() {
       const previewBadge = document.getElementById('preview-badge');
       const errorEl = document.getElementById('connection-error');
       if (errorEl) errorEl.style.display = 'none';
+
+      // Fase 5: motor visual (escala, marco, adornos y contorno) antes de pintar
+      // textos, para que el escalado ya este aplicado cuando se mide el layout.
+      applyVisualEngine(data);
+      lastStateData = data;
 
       // Session switch
       if (data.sessionId !== undefined && data.sessionId !== currentSessionId) {
@@ -750,6 +1613,7 @@ function updateOverlay() {
           lastDigits[di] = '-';
         }
         setCounterState(counterEl, null, localCounterEffectName);
+        updateProgress(0, data);
         bannerEl.classList.remove('visible');
         pollDelay = Math.max(1000, pollDelay * 0.5);
       } else if (data.paused) {
@@ -758,6 +1622,7 @@ function updateOverlay() {
         showDaysLabel(parsedPaused.days);
         renderDigits(parsedPaused.time.replace(/:/g, ''), currentDigitEffect);
         setCounterState(counterEl, 'warning', localCounterEffectName);
+        updateProgress(data.remainingSeconds, data);
         bannerEl.classList.remove('visible');
         pollDelay = Math.max(1000, pollDelay * 0.5);
       } else if (data.completed) {
@@ -770,10 +1635,17 @@ function updateOverlay() {
         bannerEl.style.color = completedStyle.color;
         bannerEl.style.fontSize = completedStyle.size + 'px';
         bannerEl.classList.add('visible');
+        updateProgress(0, data);
+        // V11: una sola celebracion por finalizacion, no una por cada poll.
+        if (!sessionCompletedBurst) {
+          sessionCompletedBurst = true;
+          emitParticles('complete');
+        }
         pollDelay = Math.max(1000, pollDelay * 0.5);
       } else {
         // Running — iniciar o resincronizar reloj local
         startLocalClock(data.remainingSeconds);
+        sessionCompletedBurst = false;
         // F3.3: polling relajado a 3s cuando el reloj local mantiene la fluidez
         pollDelay = Math.max(3000, pollDelay * 0.75);
         // No renderizar digitos aqui — el reloj local lo hace via RAF
@@ -787,6 +1659,9 @@ function updateOverlay() {
             showPopup(ev.icon, ev.label, ev.delta);
             if (ev.id) lastShownEventId = ev.id;
             if (ev.isAddition && ev.delta > 0) { playAddSound(data); triggerCounterBump(); }
+            // V11: solo los regalos grandes sueltan particulas. 200 coins
+            // pequenas no pueden soltar 200 estallidos.
+            if (ev.isAddition && ev.delta >= BIG_EVENT_SECONDS) { emitParticles('event'); }
           }
         });
       }
@@ -834,12 +1709,15 @@ function renderDigits(digitStr, effect) {
   if (str.length > digits.length) {
     str = str.slice(str.length - digits.length);
   }
+  applyHoursVisibility(str);
   for (var i = 0; i < digits.length; i++) {
     var newChar = i < str.length ? str[i] : '0';
     if (lastDigits[i] !== newChar) {
       digits[i].textContent = newChar;
       if (effect && effect !== 'none') {
-        digits[i].classList.remove('digit-flip', 'digit-roll', 'digit-pop', 'digit-fade');
+        digits[i].classList.remove(
+          'digit-flip', 'digit-roll', 'digit-pop', 'digit-fade',
+          'digit-odometer', 'digit-typewriter', 'digit-blur');
         void digits[i].offsetWidth;
         digits[i].classList.add('digit-' + effect);
       }

@@ -1,3 +1,4 @@
+#include <atomic>
 #include <chrono>
 #include <cstdio>
 #include <filesystem>
@@ -6,22 +7,28 @@
 
 #include "games/live_timer_game.hpp"
 #include "platform/panel_app.hpp"
+#include "platform/wall_clock.h"
+#include "platform/win_http_client.hpp"
 #include "test_require.hpp"
 #include "test_support.hpp"
 
-static void cleanup_stale_timer_save() {
-    // ctest ejecuta tests en orden alfabetico y comparte %TEMP%.
-    // Un save stale de otro test (o ejecucion anterior) puede
-    // contaminar el estado del timer al cargarlo.
-    const char* tmp = std::getenv("TEMP");
-    if (!tmp) tmp = "C:\\Windows\\Temp";
-    auto save_path = std::filesystem::path(tmp) / "NisojeStudio" / "live_timer_save.json";
+// V2: el estado del timer ya no vive en %TEMP% sino en %LOCALAPPDATA%. Ese es
+// el estado REAL del usuario: este test no debe leerlo ni pisarlo, y ademas su
+// resultado no puede depender de lo que el usuario tenga guardado. Se aisla el
+// directorio via NLP3_TIMER_STATE_DIR.
+static std::filesystem::path setup_isolated_timer_state_dir() {
     std::error_code ec;
-    std::filesystem::remove(save_path, ec);
+    auto dir = std::filesystem::temp_directory_path(ec) / "nlp3_live_timer_state";
+    std::filesystem::remove_all(dir, ec);
+    std::filesystem::create_directories(dir, ec);
+#ifdef _WIN32
+    _putenv_s("NLP3_TIMER_STATE_DIR", dir.string().c_str());
+#endif
+    return dir;
 }
 
 int main() {
-    cleanup_stale_timer_save();
+    const auto timer_state_dir = setup_isolated_timer_state_dir();
     std::puts("live_timer_api_smoke cp1: standalone timer works");
     std::fflush(stdout);
 
@@ -67,7 +74,11 @@ int main() {
         NLP3_TEST_REQUIRE(!snapshot.timer.running);
         NLP3_TEST_REQUIRE(snapshot.timer.enabled);
         NLP3_TEST_REQUIRE(!snapshot.timer.paused);
-        NLP3_TEST_REQUIRE(snapshot.timer.remaining_seconds > 0.0);
+        // V2: sin tiempo configurado el timer arranca en CERO (antes habia un
+        // default de 5 minutos). El snapshot debe seguir siendo coherente y no
+        // puede quedar corriendo solo.
+        NLP3_TEST_REQUIRE(snapshot.timer.remaining_seconds == 0.0);
+        NLP3_TEST_REQUIRE(!snapshot.timer.running);
         NLP3_TEST_REQUIRE(!snapshot.timer.remaining_formatted.empty());
         NLP3_TEST_REQUIRE(!snapshot.timer.overlay_url.empty());
         NLP3_TEST_REQUIRE(snapshot.timer.overlay_url.find("/overlay/live-timer") != std::string::npos);
@@ -150,6 +161,183 @@ int main() {
 
         panel_app.stop_http_ui();
     }
+
+    std::puts("live_timer_api_smoke cp6: el tiempo sobrevive al cierre del panel");
+    std::fflush(stdout);
+
+    {
+        const auto config_path = nlp3::testsupport::write_temp_panel_config(
+            "nlp3_live_timer_persist_config.json",
+            []() {
+                nlp3::platform::PanelConfig config{};
+                config.bridge_mode = "stub";
+                config.bridge.stub_mode = true;
+                config.bridge.source_name = "tiktok-stub";
+                config.default_game_id = "event-counter";
+                return config;
+            }());
+
+        // 1) Configurar 600s, arrancar y guardar: es lo que hace el cierre del
+        //    panel a mitad de cuenta.
+        {
+            nlp3::platform::PanelApp app;
+            NLP3_TEST_REQUIRE(app.initialize(config_path.string()));
+            auto* timer = app.live_timer();
+            NLP3_TEST_REQUIRE(timer != nullptr);
+
+            auto cfg = timer->default_config();
+            cfg.set("initial_time_s", 600.0);
+            timer->apply_config(cfg);
+            timer->on_activated();
+            NLP3_TEST_REQUIRE(timer->is_running());
+            NLP3_TEST_REQUIRE(timer->is_enabled());
+
+            NLP3_TEST_REQUIRE(app.save_timer_state());
+        }
+
+        // 2) Reabrir: el tiempo se CONSERVA y el timer NO arranca solo.
+        {
+            nlp3::platform::PanelApp app2;
+            NLP3_TEST_REQUIRE(app2.initialize(config_path.string()));
+            auto* timer2 = app2.live_timer();
+            NLP3_TEST_REQUIRE(timer2 != nullptr);
+
+            NLP3_TEST_REQUIRE(!timer2->is_running());   // espera a Iniciar
+            const double restored = timer2->remaining_seconds();
+            NLP3_TEST_REQUIRE(restored > 595.0);
+            NLP3_TEST_REQUIRE(restored <= 600.0);
+
+            // Pulsar Iniciar CONTINUA desde el valor restaurado y lo hace
+            // visible (no vuelve al tiempo inicial ni se queda oculto).
+            timer2->on_activated();
+            NLP3_TEST_REQUIRE(timer2->is_running());
+            NLP3_TEST_REQUIRE(timer2->is_enabled());
+            NLP3_TEST_REQUIRE(timer2->remaining_seconds() > 595.0);
+        }
+    }
+
+    std::puts("live_timer_api_smoke cp7: el motor visual viaja por HTTP (ida y vuelta)");
+    std::fflush(stdout);
+
+    // Fase 5: este checkpoint existe porque el mapeo de claves del config es
+    // EXPLICITO en los dos lados (GET /api/timer/config y POST
+    // /api/timer/configure). Una clave que falte en cualquiera de los dos se
+    // ignora en silencio: el operador la configura y no pasa nada. Sin una prueba
+    // por HTTP, ese fallo no lo ve nadie hasta que se queja.
+    {
+        const auto config_path = nlp3::testsupport::write_temp_panel_config(
+            "nlp3_live_timer_visual_http_config.json",
+            []() {
+                nlp3::platform::PanelConfig config{};
+                config.bridge_mode = "stub";
+                config.bridge.stub_mode = true;
+                config.bridge.source_name = "tiktok-stub";
+                config.default_game_id = "event-counter";
+                return config;
+            }());
+
+        nlp3::platform::PanelApp app;
+        NLP3_TEST_REQUIRE(app.initialize(config_path.string()));
+        NLP3_TEST_REQUIRE(app.start_http_ui(19123));
+        std::this_thread::sleep_for(std::chrono::milliseconds(400));
+
+        const std::string base = "http://127.0.0.1:19123";
+
+        // El servidor HTTP del panel es cooperativo: acepta y responde dentro de
+        // PanelApp::tick(), asi que la peticion tiene que ir en otro hilo mientras
+        // el principal bombea. Sin esto la peticion se queda esperando y el test
+        // mediria un timeout, no el contrato.
+        const auto pump_request = [&app](const std::string& method, const std::string& url,
+                                         const std::string& body) {
+            nlp3::platform::HttpResponse response{};
+            std::atomic<bool> finished{false};
+            std::thread worker([&]() {
+                response = nlp3::platform::http_request(
+                    method, url, body, body.empty() ? std::string_view{} : std::string_view{"application/json"}, {});
+                finished.store(true);
+            });
+            const auto deadline = std::chrono::steady_clock::now() + std::chrono::seconds(8);
+            while (!finished.load() && std::chrono::steady_clock::now() < deadline) {
+                app.tick(nlp3::platform::now_wall_clock_ms());
+                std::this_thread::sleep_for(std::chrono::milliseconds(2));
+            }
+            worker.join();
+            return response;
+        };
+
+        const std::string hud_body = R"JSON({
+            "frame_style": "neon", "frame_brackets": true, "frame_grid": true,
+            "frame_scanlines": true, "frame_color": "#00FFFF", "frame_opacity": 55,
+            "frame_border_px": 1, "frame_radius_px": 4, "frame_padding_px": 36,
+            "text_outline_px": 2, "text_outline_color": "#001018",
+            "time_separator": ".", "show_hours": false,
+            "warn_seconds": 120, "danger_seconds": 30, "danger_effect": "glitch",
+            "progress_style": "bar", "progress_thickness_px": 8, "progress_color": "#00FFFF",
+            "scale_mode": "auto", "canvas_width": 1920, "canvas_height": 1080,
+            "particles_enabled": true, "particles_style": "sparks",
+            "particles_budget": 80, "particles_density": 1.5, "particles_force": true
+        })JSON";
+
+        const auto post = pump_request("POST", base + "/api/timer/configure", hud_body);
+        std::printf("  cp7 POST configure -> %d %s\n", post.status_code, post.error.c_str());
+        std::fflush(stdout);
+        NLP3_TEST_REQUIRE(post.status_code == 200);
+
+        const auto get = pump_request("GET", base + "/api/timer/config", {});
+        NLP3_TEST_REQUIRE(get.status_code == 200);
+        const auto contains = [&get](const std::string& needle) {
+            return get.body.find(needle) != std::string::npos;
+        };
+        NLP3_TEST_REQUIRE(contains("\"frame_style\":\"neon\""));
+        NLP3_TEST_REQUIRE(contains("\"frame_brackets\":true"));
+        NLP3_TEST_REQUIRE(contains("\"frame_grid\":true"));
+        NLP3_TEST_REQUIRE(contains("\"frame_scanlines\":true"));
+        NLP3_TEST_REQUIRE(contains("\"frame_color\":\"#00FFFF\""));
+        NLP3_TEST_REQUIRE(contains("\"frame_opacity\":55"));
+        NLP3_TEST_REQUIRE(contains("\"frame_padding_px\":36"));
+        NLP3_TEST_REQUIRE(contains("\"text_outline_px\":2"));
+        NLP3_TEST_REQUIRE(contains("\"text_outline_color\":\"#001018\""));
+        NLP3_TEST_REQUIRE(contains("\"time_separator\":\".\""));
+        NLP3_TEST_REQUIRE(contains("\"show_hours\":false"));
+        NLP3_TEST_REQUIRE(contains("\"warn_seconds\":120"));
+        NLP3_TEST_REQUIRE(contains("\"danger_seconds\":30"));
+        NLP3_TEST_REQUIRE(contains("\"danger_effect\":\"glitch\""));
+        NLP3_TEST_REQUIRE(contains("\"progress_style\":\"bar\""));
+        NLP3_TEST_REQUIRE(contains("\"progress_thickness_px\":8"));
+        NLP3_TEST_REQUIRE(contains("\"progress_color\":\"#00FFFF\""));
+        NLP3_TEST_REQUIRE(contains("\"scale_mode\":\"auto\""));
+        NLP3_TEST_REQUIRE(contains("\"canvas_width\":1920"));
+        NLP3_TEST_REQUIRE(contains("\"canvas_height\":1080"));
+        NLP3_TEST_REQUIRE(contains("\"particles_enabled\":true"));
+        NLP3_TEST_REQUIRE(contains("\"particles_style\":\"sparks\""));
+        NLP3_TEST_REQUIRE(contains("\"particles_budget\":80"));
+        NLP3_TEST_REQUIRE(contains("\"particles_force\":true"));
+
+        // Y los valores absurdos no pasan la puerta del HTTP.
+        const std::string junk_body = R"JSON({
+            "canvas_width": 0, "frame_opacity": 500, "particles_budget": 99999,
+            "progress_thickness_px": 0, "text_outline_px": 99
+        })JSON";
+        const auto post_junk = pump_request("POST", base + "/api/timer/configure", junk_body);
+        NLP3_TEST_REQUIRE(post_junk.status_code == 200);
+
+        const auto get2 = pump_request("GET", base + "/api/timer/config", {});
+        NLP3_TEST_REQUIRE(get2.status_code == 200);
+        const auto contains2 = [&get2](const std::string& needle) {
+            return get2.body.find(needle) != std::string::npos;
+        };
+        NLP3_TEST_REQUIRE(!contains2("\"canvas_width\":0"));
+        NLP3_TEST_REQUIRE(contains2("\"canvas_width\":320"));
+        NLP3_TEST_REQUIRE(contains2("\"frame_opacity\":100"));
+        NLP3_TEST_REQUIRE(contains2("\"particles_budget\":300"));
+        NLP3_TEST_REQUIRE(contains2("\"progress_thickness_px\":1"));
+        NLP3_TEST_REQUIRE(contains2("\"text_outline_px\":8"));
+
+        app.stop_http_ui();
+    }
+
+    std::error_code cleanup_ec;
+    std::filesystem::remove_all(timer_state_dir, cleanup_ec);
 
     std::puts("live_timer_api_smoke PASSED");
     std::fflush(stdout);

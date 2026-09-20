@@ -52,6 +52,16 @@ logging:
   level: INFO
   log_path: tools/bridge_py/logs/bridge.jsonl
 
+sound_alerts:
+  # Alertas sonoras en los cambios de estado de conexion (conectar/desconectar/
+  # reconectar). enabled=false las desactiva por completo.
+  enabled: true
+  # require_panel=true (por defecto) las silencia cuando el panel no esta
+  # conectado: la alerta avisa al operador que mira el panel, asi que sin panel
+  # no hay destinatario. Ponlo en false para recuperar el aviso incondicional
+  # (era el comportamiento anterior, que pitaba con el panel cerrado).
+  require_panel: true
+
 legacy_bridge_root: ""
 max_events: 0
 max_seconds: 0

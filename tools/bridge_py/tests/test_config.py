@@ -75,6 +75,41 @@ class BridgeConfigTests(unittest.TestCase):
 
         self.assertEqual(config.connection_mode, "direct")
 
+    def test_sound_alerts_default_to_requiring_a_panel(self) -> None:
+        """Por defecto se silencian sin panel: es el pitido con el panel cerrado."""
+        with patch.dict("os.environ", {}, clear=True):
+            config = load_bridge_config(Path("missing-bridge-config.yaml"))
+
+        self.assertTrue(config.sound_alerts.enabled)
+        self.assertTrue(config.sound_alerts.require_panel)
+
+    def test_load_bridge_config_reads_sound_alerts_section(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            config_path = Path(temp_dir) / "bridge_config.yaml"
+            config_path.write_text(
+                textwrap.dedent(
+                    """
+                    sound_alerts:
+                      enabled: false
+                      require_panel: false
+                    """
+                ).strip(),
+                encoding="utf-8",
+            )
+            config = load_bridge_config(config_path)
+
+        self.assertFalse(config.sound_alerts.enabled)
+        self.assertFalse(config.sound_alerts.require_panel)
+
+    def test_sound_alerts_env_override_wins_over_yaml(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            config_path = Path(temp_dir) / "bridge_config.yaml"
+            config_path.write_text("sound_alerts:\n  enabled: true\n", encoding="utf-8")
+            with patch.dict("os.environ", {"LIVEPANEL_BRIDGE_SOUND_ALERTS_ENABLED": "false"}, clear=True):
+                config = load_bridge_config(config_path)
+
+        self.assertFalse(config.sound_alerts.enabled)
+
 
 if __name__ == "__main__":
     unittest.main()

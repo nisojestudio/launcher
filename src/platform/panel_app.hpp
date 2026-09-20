@@ -127,6 +127,12 @@ public:
     bool start_http_ui(std::uint16_t port = 8080);
     void stop_http_ui();
     PanelHttpServerStatus http_ui_status() const;
+    /// Fase 3: puerto del listener "solo overlay" que se expone por el tunel.
+    /// 0 cuando no esta activo. Nunca es el puerto de la UI del panel.
+    std::uint16_t overlay_tunnel_status_port() const noexcept;
+    /// Fase 3: publica en el Worker la URL base del tunel vigente. Best-effort:
+    /// si falla, el panel sigue arrancando igual (nunca bloquea ni lanza).
+    bool publish_overlay_session(const std::string& public_base_url);
     bool submit_external_ws_payload(const std::string& payload);
     bridge::TikTokExternalInboxResult process_external_inbox(const std::string& inbox_dir);
     bridge::TikTokExternalInboxResult process_external_inbox_and_tick(
@@ -197,6 +203,13 @@ private:
     std::unique_ptr<ExternalBridgeRunner> external_runner_{};
     std::unique_ptr<ExternalGameBridgeRunner> external_game_bridge_runner_{};
     std::unique_ptr<PanelHttpServer> http_ui_server_{};
+    /// Fase 3: segundo listener, loopback y efimero, que solo sirve
+    /// `/api/overlay/*`. Es el unico que se publica por el tunel, de modo que
+    /// `/api/state`, la licencia, las metricas y la UI no quedan expuestos.
+    std::unique_ptr<PanelHttpServer> overlay_tunnel_server_{};
+    /// Fase 3: URL publica base del tunel vigente. Es estado de ejecucion, no
+    /// configuracion del usuario: nunca se persiste en panel_config.json.
+    std::string overlay_public_base_url_{};
 
     std::unique_ptr<tts::ITtsBackend> tts_backend_{};
     std::unique_ptr<tts::HostTtsService> tts_service_{};

@@ -174,14 +174,21 @@ std::string request_header(const ParsedRequest& request, std::string_view name) 
 std::string make_http_response(
     std::string_view status_line,
     std::string_view content_type,
-    std::string body) {
+    std::string body,
+    std::string_view extra_headers = {}) {
     std::ostringstream output;
     output << "HTTP/1.1 " << status_line << "\r\n"
            << "Content-Type: " << content_type << "\r\n"
            << "Content-Length: " << body.size() << "\r\n"
            << "Connection: close\r\n"
-           << "Cache-Control: no-store\r\n"
-           << "\r\n"
+           << "Cache-Control: no-store\r\n";
+    if (!extra_headers.empty()) {
+        output << extra_headers;
+        if (extra_headers.back() != '\n') {
+            output << "\r\n";
+        }
+    }
+    output << "\r\n"
            << body;
     return output.str();
 }
@@ -1030,7 +1037,38 @@ std::string build_live_timer_config_json(const nlp3::games::LiveTimerGame* game)
     add("glow_intensity_px"); out << ",";
     add("pulse_speed_s"); out << ",";
     add("digit_effect"); out << ",";
-    add("color_preset");
+    add("color_preset"); out << ",";
+    // Fase 5 — motor visual (escala, marco, adornos, contorno, tiempo, estados,
+    // medidor y particulas). Estas claves tienen que aparecer AQUI y en
+    // handle_timer_configure: el mapeo es explicito, asi que una clave que falte
+    // en cualquiera de los dos lados se ignora en silencio.
+    add("scale_mode"); out << ",";
+    add("canvas_width"); out << ",";
+    add("canvas_height"); out << ",";
+    add("frame_style"); out << ",";
+    add("frame_color"); out << ",";
+    add("frame_opacity"); out << ",";
+    add("frame_border_px"); out << ",";
+    add("frame_radius_px"); out << ",";
+    add("frame_padding_px"); out << ",";
+    add("frame_brackets"); out << ",";
+    add("frame_grid"); out << ",";
+    add("frame_scanlines"); out << ",";
+    add("text_outline_px"); out << ",";
+    add("text_outline_color"); out << ",";
+    add("time_separator"); out << ",";
+    add("show_hours"); out << ",";
+    add("warn_seconds"); out << ",";
+    add("danger_seconds"); out << ",";
+    add("danger_effect"); out << ",";
+    add("progress_style"); out << ",";
+    add("progress_thickness_px"); out << ",";
+    add("progress_color"); out << ",";
+    add("particles_enabled"); out << ",";
+    add("particles_style"); out << ",";
+    add("particles_budget"); out << ",";
+    add("particles_density"); out << ",";
+    add("particles_force");
     out << "}";
     return out.str();
 }
@@ -1063,7 +1101,10 @@ std::string handle_timer_configure(PanelApp* app, std::string_view body) {
     if (maybe_bool.has_value()) config.set("on_complete_repeat", *maybe_bool);
 
     auto maybe_d = parse_json_double(body, "initial_time_s");
-    if (maybe_d.has_value()) config.set("initial_time_s", std::clamp(*maybe_d, 1.0, 31536000.0));
+    // V2: min 0.0 (antes 1.0) para que "sin tiempo configurado" sea un estado
+    // valido y persistible: el timer arranca en cero hasta que el usuario
+    // configure, en vez de forzar un minimo de 1 segundo.
+    if (maybe_d.has_value()) config.set("initial_time_s", std::clamp(*maybe_d, 0.0, 31536000.0));
     maybe_d = parse_json_double(body, "max_time_s");
     if (maybe_d.has_value()) config.set("max_time_s", std::clamp(*maybe_d, 0.0, 31536000.0));
     maybe_d = parse_json_double(body, "time_per_like_s");
@@ -1158,6 +1199,71 @@ std::string handle_timer_configure(PanelApp* app, std::string_view body) {
     if (maybe_str.has_value()) config.set("digit_effect", *maybe_str);
     maybe_str = parse_json_string(body, "color_preset");
     if (maybe_str.has_value()) config.set("color_preset", *maybe_str);
+
+    // === Fase 5: motor visual ================================================
+    // Los limites se repiten aqui a proposito: el motor tambien los aplica, pero
+    // el HTTP no puede ser la puerta por la que entra un lienzo de 0 o una
+    // opacidad de 500. Un clamp en cada capa, no en una sola.
+    maybe_str = parse_json_string(body, "scale_mode");
+    if (maybe_str.has_value()) config.set("scale_mode", *maybe_str);
+    maybe_i64 = parse_json_uint64(body, "canvas_width");
+    if (maybe_i64.has_value()) config.set("canvas_width", static_cast<std::int64_t>(std::clamp<uint64_t>(*maybe_i64, 320, 7680)));
+    maybe_i64 = parse_json_uint64(body, "canvas_height");
+    if (maybe_i64.has_value()) config.set("canvas_height", static_cast<std::int64_t>(std::clamp<uint64_t>(*maybe_i64, 320, 7680)));
+
+    maybe_str = parse_json_string(body, "frame_style");
+    if (maybe_str.has_value()) config.set("frame_style", *maybe_str);
+    maybe_str = parse_json_string(body, "frame_color");
+    if (maybe_str.has_value()) config.set("frame_color", *maybe_str);
+    maybe_i64 = parse_json_uint64(body, "frame_opacity");
+    if (maybe_i64.has_value()) config.set("frame_opacity", static_cast<std::int64_t>(std::clamp<uint64_t>(*maybe_i64, 0, 100)));
+    maybe_i64 = parse_json_uint64(body, "frame_border_px");
+    if (maybe_i64.has_value()) config.set("frame_border_px", static_cast<std::int64_t>(std::clamp<uint64_t>(*maybe_i64, 0, 12)));
+    maybe_i64 = parse_json_uint64(body, "frame_radius_px");
+    if (maybe_i64.has_value()) config.set("frame_radius_px", static_cast<std::int64_t>(std::clamp<uint64_t>(*maybe_i64, 0, 64)));
+    maybe_i64 = parse_json_uint64(body, "frame_padding_px");
+    if (maybe_i64.has_value()) config.set("frame_padding_px", static_cast<std::int64_t>(std::clamp<uint64_t>(*maybe_i64, 0, 120)));
+    maybe_bool = parse_json_bool(body, "frame_brackets");
+    if (maybe_bool.has_value()) config.set("frame_brackets", *maybe_bool);
+    maybe_bool = parse_json_bool(body, "frame_grid");
+    if (maybe_bool.has_value()) config.set("frame_grid", *maybe_bool);
+    maybe_bool = parse_json_bool(body, "frame_scanlines");
+    if (maybe_bool.has_value()) config.set("frame_scanlines", *maybe_bool);
+
+    maybe_i64 = parse_json_uint64(body, "text_outline_px");
+    if (maybe_i64.has_value()) config.set("text_outline_px", static_cast<std::int64_t>(std::clamp<uint64_t>(*maybe_i64, 0, 8)));
+    maybe_str = parse_json_string(body, "text_outline_color");
+    if (maybe_str.has_value()) config.set("text_outline_color", *maybe_str);
+
+    maybe_str = parse_json_string(body, "time_separator");
+    if (maybe_str.has_value()) config.set("time_separator", maybe_str->substr(0, 4));
+    maybe_bool = parse_json_bool(body, "show_hours");
+    if (maybe_bool.has_value()) config.set("show_hours", *maybe_bool);
+
+    maybe_i64 = parse_json_uint64(body, "warn_seconds");
+    if (maybe_i64.has_value()) config.set("warn_seconds", static_cast<std::int64_t>(std::clamp<uint64_t>(*maybe_i64, 0, 3600)));
+    maybe_i64 = parse_json_uint64(body, "danger_seconds");
+    if (maybe_i64.has_value()) config.set("danger_seconds", static_cast<std::int64_t>(std::clamp<uint64_t>(*maybe_i64, 0, 3600)));
+    maybe_str = parse_json_string(body, "danger_effect");
+    if (maybe_str.has_value()) config.set("danger_effect", *maybe_str);
+
+    maybe_str = parse_json_string(body, "progress_style");
+    if (maybe_str.has_value()) config.set("progress_style", *maybe_str);
+    maybe_i64 = parse_json_uint64(body, "progress_thickness_px");
+    if (maybe_i64.has_value()) config.set("progress_thickness_px", static_cast<std::int64_t>(std::clamp<uint64_t>(*maybe_i64, 1, 40)));
+    maybe_str = parse_json_string(body, "progress_color");
+    if (maybe_str.has_value()) config.set("progress_color", *maybe_str);
+
+    maybe_bool = parse_json_bool(body, "particles_enabled");
+    if (maybe_bool.has_value()) config.set("particles_enabled", *maybe_bool);
+    maybe_str = parse_json_string(body, "particles_style");
+    if (maybe_str.has_value()) config.set("particles_style", *maybe_str);
+    maybe_i64 = parse_json_uint64(body, "particles_budget");
+    if (maybe_i64.has_value()) config.set("particles_budget", static_cast<std::int64_t>(std::clamp<uint64_t>(*maybe_i64, 10, 300)));
+    maybe_d = parse_json_double(body, "particles_density");
+    if (maybe_d.has_value()) config.set("particles_density", std::clamp(*maybe_d, 0.25, 2.0));
+    maybe_bool = parse_json_bool(body, "particles_force");
+    if (maybe_bool.has_value()) config.set("particles_force", *maybe_bool);
 
     // T3.1: capture the requested config snapshot so we can compare against the
     // effective post-apply config and report normalization/clamps to the caller.
@@ -1694,12 +1800,42 @@ std::string handle_diagnostics_ports(PanelApp* app) {
     return out.str();
 }
 
+/// Fase 3: rutas que si puede servir el listener expuesto por el tunel.
+/// Todo lo demas (UI, /api/state, licencia, metricas, /status) queda fuera.
+bool is_overlay_only_path(std::string_view path) {
+    return path.rfind("/api/overlay/", 0) == 0 || path == "/health";
+}
+
+/// Cabeceras CORS del endpoint de estado del overlay, consumido por la pagina
+/// estatica publica desde otro origen.
+constexpr std::string_view kOverlayCorsHeaders =
+    "Access-Control-Allow-Origin: *\r\nVary: Origin\r\n";
+
 std::string build_route_response(
     PanelApp* app,
     const ParsedRequest& request,
-    const PanelHttpServerStatus& status) {
+    const PanelHttpServerStatus& status,
+    bool overlay_only) {
     if (!request_origin_allowed(request, status)) {
         return make_http_response("403 Forbidden", "application/json; charset=utf-8", make_origin_forbidden_result());
+    }
+
+    if (overlay_only) {
+        if (request.method == "OPTIONS" && is_overlay_only_path(request.path)) {
+            return make_http_response(
+                "204 No Content",
+                "text/plain; charset=utf-8",
+                {},
+                "Access-Control-Allow-Origin: *\r\n"
+                "Access-Control-Allow-Methods: GET, OPTIONS\r\n"
+                "Access-Control-Max-Age: 600\r\n");
+        }
+        if (!is_overlay_only_path(request.path)) {
+            return make_http_response(
+                "404 Not Found",
+                "application/json; charset=utf-8",
+                "{\"error\":\"not_found\"}");
+        }
     }
 
     if (request.method == "GET" && request.path == "/") {
@@ -1751,10 +1887,22 @@ std::string build_route_response(
         return make_http_response("200 OK", "text/html; charset=utf-8", std::string(nlp3::platform::panel_overlay_live_timer_html()));
     }
     if (request.method == "GET" && request.path == "/api/overlay/live-timer/state") {
+        // Fase 3: esta respuesta la consume la pagina estatica publica
+        // (https://nisoje.com/overlay/live-timer) desde otro origen, asi que
+        // necesita CORS para que el fetch del navegador la pueda leer. Es un GET
+        // de solo lectura con datos que ya se emiten en directo en el stream.
         if (app == nullptr) {
-            return make_http_response("200 OK", "application/json; charset=utf-8", nlp3::platform::build_live_timer_state_json(nullptr));
+            return make_http_response(
+                "200 OK",
+                "application/json; charset=utf-8",
+                nlp3::platform::build_live_timer_state_json(nullptr),
+                kOverlayCorsHeaders);
         }
-        return make_http_response("200 OK", "application/json; charset=utf-8", nlp3::platform::build_live_timer_state_json(app->live_timer()));
+        return make_http_response(
+            "200 OK",
+            "application/json; charset=utf-8",
+            nlp3::platform::build_live_timer_state_json(app->live_timer()),
+            kOverlayCorsHeaders);
     }
     if (request.method == "GET" && request.path == "/health") {
         return make_http_response("200 OK", "application/json; charset=utf-8", "{\"ok\":true}");
@@ -1907,6 +2055,11 @@ PanelHttpServer::PanelHttpServer(PanelApp* app) noexcept
     : app_(app) {
 }
 
+PanelHttpServer::PanelHttpServer(PanelApp* app, bool overlay_only) noexcept
+    : app_(app)
+    , overlay_only_(overlay_only) {
+}
+
 PanelHttpServer::~PanelHttpServer() {
     stop();
 }
@@ -1958,8 +2111,21 @@ bool PanelHttpServer::start(std::uint16_t port) {
     }
 
     listen_socket_ = reinterpret_cast<void*>(listen_socket);
+    // Puerto efimero (port == 0): lo elige el SO y hay que leer cual es, porque
+    // Fase 3 apunta el tunel al listener "solo overlay" en un puerto efimero.
+    std::uint16_t bound_port = port;
+    if (bound_port == 0) {
+        sockaddr_in local_address{};
+        int local_length = static_cast<int>(sizeof(local_address));
+        if (getsockname(
+                listen_socket,
+                reinterpret_cast<sockaddr*>(&local_address),
+                &local_length) == 0) {
+            bound_port = ntohs(local_address.sin_port);
+        }
+    }
     status_.running = true;
-    status_.port = port;
+    status_.port = bound_port;
     status_.last_error.clear();
     client_socket_ = nullptr;
     request_buffer_.clear();
@@ -2036,7 +2202,7 @@ void PanelHttpServer::poll() {
             } else {
                 const auto parsed = parse_request_buffer(request_buffer_);
                 if (parsed.ready) {
-                    pending_response_ = build_route_response(app_, parsed, status_);
+                    pending_response_ = build_route_response(app_, parsed, status_, overlay_only_);
                     request_buffer_.clear();
                 }
             }
@@ -2082,6 +2248,10 @@ void PanelHttpServer::poll() {
 
 bool PanelHttpServer::running() const noexcept {
     return status_.running;
+}
+
+bool PanelHttpServer::overlay_only() const noexcept {
+    return overlay_only_;
 }
 
 PanelHttpServerStatus PanelHttpServer::status() const noexcept {

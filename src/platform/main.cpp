@@ -415,18 +415,16 @@ EmbeddedUiLaunchContext resolve_embedded_ui_context(
         return context;
     }
 
-    auto parsed_url = nlp3::platform::parse_embedded_ui_url(app.config().embedded_ui_url);
-    if (!parsed_url.valid || !parsed_url.loopback) {
-        context.port = 18913;
-        context.url = nlp3::platform::build_loopback_ui_url(context.port);
-        return context;
-    }
-
-    context.port = parsed_url.port == 0 ? static_cast<std::uint16_t>(18913) : parsed_url.port;
-    context.url = parsed_url.raw_url;
-    if (!context.url.empty() && context.url.back() != '/') {
-        context.url.push_back('/');
-    }
+    // Fase 3: el puerto local lo manda `embedded_ui_port`, un campo propio.
+    // Antes se derivaba de `embedded_ui_url` y, como el quick tunnel escribia su
+    // URL efimera ahi, el arranque siguiente caia siempre a 18913 y el panel
+    // olvidaba su puerto real. La resolucion vive en la libreria de plataforma
+    // para poder testearla sin arrancar el panel.
+    const auto target = nlp3::platform::resolve_embedded_ui_target(
+        app.config().embedded_ui_url,
+        app.config().embedded_ui_port);
+    context.port = target.port;
+    context.url = target.url;
     return context;
 }
 

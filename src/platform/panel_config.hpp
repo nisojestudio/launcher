@@ -38,6 +38,11 @@ struct PanelConfig {
     bool embedded_ui_fallback_to_browser = true;
     bool embedded_ui_devtools = false;
     std::string embedded_ui_url = "http://127.0.0.1:18913/";
+    // Fase 3: el puerto local de la UI embebida vive en su propio campo porque
+    // antes se derivaba de `embedded_ui_url`, y la URL efimera del quick tunnel
+    // que se escribia ahi hacia que el panel olvidara su puerto real en el
+    // siguiente arranque (caia siempre a 18913).
+    std::uint16_t embedded_ui_port = 18913;
     std::uint64_t embedded_ui_startup_timeout_ms = 8000;
     std::string host_energy_level = "balanced";
     std::string host_tone_style = "neutral";

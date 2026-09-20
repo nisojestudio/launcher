@@ -40,7 +40,9 @@ struct LiveTimerRecentEvent {
 
 struct LiveTimerGameState {
     double remaining_seconds = 0.0;
-    double initial_seconds = 300.0;
+    // V2: sin tiempo por defecto. El timer arranca en cero y no cuenta hasta
+    // que el usuario configure su tiempo inicial y pulse Iniciar.
+    double initial_seconds = 0.0;
     bool running = false;
     bool completed = false;
     bool paused = false;
@@ -94,6 +96,54 @@ struct LiveTimerGameState {
     std::string digit_effect = "none";
     // V3: color preset ("neon-green" | "cyber-blue" | "clean-white" | "rose-gold")
     std::string color_preset = "neon-green";
+
+    // === Fase 5: motor visual (specs/live-timer-mejoras/visual.md) ============
+    // Todo lo de aqui tiene default neutro: con estos valores el overlay se ve
+    // exactamente como antes de la fase. El diseño se enciende configurandolo.
+    //
+    // M16 — escala relativa. Los tamaños en px del diseño se interpretan DENTRO de
+    // un lienzo de referencia, y el overlay escala el bloque entero al tamaño real
+    // del browser source. Sin esto, un overlay pensado a 1920x1080 se desarma a
+    // cualquier otra resolucion. "auto" = escalar; "off" = px literal (lo de antes).
+    std::string scale_mode = "auto";
+    int canvas_width = 1920;
+    int canvas_height = 1080;
+    // V1 — marco. "none" | "card" | "glass" | "neon" | "ribbon" | "badge"
+    std::string frame_style = "none";
+    std::string frame_color = "#00FFFF";
+    int frame_opacity = 55;      // % de opacidad del fondo del marco
+    int frame_border_px = 1;
+    int frame_radius_px = 4;
+    int frame_padding_px = 28;
+    // V2/V3 — adornos del marco
+    bool frame_brackets = false;
+    bool frame_grid = false;
+    bool frame_scanlines = false;
+    // V8 — contorno del texto (0 = sin contorno)
+    int text_outline_px = 0;
+    std::string text_outline_color = "#000000";
+    // V6 — formato del tiempo. El contador se compone de bloques HH:MM:SS; con
+    // show_hours=false se oculta el bloque de horas (12:34 en vez de 00:12:34).
+    std::string time_separator = ":";
+    bool show_hours = true;
+    // V13 — estados con umbrales configurables (antes 60 y 10 estaban en el codigo
+    // del overlay) y efecto propio del estado de peligro.
+    int warn_seconds = 60;
+    int danger_seconds = 10;
+    std::string danger_effect = "pulse";   // "none" | "pulse" | "glitch" | "flash"
+    // V5 — medidor de progreso respecto al maximo (o al tiempo inicial si no hay tope).
+    std::string progress_style = "none";   // "none" | "bar" | "ring"
+    int progress_thickness_px = 6;
+    std::string progress_color = "";       // vacio = seguir el color del contador
+    // V11 — particulas. Apagadas por defecto: son decoracion, y en un browser
+    // source estrangulado (OBS pone sus procesos en «Efficiency Mode» y Windows
+    // los frena cuando OBS pierde el foco) es lo primero que hay que poder apagar.
+    // Ademas el overlay se auto-apaga si detecta que le cuestan FPS.
+    bool particles_enabled = false;
+    std::string particles_style = "none";  // "none" | "confetti" | "sparks" | "stars"
+    int particles_budget = 120;            // tope de particulas simultaneas
+    double particles_density = 1.0;        // multiplicador dentro del tope (0.25..2)
+    bool particles_force = false;          // true = no auto-apagar por FPS
     // V3: counter font family — merged into counter_style.font_family. The panel's
     // "Fuente" dropdown now includes mono fonts (Space Mono, JetBrains Mono, Share Tech Mono)
     // alongside standard fonts. No separate counter_font field exists.

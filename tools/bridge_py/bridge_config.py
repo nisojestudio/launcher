@@ -160,6 +160,21 @@ class LoggingConfig:
 
 
 @dataclass(slots=True)
+class SoundAlertConfig:
+    """Alertas sonoras en los cambios de estado de conexion.
+
+    `require_panel=True` (por defecto) las silencia cuando el panel no esta
+    conectado. La alerta existe para avisar al operador que mira el panel, asi
+    que sin panel no hay destinatario y solo queda ruido: un bridge que
+    sobrevive al panel se quedaba pitando cada intento de reconexion.
+    Ponlo en False para recuperar el aviso incondicional.
+    """
+
+    enabled: bool = True
+    require_panel: bool = True
+
+
+@dataclass(slots=True)
 class BridgeConfig:
     connection_mode: str = "tiktools"
     connection: ConnectionConfig = field(default_factory=ConnectionConfig)
@@ -168,6 +183,7 @@ class BridgeConfig:
     output: OutputConfig = field(default_factory=OutputConfig)
     replay: ReplayConfig = field(default_factory=ReplayConfig)
     logging: LoggingConfig = field(default_factory=LoggingConfig)
+    sound_alerts: SoundAlertConfig = field(default_factory=SoundAlertConfig)
     legacy_bridge_root: str = ""
     max_events: int = 0
     max_seconds: int = 0
@@ -220,6 +236,7 @@ def load_bridge_config(path: str | Path | None = None) -> BridgeConfig:
     output = data.get("output", {}) if isinstance(data.get("output"), dict) else {}
     replay = data.get("replay", {}) if isinstance(data.get("replay"), dict) else {}
     logging = data.get("logging", {}) if isinstance(data.get("logging"), dict) else {}
+    sound_alerts = data.get("sound_alerts", {}) if isinstance(data.get("sound_alerts"), dict) else {}
 
     pool_keys, pool_labels = _load_key_pool(connection)
 
@@ -389,6 +406,16 @@ def load_bridge_config(path: str | Path | None = None) -> BridgeConfig:
         logging=LoggingConfig(
             level=_parse_text(_env("LIVEPANEL_BRIDGE_LOG_LEVEL") or logging.get("level"), "INFO"),
             log_path=_parse_text(_env("LIVEPANEL_BRIDGE_LOG_PATH") or logging.get("log_path"), "tools/bridge_py/logs/bridge.jsonl"),
+        ),
+        sound_alerts=SoundAlertConfig(
+            enabled=_parse_bool(
+                _env("LIVEPANEL_BRIDGE_SOUND_ALERTS_ENABLED") or sound_alerts.get("enabled"),
+                True,
+            ),
+            require_panel=_parse_bool(
+                _env("LIVEPANEL_BRIDGE_SOUND_ALERTS_REQUIRE_PANEL") or sound_alerts.get("require_panel"),
+                True,
+            ),
         ),
         legacy_bridge_root=_parse_text(
             _env("LIVEPANEL_LEGACY_BRIDGE_ROOT") or data.get("legacy_bridge_root"),

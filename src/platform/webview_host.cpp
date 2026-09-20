@@ -372,6 +372,31 @@ EmbeddedUiUrl parse_embedded_ui_url(std::string_view url) {
     return parsed;
 }
 
+EmbeddedUiTarget resolve_embedded_ui_target(
+    std::string_view embedded_ui_url,
+    std::uint16_t embedded_ui_port) {
+    EmbeddedUiTarget target{};
+    const auto configured_port = embedded_ui_port != 0
+        ? embedded_ui_port
+        : static_cast<std::uint16_t>(18913);
+    target.port = configured_port;
+
+    const auto parsed = parse_embedded_ui_url(embedded_ui_url);
+    if (parsed.valid && parsed.loopback) {
+        // Config antigua o override: la URL loopback manda sobre el campo.
+        target.port = parsed.port != 0 ? parsed.port : configured_port;
+        target.url = parsed.raw_url;
+    } else {
+        // La URL no es la de la UI embebida (p. ej. la del tunel). Se ignora.
+        target.url = build_loopback_ui_url(target.port);
+    }
+
+    if (!target.url.empty() && target.url.back() != '/') {
+        target.url.push_back('/');
+    }
+    return target;
+}
+
 std::string build_loopback_ui_url(std::uint16_t port, std::string_view path) {
     std::string normalized_path = path.empty() ? "/" : std::string(path);
     if (normalized_path.front() != '/') {
@@ -813,6 +838,30 @@ EmbeddedUiUrl parse_embedded_ui_url(std::string_view url) {
     EmbeddedUiUrl parsed{};
     parsed.raw_url = std::string(url);
     return parsed;
+}
+
+EmbeddedUiTarget resolve_embedded_ui_target(
+    std::string_view embedded_ui_url,
+    std::uint16_t embedded_ui_port) {
+    // Fase 3: en esta ruta no hay UI embebida, pero la resolucion del puerto es
+    // la misma para que el comportamiento sea consistente entre plataformas.
+    EmbeddedUiTarget target{};
+    target.port = embedded_ui_port != 0
+        ? embedded_ui_port
+        : static_cast<std::uint16_t>(18913);
+
+    const auto parsed = parse_embedded_ui_url(embedded_ui_url);
+    if (parsed.valid && parsed.loopback) {
+        target.port = parsed.port != 0 ? parsed.port : target.port;
+        target.url = parsed.raw_url;
+    } else {
+        target.url = "http://127.0.0.1:" + std::to_string(target.port) + "/";
+    }
+
+    if (!target.url.empty() && target.url.back() != '/') {
+        target.url.push_back('/');
+    }
+    return target;
 }
 
 std::string build_loopback_ui_url(std::uint16_t port, std::string_view path) {

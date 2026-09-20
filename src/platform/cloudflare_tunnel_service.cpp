@@ -146,7 +146,7 @@ bool CloudflareTunnelService::start_tunnel(std::uint16_t overlay_port, TunnelUrl
 
     {
         std::lock_guard<std::mutex> lock(mutex_);
-        tunnel_url_.clear();
+        public_base_url_.clear();
         last_error_.clear();
     }
     overlay_port_ = overlay_port;
@@ -216,7 +216,7 @@ bool CloudflareTunnelService::start_tunnel(std::uint16_t overlay_port, TunnelUrl
         std::string url;
         {
             std::lock_guard<std::mutex> lock(mutex_);
-            url = tunnel_url_;
+            url = public_base_url_;
         }
         if (on_url && !url.empty()) {
             on_url(url);
@@ -266,7 +266,7 @@ void CloudflareTunnelService::stop_tunnel() {
     // 6. Clear state
     {
         std::lock_guard<std::mutex> lock(mutex_);
-        tunnel_url_.clear();
+        public_base_url_.clear();
         last_error_.clear();
     }
 }
@@ -275,9 +275,9 @@ bool CloudflareTunnelService::is_running() const noexcept {
     return running_;
 }
 
-std::string CloudflareTunnelService::tunnel_url() const noexcept {
+std::string CloudflareTunnelService::public_base_url() const noexcept {
     std::lock_guard<std::mutex> lock(mutex_);
-    return tunnel_url_;
+    return public_base_url_;
 }
 
 std::string CloudflareTunnelService::last_error() const noexcept {
@@ -312,7 +312,12 @@ void CloudflareTunnelService::reader_thread(std::uint16_t port) {
                     if (url.find(".trycloudflare.com") != std::string::npos) {
                         {
                             std::lock_guard<std::mutex> lock(mutex_);
-                            tunnel_url_ = url + "/overlay/live-timer";
+                            // Fase 3: se guarda la URL BASE, sin sufijo de ruta.
+                            // Antes se anadia aqui "/overlay/live-timer", lo que
+                            // cableaba una ruta de juego dentro de un servicio de
+                            // tunel generico e impedia que un segundo modulo
+                            // tuviera su propia URL.
+                            public_base_url_ = url;
                         }
                         return;
                     }

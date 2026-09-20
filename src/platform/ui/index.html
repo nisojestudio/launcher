@@ -276,7 +276,7 @@
                   <div class="tv-row">
                     <div class="tv-group">
                       <span class="tv-label">Inicial</span>
-                      <input class="timer-input tv-num" id="timer-initial-time" type="text" value="05:00" placeholder="mm:ss">
+                      <input class="timer-input tv-num" id="timer-initial-time" type="text" value="00:00" placeholder="mm:ss">
                     </div>
                     <div class="tv-group">
                       <span class="tv-label">M&aacute;x</span>
@@ -339,7 +339,12 @@
                           <option value="Georgia, serif">Georgia</option>
                           <option value="Impact, sans-serif">Impact</option>
                           <option value="&quot;Times New Roman&quot;, serif">Times New Roman</option>
-                        </select>
+                                                  <option value="&quot;Chakra Petch&quot;, sans-serif">Chakra Petch</option>
+                          <option value="Rajdhani, sans-serif">Rajdhani</option>
+                          <option value="&quot;JetBrains Mono&quot;, monospace">JetBrains Mono</option>
+    <option value="&quot;Space Mono&quot;, monospace">Space Mono</option>
+    <option value="&quot;Share Tech Mono&quot;, monospace">Share Tech Mono</option>
+</select>
                       </div>
                       <label class="tv-chip">
                         <input id="timer-title-bold" type="checkbox" checked>
@@ -353,6 +358,10 @@
                           <option value="none">Ninguno</option>
                           <option value="glow">Brillo ne&oacute;n</option>
                           <option value="pulse">Latido</option>
+    <option value="heartbeat">Latido doble</option>
+    <option value="float">Flotar</option>
+    <option value="flicker">Parpadeo</option>
+    <option value="shake">Vibrar</option>
                         </select>
                       </div>
                       <label class="tv-chip">
@@ -390,6 +399,8 @@
                           <option value="&quot;Space Mono&quot;, monospace">Space Mono</option>
                           <option value="&quot;JetBrains Mono&quot;, monospace">JetBrains Mono</option>
                           <option value="&quot;Share Tech Mono&quot;, monospace">Share Tech Mono</option>
+    <option value="&quot;Chakra Petch&quot;, sans-serif">Chakra Petch</option>
+    <option value="Rajdhani, sans-serif">Rajdhani</option>
                         </select>
                       </div>
                       <label class="tv-chip">
@@ -404,6 +415,10 @@
                           <option value="none">Ninguno</option>
                           <option value="glow">Brillo ne&oacute;n</option>
                           <option value="pulse">Latido</option>
+    <option value="heartbeat">Latido doble</option>
+    <option value="float">Flotar</option>
+    <option value="flicker">Parpadeo</option>
+    <option value="shake">Vibrar</option>
                         </select>
                       </div>
                       <label class="tv-chip">
@@ -420,6 +435,9 @@
                           <option value="roll">Slot Roll</option>
                           <option value="pop">Scale Pop</option>
                           <option value="fade">Fade</option>
+    <option value="odometer">Od&oacute;metro</option>
+    <option value="typewriter">M&aacute;quina de escribir</option>
+    <option value="blur">Desenfoque</option>
                         </select>
                       </div>
                       <div class="tv-group">
@@ -461,6 +479,11 @@
                           <option value="Georgia, serif">Georgia</option>
                           <option value="Impact, sans-serif">Impact</option>
                           <option value="&quot;Times New Roman&quot;, serif">Times New Roman</option>
+    <option value="&quot;Chakra Petch&quot;, sans-serif">Chakra Petch</option>
+    <option value="Rajdhani, sans-serif">Rajdhani</option>
+    <option value="&quot;JetBrains Mono&quot;, monospace">JetBrains Mono</option>
+    <option value="&quot;Space Mono&quot;, monospace">Space Mono</option>
+    <option value="&quot;Share Tech Mono&quot;, monospace">Share Tech Mono</option>
                         </select>
                       </div>
                       <label class="tv-chip">
@@ -475,6 +498,10 @@
                           <option value="none">Ninguno</option>
                           <option value="glow">Brillo ne&oacute;n</option>
                           <option value="pulse">Latido</option>
+    <option value="heartbeat">Latido doble</option>
+    <option value="float">Flotar</option>
+    <option value="flicker">Parpadeo</option>
+    <option value="shake">Vibrar</option>
                         </select>
                       </div>
                       <label class="tv-chip">
@@ -526,6 +553,197 @@
                       </select>
                     </div>
                   </div>
+
+                </div>
+              </details>
+
+              <!-- ===== Section 4b: Diseno (motor visual) ===== -->
+              <details class="tv-section">
+                <summary class="tv-summary">🖥 Dise&ntilde;o (motor visual)</summary>
+                <div class="tv-body">
+
+                  <div class="tv-presets-row">
+                    <span class="tv-label" style="align-self:center">Dise&ntilde;os:</span>
+                    <button class="secondary-button" style="font-size:11px;padding:2px 8px" type="button" id="timer-design-hud">HUD &Oacute;rbita</button>
+                    <button class="secondary-button" style="font-size:11px;padding:2px 8px" type="button" id="timer-design-glass">Cristal L&iacute;quido</button>
+                    <button class="secondary-button" style="font-size:11px;padding:2px 8px" type="button" id="timer-design-sticker">Pegatina Brutal</button>
+                    <button class="secondary-button" style="font-size:11px;padding:2px 8px" type="button" id="timer-design-classic">Cl&aacute;sico</button>
+                    <span class="summary-note" id="timer-design-status"></span>
+                  </div>
+
+                  <div class="tv-row">
+                    <div class="tv-group">
+                      <span class="tv-label">Escala</span>
+                      <select class="timer-input tv-select" id="timer-scale-mode">
+                        <option value="auto" selected>Escalar al lienzo (recomendado)</option>
+                        <option value="off">Tama&ntilde;o literal en p&iacute;xeles</option>
+                      </select>
+                    </div>
+                    <div class="tv-group">
+                      <span class="tv-label">Ancho del lienzo (px)</span>
+                      <input class="timer-input" id="timer-canvas-width" type="number" min="320" max="7680" step="1" value="1920">
+                    </div>
+                    <div class="tv-group">
+                      <span class="tv-label">Alto del lienzo (px)</span>
+                      <input class="timer-input" id="timer-canvas-height" type="number" min="320" max="7680" step="1" value="1080">
+                    </div>
+                  </div>
+
+                  <div class="tv-row">
+                    <div class="tv-group">
+                      <span class="tv-label">Estilo de marco</span>
+                      <select class="timer-input tv-select" id="timer-frame-style">
+                        <option value="none" selected>Sin marco</option>
+                        <option value="card">Tarjeta</option>
+                        <option value="glass">Cristal</option>
+                        <option value="neon">Ne&oacute;n</option>
+                        <option value="ribbon">Cinta</option>
+                        <option value="badge">Insignia</option>
+                      </select>
+                    </div>
+                    <div class="tv-group">
+                      <span class="tv-label">Color del marco</span>
+                      <input class="timer-input tv-color" id="timer-frame-color" type="color" value="#00FFFF">
+                    </div>
+                    <div class="tv-group">
+                      <span class="tv-label">Opacidad del relleno (%)</span>
+                      <input class="timer-input" id="timer-frame-opacity" type="number" min="0" max="100" step="1" value="55">
+                    </div>
+                  </div>
+
+                  <div class="tv-row">
+                    <div class="tv-group">
+                      <span class="tv-label">Grosor del borde (px)</span>
+                      <input class="timer-input" id="timer-frame-border-px" type="number" min="0" max="12" step="1" value="1">
+                    </div>
+                    <div class="tv-group">
+                      <span class="tv-label">Radio de esquinas (px)</span>
+                      <input class="timer-input" id="timer-frame-radius-px" type="number" min="0" max="64" step="1" value="4">
+                    </div>
+                    <div class="tv-group">
+                      <span class="tv-label">Relleno interior (px)</span>
+                      <input class="timer-input" id="timer-frame-padding-px" type="number" min="0" max="120" step="1" value="28">
+                    </div>
+                  </div>
+
+                  <div class="tv-row">
+                    <label class="tv-chip">
+                      <input id="timer-frame-brackets" type="checkbox">
+                      <span>Esquinas de bracket</span>
+                    </label>
+                    <label class="tv-chip">
+                      <input id="timer-frame-grid" type="checkbox">
+                      <span>Rejilla t&eacute;cnica</span>
+                    </label>
+                    <label class="tv-chip">
+                      <input id="timer-frame-scanlines" type="checkbox">
+                      <span>Scanlines</span>
+                    </label>
+                  </div>
+
+                  <div class="tv-row">
+                    <div class="tv-group">
+                      <span class="tv-label">Contorno del texto (px)</span>
+                      <input class="timer-input" id="timer-text-outline-px" type="number" min="0" max="8" step="1" value="0">
+                    </div>
+                    <div class="tv-group">
+                      <span class="tv-label">Color del contorno</span>
+                      <input class="timer-input tv-color" id="timer-text-outline-color" type="color" value="#000000">
+                    </div>
+                  </div>
+
+                  <div class="tv-row">
+                    <div class="tv-group">
+                      <span class="tv-label">Separador del tiempo</span>
+                      <select class="timer-input tv-select" id="timer-time-separator">
+                        <option value=":" selected>:</option>
+                        <option value="&middot;">&middot;</option>
+                        <option value=".">.</option>
+                        <option value="-">-</option>
+                        <option value="|">|</option>
+                      </select>
+                    </div>
+                    <div class="tv-group">
+                      <span class="tv-label">Aviso a los (s)</span>
+                      <input class="timer-input" id="timer-warn-seconds" type="number" min="0" max="3600" step="1" value="60">
+                    </div>
+                    <div class="tv-group">
+                      <span class="tv-label">Peligro a los (s)</span>
+                      <input class="timer-input" id="timer-danger-seconds" type="number" min="0" max="3600" step="1" value="10">
+                    </div>
+                  </div>
+
+                  <div class="tv-row">
+                    <div class="tv-group">
+                      <span class="tv-label">Efecto en peligro</span>
+                      <select class="timer-input tv-select" id="timer-danger-effect">
+                        <option value="pulse" selected>Pulso</option>
+                        <option value="glitch">Glitch</option>
+                        <option value="flash">Destello</option>
+                        <option value="none">Ninguno</option>
+                      </select>
+                    </div>
+                    <label class="tv-chip">
+                      <input id="timer-show-hours" type="checkbox" checked>
+                      <span>Mostrar horas</span>
+                    </label>
+                  </div>
+
+                  <div class="tv-row">
+                    <div class="tv-group">
+                      <span class="tv-label">Medidor de progreso</span>
+                      <select class="timer-input tv-select" id="timer-progress-style">
+                        <option value="none" selected>Sin medidor</option>
+                        <option value="bar">Barra (debajo)</option>
+                        <option value="ring">Anillo (alrededor del reloj)</option>
+                      </select>
+                    </div>
+                    <div class="tv-group">
+                      <span class="tv-label">Grosor del medidor (px)</span>
+                      <input class="timer-input" id="timer-progress-thickness-px" type="number" min="1" max="40" step="1" value="6">
+                    </div>
+                    <div class="tv-group">
+                      <span class="tv-label">Color del medidor</span>
+                      <input class="timer-input tv-color" id="timer-progress-color" type="color" value="#00FF88">
+                    </div>
+                    <label class="tv-chip">
+                      <input id="timer-progress-color-auto" type="checkbox" checked>
+                      <span>Usar el color del contador</span>
+                    </label>
+                  </div>
+
+                  <div class="tv-row">
+                    <label class="tv-chip">
+                      <input id="timer-particles-enabled" type="checkbox">
+                      <span>Part&iacute;culas en regalos grandes</span>
+                    </label>
+                    <div class="tv-group">
+                      <span class="tv-label">Tipo</span>
+                      <select class="timer-input tv-select" id="timer-particles-style">
+                        <option value="none" selected>Ninguna</option>
+                        <option value="confetti">Confeti</option>
+                        <option value="sparks">Chispas</option>
+                        <option value="stars">Estrellas</option>
+                      </select>
+                    </div>
+                    <div class="tv-group">
+                      <span class="tv-label">M&aacute;ximo a la vez</span>
+                      <input class="timer-input" id="timer-particles-budget" type="number" min="10" max="300" step="10" value="120">
+                    </div>
+                    <div class="tv-group">
+                      <span class="tv-label">Densidad</span>
+                      <input class="timer-input" id="timer-particles-density" type="number" min="0.25" max="2" step="0.25" value="1">
+                    </div>
+                    <label class="tv-chip">
+                      <input id="timer-particles-force" type="checkbox">
+                      <span>No apagar por rendimiento</span>
+                    </label>
+                  </div>
+
+                  <p class="summary-note" style="margin:4px 0 0">
+                    Las part&iacute;culas se apagan solas si detectan que bajan los FPS; el aviso s&oacute;lo se
+                    ve en la vista previa, nunca en directo.
+                  </p>
 
                 </div>
               </details>

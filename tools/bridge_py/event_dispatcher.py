@@ -26,6 +26,16 @@ class PanelWsSink:
         self._retry_cooldown_sec = 2.0
         self._consecutive_failures = 0
 
+    @property
+    def is_attached(self) -> bool:
+        """True si hay motivos para creer que el panel esta escuchando.
+
+        Hay conexion activa, o todavia no ha fallado ningun envio (arranque).
+        Lo usa el ConnectionManager para no emitir alertas sonoras cuando no
+        hay nadie mirando el panel.
+        """
+        return self._connection is not None or self._consecutive_failures == 0
+
     async def _ensure_connection(self) -> Any:
         if self._connection is None:
             now = time.monotonic()

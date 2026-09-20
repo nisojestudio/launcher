@@ -169,10 +169,27 @@ Cada etapa debe terminar con:
 
 ## 11. Estado del release (baseline actual)
 
-- Versión en `master`: **0.3.0** (2026-09-20). Tag: `v0.3.0`.
-- Artefactos: `dist/releases/0.3.0/installer/panel-live-0.3.0-win-x64.exe`,
-  `dist/releases/0.3.0/panel-live-0.3.0-win-x64-portable.zip`, `SHA256SUMS.txt` y
-  `release-manifest-0.3.0.json` (gates build/tests/installer/backup = `passed`).
+- Versión en `master`: **0.3.1** (2026-09-20). Tag público más reciente: `v0.3.0`
+  (0.3.1 se preparó como **draft**, ver abajo).
+- Artefactos 0.3.1: `dist/releases/0.3.1/installer/panel-live-0.3.1-win-x64.exe`
+  (SHA256 `EB171BD8…13465`), `panel-live-0.3.1-win-x64-portable.zip`
+  (`563B6D13…F31B1`), `NisojeStudio\NisojeStudio.exe` (`F26CC514…44ED`),
+  `SHA256SUMS.txt` y `release-manifest-0.3.1.json` (gates
+  build/tests/installer/backup = `passed`).
+- **0.3.1 es un release draft**: se preparó con `-AllowDirty` (árbol con los
+  cambios de Live Timer Fases 1–3 sin commitear), así que su manifest lleva
+  `git.dirty: true` y **no se ejecutaron** los gates 0.4 (tag) ni la Fase 4
+  (GitHub Release, `INSTALLER_URL`, verificación de producción). Si se quiere
+  publicar, hay que commitear, re-ejecutar sin `-AllowDirty` y seguir la Fase 4.
+- El panel de escritorio (`Panel Live 3.0.lnk` → `panel_desktop_launcher.py`)
+  arranca el `NisojeStudio.exe` **más reciente** de `dist/releases/*/NisojeStudio/`
+  y `build/release-*/src/platform/` (ojo: el glob es `release-*`, así que
+  `build/release/` **no** entra). Tras 0.3.1 arranca el binario con Fase 3.
+- Rollback (Gate 6.3): dejar que el launcher vuelva a 0.3.0 borrando o
+  renombrando `dist/releases/0.3.1/`; el código puede volver con
+  `git checkout -- <archivo>` (los cambios de Fase 3 no están commiteados) y el
+  sitio con `git revert` en `sitio/`. Backup previo al release:
+  `C:\Users\Nisoje\Desktop\PanelLiveBackups\Panel live 3.0-code-2026-09-20_07-30-56`.
 - Para lanzar un release, ejecutar el script (Hard Rules de
   `docs/releases/RELEASE_PROTOCOL.md`), cargando ANTES el entorno MSVC: en este
   equipo el paso `cmake --build --preset release` no lo hereda por sí solo y

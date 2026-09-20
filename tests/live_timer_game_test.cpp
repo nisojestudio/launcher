@@ -52,7 +52,9 @@ void test_default_config() {
     LiveTimerGame game;
     auto config = game.default_config();
 
-    assert(config.get_double("initial_time_s", 0) == 300.0);
+    // V2: el default es 0. El timer no arranca con tiempo hasta que el usuario
+    // lo configure (antes habia un default de 300s = 05:00).
+    assert(config.get_double("initial_time_s", 0) == 0.0);
     assert(config.get_double("time_per_like_s", 0) == 0.0);
     assert(config.get_double("time_per_share_s", 0) == 0.0);
     assert(config.get_double("time_per_follow_s", 0) == 0.0);
@@ -86,6 +88,17 @@ void test_manifest() {
 
 void test_on_activated_starts_timer() {
     LiveTimerGame game;
+
+    // V2: sin tiempo configurado on_activated NO arranca nada. El default es 0,
+    // asi que no puede quedar un contador corriendo sobre cero.
+    game.on_activated();
+    assert(game.state().running == false);
+    assert(std::abs(game.remaining_seconds() - 0.0) < 1.0);
+
+    // Con tiempo configurado si arranca, y carga el valor inicial.
+    auto config = game.default_config();
+    config.set("initial_time_s", 300.0);
+    game.apply_config(config);
     game.on_activated();
 
     auto rem = game.remaining_seconds();
@@ -165,6 +178,9 @@ void test_gift_adds_time_based_on_diamonds() {
 void test_negative_config_removes_time() {
     LiveTimerGame game;
     auto config = game.default_config();
+    // V2: hace falta un tiempo base. Con el default ahora en 0 la resta se
+    // clampearia a 0 y el test no probaria nada (0 no puede bajar de 0).
+    config.set("initial_time_s", 100.0);
     config.set("time_per_like_s", -1.5);
     game.apply_config(config);
     game.on_activated();
@@ -175,6 +191,7 @@ void test_negative_config_removes_time() {
 
     auto after = game.remaining_seconds();
     assert(after <= before - 1.0);
+    assert(after > 0.0);
 
     std::cout << "PASS: negative config removes time\n";
 }
@@ -211,6 +228,10 @@ void test_format_time_display() {
 
     // Test with days
     config.set("initial_time_s", 90061.0); // 1 day 1:01:01
+    // V2 (Fase 2): para reconfigurar el tiempo hay que estar en reposo. Con el
+    // timer corriendo, apply_config no toca el reloj a proposito (asi cambiar
+    // el diseno no puede mover la cuenta).
+    game.stop();
     game.apply_config(config);
     game.on_activated();
     fmt = game.format_time();
@@ -218,6 +239,7 @@ void test_format_time_display() {
 
     // Test zero
     config.set("initial_time_s", 0.0);
+    game.stop();
     game.apply_config(config);
     game.on_activated();
     fmt = game.format_time();
@@ -390,6 +412,12 @@ void test_factory_creates() {
 
 void test_stop() {
     LiveTimerGame game;
+    // V2: hay que configurar tiempo para que on_activated deje el timer
+    // corriendo; con el default en 0 no arranca y stop() no tendria nada que
+    // parar.
+    auto config = game.default_config();
+    config.set("initial_time_s", 10.0);
+    game.apply_config(config);
     game.on_activated();
     assert(game.is_running());
 
@@ -448,7 +476,8 @@ void test_reset_config_to_defaults() {
     assert(game.config().get_double("initial_time_s", 0) == 999.0);
 
     game.reset_config_to_defaults();
-    assert(game.config().get_double("initial_time_s", 0) == 300.0);
+    // V2: el default es 0, no 300.
+    assert(game.config().get_double("initial_time_s", 0) == 0.0);
 
     std::cout << "PASS: reset_config_to_defaults\n";
 }
@@ -596,6 +625,43 @@ void test_apply_config_paused_does_not_alter_remaining() {
     assert(std::abs(after - before) < 0.1);
 
     std::cout << "PASS: apply_config_paused_does_not_alter_remaining\n";
+}
+
+// V2 (Fase 2): cambiar configuracion con el timer CORRIENDO no debe mover el
+// reloj. Era el bug reportado: el panel mandaba 30 claves juntas cada vez que
+// tocabas un control visual, asi que cambiar un color cambiaba el tiempo.
+void test_design_config_change_does_not_move_the_clock() {
+    LiveTimerGame game;
+    auto config = game.default_config();
+    config.set("initial_time_s", 600.0);
+    game.apply_config(config);
+    game.on_activated();
+    assert(game.is_running());
+
+    const double before = game.remaining_seconds();
+
+    // 1) Cambio de diseno puro: distinto aspecto, mismos tiempos.
+    auto design = game.config();
+    design.set("counter_font_color", std::string("#FF00FF"));
+    design.set("title_text", std::string("otro titulo"));
+    design.set("color_preset", std::string("cyber-blue"));
+    design.set("counter_font_size", static_cast<std::int64_t>(200));
+    game.apply_config(design);
+
+    assert(std::abs(game.remaining_seconds() - before) < 0.5);
+    assert(game.state().counter_style.font_color == "#FF00FF");
+    assert(game.state().counter_style.font_size_px == 200);
+
+    // 2) Cambiar initial_time_s en caliente tampoco reajusta la cuenta en
+    //    curso: el nuevo valor queda para el PROXIMO arranque.
+    auto new_initial = game.config();
+    new_initial.set("initial_time_s", 900.0);
+    game.apply_config(new_initial);
+
+    assert(std::abs(game.remaining_seconds() - before) < 0.5);
+    assert(game.state().initial_seconds == 900.0);
+
+    std::cout << "PASS: design_config_change_does_not_move_the_clock\n";
 }
 
 // EXPECTED-FAIL until T2.3
@@ -765,13 +831,20 @@ void test_non_finite_input_is_sanitized() {
     assert(std::isfinite(game.remaining_seconds()));
     assert(game.remaining_seconds() < 365.0 * 86400.0);
 
-    // apply_config with NaN must not propagate.
+    // apply_config with NaN must not propagate. Se fija antes un valor valido
+    // conocido: con el default ahora en 0, "initial_seconds > 0" ya no probaria
+    // que el NaN se descarto (el valor previo tambien seria 0).
+    nlp3::gamesdk::GameConfig valid;
+    valid.set("initial_time_s", 120.0);
+    game.apply_config(valid);
+    assert(game.state().initial_seconds == 120.0);
+
     nlp3::gamesdk::GameConfig bad;
     bad.set("initial_time_s", std::numeric_limits<double>::quiet_NaN());
     game.apply_config(bad);
     assert(std::isfinite(game.remaining_seconds()));
     // NaN dropped on the floor; the previous valid initial_seconds is kept.
-    assert(game.state().initial_seconds > 0.0);
+    assert(game.state().initial_seconds == 120.0);
 
     std::cout << "PASS: non_finite_input_is_sanitized\n";
 }
@@ -933,6 +1006,7 @@ int main() {
     test_pause_remaining_seconds_correct();
     test_apply_config_completed_does_not_inflate();
     test_apply_config_paused_does_not_alter_remaining();
+    test_design_config_change_does_not_move_the_clock();
     test_restore_state_running_paused_keeps_paused();
     test_event_id_monotonic_across_arm();
     test_poll_tick_sound_below_60s();

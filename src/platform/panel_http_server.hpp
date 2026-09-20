@@ -19,6 +19,11 @@ struct PanelHttpServerStatus {
 class PanelHttpServer {
 public:
     explicit PanelHttpServer(PanelApp* app) noexcept;
+    /// Fase 3 — modo "solo overlay". Un servidor creado con `overlay_only = true`
+    /// sirve unicamente `/api/overlay/*` (y `/health`); cualquier otra ruta
+    /// responde 404. Es lo que se expone por el tunel publico, para que
+    /// `/api/state`, la licencia, las metricas y la UI no salgan a internet.
+    PanelHttpServer(PanelApp* app, bool overlay_only) noexcept;
     ~PanelHttpServer();
 
     bool start(std::uint16_t port = 8080);
@@ -26,10 +31,12 @@ public:
     void poll();
 
     bool running() const noexcept;
+    bool overlay_only() const noexcept;
     PanelHttpServerStatus status() const noexcept;
 
 private:
     PanelApp* app_ = nullptr;
+    bool overlay_only_ = false;
     void* listen_socket_ = nullptr;
     void* client_socket_ = nullptr;
     std::string request_buffer_{};

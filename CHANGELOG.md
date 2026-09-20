@@ -4,6 +4,66 @@ All notable Panel Live changes should be recorded here.
 
 Format follows a lightweight Keep a Changelog style. Versions use SemVer.
 
+## 0.3.1 - 2026-09-20
+
+### Fixed
+
+- **Alertas sonoras con el panel cerrado**: el bridge sobrevive al panel a propósito (resiliencia ante reinicios, con buffer de eventos), pero `SoundAlerts` estaba cableado con `enabled=True` y pitaba en cada intento de reconexión aunque el panel ya estuviera cerrado. Un bridge huérfano de la sesión de `musitogamer` estuvo ~70 minutos emitiendo la secuencia de desconexión/reconexión cada 20–45 s, además de acumular 3985 envíos fallidos al WebSocket del panel y consumir cuota de tik.tools. Ahora las alertas se silencian cuando no hay panel conectado (`sound_alerts.require_panel`, default `true`) y quedan contabilizadas en `sound_alerts_suppressed_total`. Se añaden `--no-sound-alerts` y `--sound-alerts-without-panel` (y las variables `LIVEPANEL_BRIDGE_SOUND_ALERTS_ENABLED` / `LIVEPANEL_BRIDGE_SOUND_ALERTS_REQUIRE_PANEL`) para controlarlo.
+  - No se toca la supervivencia del bridge al panel: es intencional. La vía soportada para pararlo es `POST /shutdown` en el puerto de control, que es lo que ya hace el panel al cerrarse.
+
+### Fixed — Live Timer (Fase 1)
+
+- **El tiempo se perdía al cerrar el panel.** El estado se guardaba en `%TEMP%` (Windows lo limpia) y el autosave solo se disparaba cuando cambiaba `event_id_counter`, así que **el avance puro de la cuenta no se persistía nunca**. Ahora vive en `%LOCALAPPDATA%\NisojeStudio\timer\live-timer.json` (con migración automática del save viejo de `%TEMP%`), se guarda en cada transición, cada 10 s **mientras corre**, y siempre al cerrar el panel. Esquema de save subido a v3.
+- **Al reiniciar arrancaba solo y ya descontado.** `restore_state` restauraba `running=true` y restaba el tiempo de pared transcurrido con el panel cerrado. Ahora el tiempo se **congela**: se restaura el mismo valor, el timer espera, e `Iniciar` **continúa desde ahí** en vez de volver al tiempo inicial.
+- **Arrancaba con 5 minutos de regalo.** `initial_time_s` de `300.0` → `0.0` (también `initial_seconds` y el formulario). Sin tiempo configurado no cuenta: `on_activated` no arranca sobre cero.
+- **Pulsar Iniciar no mostraba nada tras restaurar.** `arm()` deja el timer oculto (`--:--:--`) y `on_activated()` no lo des-ocultaba: `running` quedaba en true mientras el overlay seguía pintando guiones. Iniciar ahora también habilita el timer.
+- **Las coins se descartaban si el timer no corría.** El handler bloqueaba con `!state_.running`, así que las coins que llegaron con el panel cerrado se perdían en silencio, y con el default en cero tampoco sumaba nada. Ahora se acumula mientras está armado; se sigue bloqueando si está pausado a propósito, completado u oculto.
+- **Clamp de cordura al cargar.** Un save con un valor absurdo llegaba a `format_time()` y casteaba a `int64` fuera de rango (comportamiento indefinido); el clamp del HTTP no cubría esa ruta. `initial_time_s` por HTTP ahora acepta 0 (antes mínimo 1 s).
+- **Overlay: el día salía en orden incorrecto.** `#days-label` estaba después del contador en el DOM y se leía al revés (`00:00:00` y debajo `2 dias`). Ahora va **sobre** el reloj como distintivo `DÍA N`.
+- **Overlay: los popups cruzaban por encima del contador.** Ocupaban todo el ancho bajo el reloj y la animación los subía 40 px. Ahora viven en una **lane lateral derecha** con entrada horizontal y desvanecido en el sitio: sin recorrido vertical, nunca tapan el reloj. Tamaño acotado y escala propia en modo preview.
+
+### Fixed — Live Timer (Fase 2)
+
+- **Cambiar el diseño movía el tiempo.** `apply_config` sumaba la diferencia de `initial_time_s` a `remaining_seconds` cuando el timer estaba corriendo, así que tocar cualquier control de aspecto podía reajustar la cuenta en vivo. Ahora `apply_config` **nunca** toca el reloj si la cuenta está en marcha, pausada o completada; solo adopta un tiempo inicial nuevo cuando el timer está **en reposo** y ese valor **cambió de verdad** (fase de configuración, antes de pulsar Iniciar). Esa condición de "cambió de verdad" es la que protege el requisito de conservar el tiempo: tras restaurar, cambiar solo el diseño no puede reescribir el valor restaurado.
+- **El formulario no se cargaba desde el servidor.** Al abrir el panel mostraba los valores de fábrica del HTML, y como el hot path reenvía las claves visuales **del formulario**, tocar cualquier control revertía el diseño guardado del operador a esos defaults. El bloque de poblado vivía inline dentro del handler de Importar; se extrajo a `populateTimerFormFromConfig(config)` y ahora se llama una vez al arrancar tras `GET /api/timer/config`. No se aplica nada de vuelta: el servidor es la fuente de verdad, solo se pinta.
+- **El tope `max_time_s` ya no se aplica en `apply_config`.** Recortaba el tiempo recién configurado antes de arrancar. El clamp vive donde sí cambia el tiempo en vivo (`on_game_input_event` y `adjust_time`), que es donde además se reporta el delta real en el popup.
+
+### Tests — Live Timer
+- Regresión del requisito central (`nlp3_live_timer_api_smoke_test` cp6): configurar 600 s, arrancar, guardar, reabrir → el tiempo se conserva, **no** arranca solo, e Iniciar continúa desde el valor restaurado.
+- Tests actualizados a la nueva verdad (default en cero). Tres dependían implícitamente de los 5 minutos de regalo (`test_on_activated_starts_timer`, `test_negative_config_removes_time`, `test_stop`) y ahora configuran su propio tiempo base, que es lo que realmente querían probar.
+- El test suite aísla su estado con `NLP3_TIMER_STATE_DIR` para no leer ni pisar el estado real del usuario.
+
+### Fixed — Live Timer (Fase 3): el panel dejaba de recordar su puerto
+
+- **La URL del quick tunnel corrompía la configuración sola.** El callback de `start_tunnel` escribía la URL efímera en `embedded_ui_url` **y guardaba la config**, y en el arranque siguiente se derivaba de ese campo el puerto local; como una URL de `trycloudflare.com` no es loopback, el panel caía siempre a 18913 y **olvidaba su puerto real**. Ahora el puerto local vive en un campo propio persistido (`embedded_ui_port`), la URL pública del túnel queda solo en memoria (`PanelApp::overlay_public_base_url_`) y no se persiste como configuración, y al cargar se repara el bloque `embedded_ui`: una `embedded_ui_url` no-loopback se reescribe a su loopback real en vez de decidir el puerto.
+- **El túnel exponía el panel entero.** cloudflared apuntaba al mismo puerto que la UI del panel, así que `/api/state`, licencia, métricas y la UI quedaban alcanzables desde internet sin autenticación (los `GET` no pasan por `request_requires_access`, que solo cubre `POST`). Ahora `PanelHttpServer` tiene un modo **solo overlay** y el túnel apunta a un segundo listener loopback en puerto efímero que sirve únicamente `/api/overlay/*`; todo lo demás responde 404 desde la URL pública. Si ese listener no arranca, no se abre túnel. Ese segundo listener se bombea también en `PanelApp::tick()`: sin eso el socket aceptaba la conexión pero nunca respondía y Cloudflare devolvía **524** al overlay.
+- **La ruta del overlay estaba cableada dentro del servicio de túnel.** `cloudflare_tunnel_service` hacía `url + "/overlay/live-timer"`, así que un servicio genérico conocía la ruta de un juego e impedía que un segundo módulo tuviera su propia URL. Ahora `public_base_url()` devuelve solo la base y la ruta la compone quien sí sabe de overlays.
+- **CORS del endpoint de estado.** Lo consume la página estática pública desde otro origen: `GET /api/overlay/live-timer/state` responde con `Access-Control-Allow-Origin: *` (antes era imposible leerlo desde un navegador a través del túnel).
+
+### Added — Live Timer (Fase 3): URL permanente del overlay
+
+- **`https://nisoje.com/overlay/live-timer`** es ahora la URL que se configura **una sola vez** en TikTok LIVE Studio: es una página estática de URL fija que resuelve en runtime cuál es el panel vigente (pregunta a `GET /api/overlay/session` y luego pollea el túnel). Si el panel está apagado no se rompe: muestra un aviso discreto de espera y reintenta, y recoge una URL de túnel nueva sin recargar la página. El campo `overlayTunnelUrl` del panel pasa a contener esa URL permanente; `overlayUrl` sigue siendo la URL local directa (fallback para OBS en la misma máquina).
+- **`POST`/`GET /api/overlay/session` en el Worker.** El panel publica ahí la URL de su túnel, autenticado con `Authorization: Bearer <license key>` contra la tabla `licenses`, con caducidad corta (900 s), rate limit de publicación (5 s) y validación estricta de que la URL sea `https` pública. El `GET` es público (lo consume el overlay) y **nunca sirve una URL caducada**: la borra y responde `410`. Son rutas nuevas y aditivas: `/api/me/*` y `/api/license/*` no se tocan.
+- El overlay estático solo reproduce sonidos con URL absoluta `http(s)`: el panel entrega rutas locales (`C:\...`, `/sounds/...`) que en un navegador remoto no existen. Se trata como silencio, nunca como beep.
+- `/overlay/*` del sitio exime `X-Frame-Options` (la regla global del sitio lo pone en `DENY`) para que un browser source pueda incrustar la página.
+
+### Tests — Live Timer (Fase 3)
+
+- `nlp3_panel_embedded_ui_port_test`: un `panel_config.json` con la URL del túnel escrita en `embedded_ui_url` ya no cambia el puerto local resuelto, la URL se repara a loopback, el túnel no se persiste, y tres arranques seguidos dejan la configuración intacta. Cubre también la migración de configs antiguas sin `embedded_ui_port` y que un override loopback explícito sigue mandando.
+
+### Verificado en producción (Fase 3)
+
+- Panel real (`NisojeStudio.exe --console --ui`) con un `panel_config.json` que llevaba la URL de un quick tunnel escrita en `embedded_ui_url` y `embedded_ui_port = 19403`: **tres arranques seguidos** resolvieron el puerto **19403** y dejaron el fichero **byte a byte idéntico** (antes caía siempre a 18913 y la config se corrompía sola).
+- Con el panel en marcha, cloudflared queda apuntando al **listener solo overlay** (puerto efímero), no al puerto de la UI: comprobado en la línea de comandos del proceso hijo.
+- Sobre una URL pública real de quick tunnel: `/api/overlay/live-timer/state` → **200** con `Access-Control-Allow-Origin: *`; `/api/state`, `/api/metrics`, `/api/events`, `/`, `/app.js`, `/status` y `/api/bridge/keys` → **404**.
+- `https://nisoje.com/overlay/live-timer/` cargada en un navegador real: resuelve el túnel, lee el estado del panel y pinta título, subtítulo y contador verdaderos, con **cero errores de consola**, cero errores de página y cero peticiones fallidas.
+- Rutas existentes del sitio y del Worker sin cambios: `/api/status`, `/api/version`, `/api/version/latest`, `/api/time`, `/api/me/licenses` (401), `/api/license-check` (400) y el fallback de rutas desconocidas responden igual que antes del despliegue.
+
+### Build — aviso importante (regresión de build detectada en esta fase)
+
+- **Los rebuilds incrementales de `build/release` no recompilan las cabeceras.** `build/release/CMakeFiles/rules.ninja` contiene `msvc_deps_prefix = Nota: inclusi├│n del archivo:` con la "ó" mal codificada, así que ninja no reconoce las líneas de `/showIncludes` y **no registra ninguna dependencia de cabecera**. Un cambio en `panel_config.hpp` / `panel_app.hpp` / `panel_http_server.hpp` deja el árbol con objetos mezclados de distinto layout (`PanelConfig`, `PanelApp`, `PanelHttpServer`) y los tests revientan con access violation: tras el primer build incremental de esta fase fallaron 13 de 32 con `0xC0000005`, y con un rebuild completo bajaron a 1 (un assert real, ya corregido). Se recuperó borrando `.ninja_deps` y recompilando todo, sin reconfigurar ni tocar vcpkg.
+  - Arreglo recomendado: configurar con `VSLANG=1033` (mensajes de MSVC en inglés) para que el prefijo sea ASCII, o corregir la codificación con la que CMake escribe `rules.ninja`.
+
 ## 0.3.0 - 2026-09-20
 
 ### Added

@@ -7,8 +7,55 @@ from pathlib import Path
 
 from bridge_client import build_chat_event
 from event_decoder import decode_canonical_event
-from event_dispatcher import AsyncEventDispatcher
+from event_dispatcher import AsyncEventDispatcher, PanelWsSink
 from metrics_registry import MetricsRegistry
+
+
+class _FakePanelConnection:
+    def __init__(self) -> None:
+        self.sent: list[str] = []
+        self.closed = False
+
+    async def send(self, payload: str) -> None:
+        self.sent.append(payload)
+
+    async def close(self) -> None:
+        self.closed = True
+
+
+async def _connect_to_fake(_url: str) -> _FakePanelConnection:
+    return _FakePanelConnection()
+
+
+async def _connect_refused(_url: str) -> _FakePanelConnection:
+    raise ConnectionRefusedError("no hay panel escuchando")
+
+
+class PanelWsSinkAttachmentTests(unittest.IsolatedAsyncioTestCase):
+    """`is_attached` es lo que permite silenciar las alertas sin panel."""
+
+    async def test_assumes_attached_before_any_failure(self) -> None:
+        """En arranque no hay evidencia de ausencia: no silenciar por defecto."""
+        sink = PanelWsSink("ws://127.0.0.1:8765", _connect_refused)
+
+        self.assertTrue(sink.is_attached)
+
+    async def test_detaches_when_send_fails(self) -> None:
+        """Un envio fallido prueba que el panel no esta."""
+        sink = PanelWsSink("ws://127.0.0.1:8765", _connect_refused)
+
+        with self.assertRaises(ConnectionRefusedError):
+            await sink.send_json({"message_type": "canonical_event"})
+
+        self.assertFalse(sink.is_attached)
+
+    async def test_reattaches_after_a_successful_send(self) -> None:
+        """Si el panel vuelve, las alertas vuelven a tener destinatario."""
+        sink = PanelWsSink("ws://127.0.0.1:8765", _connect_to_fake)
+
+        await sink.send_json({"message_type": "canonical_event"})
+
+        self.assertTrue(sink.is_attached)
 
 
 class DispatcherTests(unittest.IsolatedAsyncioTestCase):

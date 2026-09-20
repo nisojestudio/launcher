@@ -381,6 +381,37 @@
     // V3: digit effects, palette
     timerDigitEffect: $("#timer-digit-effect"),
     timerColorPreset: $("#timer-color-preset"),
+
+    // Fase 5 — motor visual: escala, marco, formato, estados, medidor y particulas.
+    timerScaleMode: $("#timer-scale-mode"),
+    timerCanvasWidth: $("#timer-canvas-width"),
+    timerCanvasHeight: $("#timer-canvas-height"),
+    timerFrameStyle: $("#timer-frame-style"),
+    timerFrameColor: $("#timer-frame-color"),
+    timerFrameOpacity: $("#timer-frame-opacity"),
+    timerFrameBorderPx: $("#timer-frame-border-px"),
+    timerFrameRadiusPx: $("#timer-frame-radius-px"),
+    timerFramePaddingPx: $("#timer-frame-padding-px"),
+    timerFrameBrackets: $("#timer-frame-brackets"),
+    timerFrameGrid: $("#timer-frame-grid"),
+    timerFrameScanlines: $("#timer-frame-scanlines"),
+    timerTextOutlinePx: $("#timer-text-outline-px"),
+    timerTextOutlineColor: $("#timer-text-outline-color"),
+    timerTimeSeparator: $("#timer-time-separator"),
+    timerShowHours: $("#timer-show-hours"),
+    timerWarnSeconds: $("#timer-warn-seconds"),
+    timerDangerSeconds: $("#timer-danger-seconds"),
+    timerDangerEffect: $("#timer-danger-effect"),
+    timerProgressStyle: $("#timer-progress-style"),
+    timerProgressThicknessPx: $("#timer-progress-thickness-px"),
+    timerProgressColor: $("#timer-progress-color"),
+    timerProgressColorAuto: $("#timer-progress-color-auto"),
+    timerParticlesEnabled: $("#timer-particles-enabled"),
+    timerParticlesStyle: $("#timer-particles-style"),
+    timerParticlesBudget: $("#timer-particles-budget"),
+    timerParticlesDensity: $("#timer-particles-density"),
+    timerParticlesForce: $("#timer-particles-force"),
+    timerDesignStatus: $("#timer-design-status"),
   };
 
   const SAMPLE_AVATAR_DATA_URL =
@@ -3691,6 +3722,76 @@
     // Read the form into a plain config object. Each field is read with a
     // type-appropriate default; bad inputs (NaN, empty strings) are
     // sanitized so the panel never sends the server garbage.
+    // Fase 5 — motor visual. Lee las 27 claves nuevas desde el formulario en un
+    // solo sitio, para que el camino "Aplicar" y el camino "auto-envio" no se
+    // desincronicen. Devuelve SOLO las claves cuyo control existe en el DOM: el
+    // mapeo del backend es explicito por clave, asi que una clave ausente nunca
+    // pisa lo que ya estaba configurado.
+    function readVisualEngineFromForm() {
+      const v = {};
+      const putStr = (key, el, fallback) => { if (el) v[key] = el.value ?? fallback; };
+      const putInt = (key, el, fallback) => {
+        if (!el) return;
+        const n = parseInt(el.value, 10);
+        v[key] = Number.isFinite(n) ? n : fallback;
+      };
+      const putBool = (key, el) => { if (el) v[key] = !!el.checked; };
+
+      // Escala y lienzo
+      putStr('scale_mode', els.timerScaleMode, 'auto');
+      putInt('canvas_width', els.timerCanvasWidth, 1920);
+      putInt('canvas_height', els.timerCanvasHeight, 1080);
+
+      // Marco
+      putStr('frame_style', els.timerFrameStyle, 'none');
+      putStr('frame_color', els.timerFrameColor, '#00FFFF');
+      putInt('frame_opacity', els.timerFrameOpacity, 55);
+      putInt('frame_border_px', els.timerFrameBorderPx, 1);
+      putInt('frame_radius_px', els.timerFrameRadiusPx, 4);
+      putInt('frame_padding_px', els.timerFramePaddingPx, 28);
+      putBool('frame_brackets', els.timerFrameBrackets);
+      putBool('frame_grid', els.timerFrameGrid);
+      putBool('frame_scanlines', els.timerFrameScanlines);
+
+      // Texto y formato
+      putInt('text_outline_px', els.timerTextOutlinePx, 0);
+      putStr('text_outline_color', els.timerTextOutlineColor, '#000000');
+      putStr('time_separator', els.timerTimeSeparator, ':');
+      putBool('show_hours', els.timerShowHours);
+
+      // Estados (aviso / peligro)
+      putInt('warn_seconds', els.timerWarnSeconds, 60);
+      putInt('danger_seconds', els.timerDangerSeconds, 10);
+      putStr('danger_effect', els.timerDangerEffect, 'pulse');
+
+      // Medidor de progreso
+      putStr('progress_style', els.timerProgressStyle, 'none');
+      putInt('progress_thickness_px', els.timerProgressThicknessPx, 6);
+      // La casilla "usar el color del contador" se traduce a cadena vacia, que es
+      // como el overlay entiende "hereda el color del contador".
+      if (els.timerProgressColor) {
+        v.progress_color = els.timerProgressColorAuto?.checked
+          ? ''
+          : (els.timerProgressColor.value || '');
+      }
+
+      // Particulas
+      putBool('particles_enabled', els.timerParticlesEnabled);
+      putBool('particles_force', els.timerParticlesForce);
+      putInt('particles_budget', els.timerParticlesBudget, 120);
+      if (els.timerParticlesDensity) {
+        const d = parseFloat(els.timerParticlesDensity.value);
+        v.particles_density = Number.isFinite(d) ? d : 1.0;
+      }
+      if (els.timerParticlesStyle) {
+        const estilo = els.timerParticlesStyle.value || 'none';
+        // Coherencia: encendidas con estilo "ninguna" no pintarian nada. Se
+        // resuelve a chispas para que el interruptor haga algo visible.
+        v.particles_style = (v.particles_enabled && estilo === 'none') ? 'sparks' : estilo;
+      }
+      return v;
+    }
+
     function readTimerConfigFromForm() {
       const cfg = {
         initial_time_s: parseTimeString(els.timerInitialTime?.value) || 300,
@@ -3740,6 +3841,8 @@
         digit_effect: els.timerDigitEffect?.value || "none",
         color_preset: els.timerColorPreset?.value || "neon-green",
       };
+      // Fase 5 — motor visual (misma lectura que el auto-envio).
+      Object.assign(cfg, readVisualEngineFromForm());
       // Sanitize any NaN that the parser may have produced on bad input.
       for (const k of Object.keys(cfg)) {
         if (typeof cfg[k] === 'number' && !Number.isFinite(cfg[k])) {
@@ -3770,9 +3873,13 @@
           issues.push(key + " debe estar entre 0 y 2");
         }
       }
-      for (const key of ['on_complete_text_size','title_font_size','counter_font_size','subtitle_font_size']) {
-        if (cfg[key] !== undefined && (cfg[key] < 8 || cfg[key] > 400)) {
-          issues.push(key + " debe estar entre 8 y 400");
+      // Rangos reales del backend, por clave: antes se comprobaba 8..400 para
+      // todas, asi que un titulo de 300 px pasaba la validacion del cliente y el
+      // servidor lo bajaba a 200 en silencio.
+      for (const [key, max] of [['on_complete_text_size', 400], ['title_font_size', 200],
+                                ['counter_font_size', 400], ['subtitle_font_size', 200]]) {
+        if (cfg[key] !== undefined && (cfg[key] < 8 || cfg[key] > max)) {
+          issues.push(key + " debe estar entre 8 y " + max);
         }
       }
       const hexRe = /^#[0-9A-Fa-f]{3,8}$/;
@@ -3782,12 +3889,43 @@
           issues.push(key + " debe ser un color hex (#RRGGBB)");
         }
       }
+      // Fase 5: los efectos ambientales (V9) son validos; sin esto, elegir
+      // "Latido doble" daba un aviso falso de "debe ser none, glow o pulse".
       const effects = ['title_effect','counter_effect','subtitle_effect'];
-      const validEffects = new Set(['none','glow','pulse']);
+      const validEffects = new Set(['none','glow','pulse','heartbeat','float','flicker','shake']);
       for (const key of effects) {
         if (cfg[key] !== undefined && !validEffects.has(cfg[key])) {
-          issues.push(key + " debe ser uno de: none, glow, pulse");
+          issues.push(key + " debe ser uno de: none, glow, pulse, heartbeat, float, flicker, shake");
         }
+      }
+      // Fase 5: color vacio en el marco/medidor significa "sin color propio",
+      // y progress_color vacio significa "hereda el color del contador".
+      for (const key of ['frame_color','text_outline_color','progress_color']) {
+        if (cfg[key] !== undefined && cfg[key] !== '' && !hexRe.test(cfg[key])) {
+          issues.push(key + " debe ser un color hex (#RRGGBB) o vacio");
+        }
+      }
+      for (const [key, min, max] of [
+        ['canvas_width', 320, 7680], ['canvas_height', 320, 7680],
+        ['frame_opacity', 0, 100], ['frame_border_px', 0, 12],
+        ['frame_radius_px', 0, 64], ['frame_padding_px', 0, 120],
+        ['text_outline_px', 0, 8], ['warn_seconds', 0, 3600], ['danger_seconds', 0, 3600],
+        ['progress_thickness_px', 1, 40], ['particles_budget', 10, 300],
+      ]) {
+        if (cfg[key] !== undefined && (cfg[key] < min || cfg[key] > max)) {
+          issues.push(key + " debe estar entre " + min + " y " + max);
+        }
+      }
+      if (cfg.particles_density !== undefined
+          && (cfg.particles_density < 0.25 || cfg.particles_density > 2)) {
+        issues.push("particles_density debe estar entre 0.25 y 2");
+      }
+      // El backend acota peligro a aviso (si no, el estado de aviso nunca se
+      // pintaria). Se avisa aqui para que el operador no vea un valor que no es.
+      if (cfg.warn_seconds !== undefined && cfg.danger_seconds !== undefined
+          && cfg.danger_seconds > cfg.warn_seconds) {
+        issues.push("danger_seconds no puede ser mayor que warn_seconds (el servidor lo bajaria a "
+          + cfg.warn_seconds + ")");
       }
       return issues;
     }
@@ -3982,12 +4120,11 @@
       }
     });
 
-    els.timerImportConfig?.addEventListener("click", async () => {
-      try {
-        const text = await navigator.clipboard.readText();
-        const config = JSON.parse(text);
-        if (typeof config !== "object" || config === null) throw new Error("No es un objeto JSON");
-        // Fill form fields from imported config
+    // V2 (Fase 2): poblado del formulario desde un objeto de config del
+    // servidor. Antes vivia inline dentro del handler de Importar; se extrae
+    // para poder reutilizarlo tambien al abrir el panel (si no, el formulario
+    // mostraba los defaults del HTML y el hot path revertia el diseno).
+    function populateTimerFormFromConfig(config) {
         const parseTimeStr = (v) => typeof v === "number" ? String(Math.round(v)) : (v || "");
         if (config.initial_time_s !== undefined) els.timerInitialTime.value = parseTimeStr(config.initial_time_s);
         if (config.max_time_s !== undefined) els.timerMaxTime.value = config.max_time_s;
@@ -4048,10 +4185,65 @@
         // V3: digit effect, palette
         if (config.digit_effect !== undefined && els.timerDigitEffect) els.timerDigitEffect.value = config.digit_effect;
         if (config.color_preset !== undefined && els.timerColorPreset) els.timerColorPreset.value = config.color_preset;
+
+        // Fase 5 — motor visual. Se rellena con el mismo cuidado que el resto: si un
+        // control no existe, la clave se ignora sin romper el resto del formulario.
+        const setV = (el, value) => { if (el && value !== undefined && value !== null) el.value = value; };
+        const setC = (el, value) => { if (el && value !== undefined) el.checked = !!value; };
+
+        setV(els.timerScaleMode, config.scale_mode);
+        setV(els.timerCanvasWidth, config.canvas_width);
+        setV(els.timerCanvasHeight, config.canvas_height);
+
+        setV(els.timerFrameStyle, config.frame_style);
+        setV(els.timerFrameColor, config.frame_color);
+        setV(els.timerFrameOpacity, config.frame_opacity);
+        setV(els.timerFrameBorderPx, config.frame_border_px);
+        setV(els.timerFrameRadiusPx, config.frame_radius_px);
+        setV(els.timerFramePaddingPx, config.frame_padding_px);
+        setC(els.timerFrameBrackets, config.frame_brackets);
+        setC(els.timerFrameGrid, config.frame_grid);
+        setC(els.timerFrameScanlines, config.frame_scanlines);
+
+        setV(els.timerTextOutlinePx, config.text_outline_px);
+        setV(els.timerTextOutlineColor, config.text_outline_color);
+        setV(els.timerTimeSeparator, config.time_separator);
+        setC(els.timerShowHours, config.show_hours);
+
+        setV(els.timerWarnSeconds, config.warn_seconds);
+        setV(els.timerDangerSeconds, config.danger_seconds);
+        setV(els.timerDangerEffect, config.danger_effect);
+
+        setV(els.timerProgressStyle, config.progress_style);
+        setV(els.timerProgressThicknessPx, config.progress_thickness_px);
+        // Cadena vacia significa "hereda el color del contador": eso es la casilla.
+        if (config.progress_color !== undefined && els.timerProgressColor) {
+          const hereda = !config.progress_color;
+          if (els.timerProgressColorAuto) els.timerProgressColorAuto.checked = hereda;
+          if (!hereda) els.timerProgressColor.value = config.progress_color;
+        }
+
+        setC(els.timerParticlesEnabled, config.particles_enabled);
+        setV(els.timerParticlesStyle, config.particles_style);
+        setV(els.timerParticlesBudget, config.particles_budget);
+        setV(els.timerParticlesDensity, config.particles_density);
+        setC(els.timerParticlesForce, config.particles_force);
+
+        // Los sub-controles se apagan si su control maestro esta apagado.
+        if (typeof updateVisualCoherence === 'function') updateVisualCoherence();
+
         // Sync +Resplandor toggles
         if (typeof updateGlowToggles === 'function') updateGlowToggles();
         // Trigger preview update
         updateSubtitlePreview();
+    }
+
+    els.timerImportConfig?.addEventListener("click", async () => {
+      try {
+        const text = await navigator.clipboard.readText();
+        const config = JSON.parse(text);
+        if (typeof config !== "object" || config === null) throw new Error("No es un objeto JSON");
+        populateTimerFormFromConfig(config);
         // Auto-apply imported config so the operator does not have to click
         // "Aplicar" again. If validation fails the status line shows the
         // issue and the form keeps the imported values.
@@ -4060,6 +4252,25 @@
         setText(els.timerConfigStatus, "Error al importar: formato inv\u00e1lido", { animate: true });
       }
     });
+
+    // V2 (Fase 2): al abrir el panel, el formulario debe reflejar lo que hay
+    // GUARDADO en el servidor, no los defaults del HTML. Sin esto, el formulario
+    // mostraba los valores de fabrica y como el hot path reenvia las claves
+    // visuales del formulario, tocar cualquier control revertia el diseno del
+    // operador a esos defaults. No se aplica nada de vuelta: el servidor ya es
+    // la fuente de verdad, solo se pinta en el formulario.
+    (async function loadTimerConfigOnStartup() {
+      try {
+        const resp = await fetch("/api/timer/config");
+        if (!resp.ok) return;
+        const data = await resp.json();
+        if (data && data.config) {
+          populateTimerFormFromConfig(data.config);
+        }
+      } catch (_e) {
+        // Si falla, el formulario se queda como esta; no se rompe el panel.
+      }
+    })();
 
     // --- Timer control buttons ---
     const timerAction = (path) => {
@@ -4125,53 +4336,95 @@
 
     // --- Auto-send visual config on change (hot) with debounce ---
     let hotConfigTimer = null;
+    // Fase 5 — coherencia de los controles visuales. Un sub-control que no aplica
+    // se desactiva en vez de quedarse ahi como si hiciera algo. Desactivar no
+    // pierde el valor: readVisualEngineFromForm lee .value aunque este disabled.
+    function updateVisualCoherence() {
+      const set = (key, enabled) => {
+        const el = els[key];
+        if (!el) return;
+        el.disabled = !enabled;
+        const grupo = el.closest ? el.closest('.tv-group, .tv-chip') : null;
+        if (grupo) grupo.style.opacity = enabled ? '' : '0.45';
+      };
+
+      const marco = (els.timerFrameStyle?.value || 'none') !== 'none';
+      ['timerFrameColor', 'timerFrameOpacity', 'timerFrameBorderPx', 'timerFrameRadiusPx',
+       'timerFramePaddingPx', 'timerFrameBrackets', 'timerFrameGrid', 'timerFrameScanlines']
+        .forEach(k => set(k, marco));
+
+      // Con escala "off" el lienzo no se usa: se pide tamano literal.
+      const lienzo = (els.timerScaleMode?.value || 'auto') !== 'off';
+      set('timerCanvasWidth', lienzo);
+      set('timerCanvasHeight', lienzo);
+
+      const medidor = (els.timerProgressStyle?.value || 'none') !== 'none';
+      ['timerProgressThicknessPx', 'timerProgressColor', 'timerProgressColorAuto']
+        .forEach(k => set(k, medidor));
+      // Si hereda el color del contador, el color propio no aplica.
+      if (medidor) set('timerProgressColor', !els.timerProgressColorAuto?.checked);
+
+      const particulas = !!els.timerParticlesEnabled?.checked;
+      ['timerParticlesStyle', 'timerParticlesBudget', 'timerParticlesDensity', 'timerParticlesForce']
+        .forEach(k => set(k, particulas));
+    }
+
     function sendTimerConfigHot() {
       if (hotConfigTimer) clearTimeout(hotConfigTimer);
-      hotConfigTimer = setTimeout(async () => {
-        hotConfigTimer = null;
-        const config = {
-          title_text: els.timerTitleText?.value ?? "🎯 Extiende el Live",
-          subtitle_text: els.timerSubtitleText?.value ?? "📌 Cada coin suma {time_per_gift_coin}s",
-          popup_add_color: els.timerPopupAddColor?.value || "#00AAFF",
-          popup_subtract_color: els.timerPopupSubtractColor?.value || "#FF4444",
-          on_complete_text: els.timerCompleteText?.value || "TIEMPO CUMPLIDO",
-          on_complete_text_color: els.timerCompleteTextColor?.value || "#FFD700",
-          on_complete_text_size: parseInt(els.timerCompleteTextSize?.value, 10) || 48,
-          title_font_size: parseInt(els.timerTitleFontSize?.value, 10) || 48,
-          title_font_color: els.timerTitleFontColor?.value || "#FFFFFF",
-          title_font_family: els.timerTitleFontFamily?.value || "Segoe UI, sans-serif",
-          title_bold: !!els.timerTitleBold?.checked,
-          counter_font_size: parseInt(els.timerCounterFontSize?.value, 10) || 120,
-          counter_font_color: els.timerCounterFontColor?.value || "#00FF88",
-          counter_font_family: els.timerCounterFontFamily?.value || "Segoe UI, monospace",
-          counter_bold: !!els.timerCounterBold?.checked,
-          subtitle_font_size: parseInt(els.timerSubtitleFontSize?.value, 10) || 32,
-          subtitle_font_color: els.timerSubtitleFontColor?.value || "#AAAAAA",
-          subtitle_font_family: els.timerSubtitleFontFamily?.value || "Segoe UI, sans-serif",
-          subtitle_bold: !!els.timerSubtitleBold?.checked,
-          title_effect: els.timerTitleEffect?.value || "none",
-          counter_effect: els.timerCounterEffect?.value || "none",
-          subtitle_effect: els.timerSubtitleEffect?.value || "none",
-          title_glow_enabled: !!els.timerTitleGlow?.checked,
-          counter_glow_enabled: !!els.timerCounterGlow?.checked,
-          subtitle_glow_enabled: !!els.timerSubtitleGlow?.checked,
-          glow_color: els.timerGlowColor?.value || "#FFD700",
-          glow_intensity_px: parseInt(els.timerGlowIntensity?.value, 10) || 8,
-          pulse_speed_s: parseFloat(els.timerPulseSpeed?.value) || 1.5,
-          // V3: digit effect, palette
-          digit_effect: els.timerDigitEffect?.value || "none",
-          color_preset: els.timerColorPreset?.value || "neon-green",
-        };
-        try {
-          await apiPostJson("/api/timer/configure", config);
-          // Refresh preview if visible
-          if (typeof previewVisible !== 'undefined' && previewVisible) {
-            setTimeout(updatePreviewUrl, 200);
+      // Devuelve una promesa con el resultado real del POST para que quien lo
+      // llame (los botones de diseno) pueda informar sin inventarse el exito.
+      return new Promise((resolve) => {
+        hotConfigTimer = setTimeout(async () => {
+          hotConfigTimer = null;
+          const config = {
+            title_text: els.timerTitleText?.value ?? "🎯 Extiende el Live",
+            subtitle_text: els.timerSubtitleText?.value ?? "📌 Cada coin suma {time_per_gift_coin}s",
+            popup_add_color: els.timerPopupAddColor?.value || "#00AAFF",
+            popup_subtract_color: els.timerPopupSubtractColor?.value || "#FF4444",
+            on_complete_text: els.timerCompleteText?.value || "TIEMPO CUMPLIDO",
+            on_complete_text_color: els.timerCompleteTextColor?.value || "#FFD700",
+            on_complete_text_size: parseInt(els.timerCompleteTextSize?.value, 10) || 48,
+            title_font_size: parseInt(els.timerTitleFontSize?.value, 10) || 48,
+            title_font_color: els.timerTitleFontColor?.value || "#FFFFFF",
+            title_font_family: els.timerTitleFontFamily?.value || "Segoe UI, sans-serif",
+            title_bold: !!els.timerTitleBold?.checked,
+            counter_font_size: parseInt(els.timerCounterFontSize?.value, 10) || 120,
+            counter_font_color: els.timerCounterFontColor?.value || "#00FF88",
+            counter_font_family: els.timerCounterFontFamily?.value || "Segoe UI, monospace",
+            counter_bold: !!els.timerCounterBold?.checked,
+            subtitle_font_size: parseInt(els.timerSubtitleFontSize?.value, 10) || 32,
+            subtitle_font_color: els.timerSubtitleFontColor?.value || "#AAAAAA",
+            subtitle_font_family: els.timerSubtitleFontFamily?.value || "Segoe UI, sans-serif",
+            subtitle_bold: !!els.timerSubtitleBold?.checked,
+            title_effect: els.timerTitleEffect?.value || "none",
+            counter_effect: els.timerCounterEffect?.value || "none",
+            subtitle_effect: els.timerSubtitleEffect?.value || "none",
+            title_glow_enabled: !!els.timerTitleGlow?.checked,
+            counter_glow_enabled: !!els.timerCounterGlow?.checked,
+            subtitle_glow_enabled: !!els.timerSubtitleGlow?.checked,
+            glow_color: els.timerGlowColor?.value || "#FFD700",
+            glow_intensity_px: parseInt(els.timerGlowIntensity?.value, 10) || 8,
+            pulse_speed_s: parseFloat(els.timerPulseSpeed?.value) || 1.5,
+            // V3: digit effect, palette
+            digit_effect: els.timerDigitEffect?.value || "none",
+            color_preset: els.timerColorPreset?.value || "neon-green",
+            // Fase 5 — motor visual (mismas 27 claves que el camino "Aplicar").
+            ...readVisualEngineFromForm(),
+          };
+          try {
+            await apiPostJson("/api/timer/configure", config);
+            // Refresh preview if visible
+            if (typeof previewVisible !== 'undefined' && previewVisible) {
+              setTimeout(updatePreviewUrl, 200);
+            }
+            resolve(true);
+          } catch (_e) {
+            // Fallo del auto-envio: no es critico para el operador (el siguiente
+            // cambio reintenta), pero quien haya pedido confirmacion la recibe.
+            resolve(false);
           }
-        } catch (_e) {
-          // silent — auto-send errors are non-critical
-        }
-      }, 350);
+        }, 350);
+      });
     }
 
     // Wire auto-send to all visual/styling controls
@@ -4186,7 +4439,21 @@
       'timerDigitEffect', 'timerColorPreset',
       'timerCompleteText', 'timerCompleteTextColor', 'timerCompleteTextSize',
       'timerPopupAddColor', 'timerPopupSubtractColor',
-      'timerTitleText', 'timerSubtitleText'
+      'timerTitleText', 'timerSubtitleText',
+      // Fase 5 — motor visual. Todo lo que se ve en pantalla se aplica en vivo
+      // (el operador esta en directo: obligarle a pulsar "Aplicar" para un color
+      // era justo el problema del sistema de configuracion anterior).
+      'timerScaleMode', 'timerCanvasWidth', 'timerCanvasHeight',
+      'timerFrameStyle', 'timerFrameColor', 'timerFrameOpacity',
+      'timerFrameBorderPx', 'timerFrameRadiusPx', 'timerFramePaddingPx',
+      'timerFrameBrackets', 'timerFrameGrid', 'timerFrameScanlines',
+      'timerTextOutlinePx', 'timerTextOutlineColor',
+      'timerTimeSeparator', 'timerShowHours',
+      'timerWarnSeconds', 'timerDangerSeconds', 'timerDangerEffect',
+      'timerProgressStyle', 'timerProgressThicknessPx',
+      'timerProgressColor', 'timerProgressColorAuto',
+      'timerParticlesEnabled', 'timerParticlesStyle',
+      'timerParticlesBudget', 'timerParticlesDensity', 'timerParticlesForce'
     ];
     hotControls.forEach(id => {
       const el = els[id];
@@ -4225,6 +4492,164 @@
     }
     document.querySelectorAll('[data-preset]').forEach(btn => {
       btn.addEventListener('click', () => applyEffectPreset(btn.dataset.preset));
+    });
+
+    // Los sub-controles se apagan solos cuando su control maestro esta apagado.
+    ['timerFrameStyle', 'timerScaleMode', 'timerProgressStyle',
+     'timerProgressColorAuto', 'timerParticlesEnabled'].forEach(key => {
+      const el = els[key];
+      if (el) el.addEventListener('change', updateVisualCoherence);
+    });
+    updateVisualCoherence();
+
+    // --- Fase 5: disenos completos -------------------------------------------
+    // Cada boton escribe un juego completo de controles y envia UNA configuracion
+    // (no depende del debounce control a control). "Clasico" no es un estilo mas:
+    // son exactamente los valores por defecto del backend, para poder volver al
+    // aspecto de siempre sin tocar nada a mano.
+    const DESIGN_PRESETS = {
+      hud: {
+        label: 'HUD \u00d3rbita',
+        controls: {
+          timerScaleMode: 'auto',
+          timerFrameStyle: 'neon', timerFrameColor: '#00FFFF', timerFrameOpacity: 9,
+          timerFrameBorderPx: 1, timerFrameRadiusPx: 4, timerFramePaddingPx: 28,
+          timerFrameBrackets: true, timerFrameGrid: true, timerFrameScanlines: true,
+          timerTextOutlinePx: 0, timerTextOutlineColor: '#00131A',
+          timerTimeSeparator: ':', timerShowHours: true,
+          timerWarnSeconds: 60, timerDangerSeconds: 10, timerDangerEffect: 'glitch',
+          timerProgressStyle: 'ring', timerProgressThicknessPx: 6, timerProgressColorAuto: true,
+          timerParticlesEnabled: true, timerParticlesStyle: 'sparks',
+          timerParticlesBudget: 120, timerParticlesDensity: 1, timerParticlesForce: false,
+          timerTitleFontFamily: 'Rajdhani, sans-serif',
+          timerCounterFontFamily: '"Chakra Petch", sans-serif',
+          timerSubtitleFontFamily: '"JetBrains Mono", monospace',
+          timerTitleFontSize: 24, timerCounterFontSize: 150, timerSubtitleFontSize: 18,
+          timerTitleFontColor: '#E8FFFF', timerCounterFontColor: '#00FFFF',
+          timerSubtitleFontColor: '#7DF9FF',
+          timerTitleBold: true, timerCounterBold: true, timerSubtitleBold: false,
+          timerTitleEffect: 'none', timerCounterEffect: 'none', timerSubtitleEffect: 'none',
+          timerTitleGlow: false, timerCounterGlow: false, timerSubtitleGlow: false,
+          timerGlowColor: '#00FFFF', timerGlowIntensity: '8', timerPulseSpeed: '1.5',
+          timerDigitEffect: 'blur', timerColorPreset: 'cyber-blue',
+        },
+      },
+      glass: {
+        label: 'Cristal L\u00edquido',
+        controls: {
+          timerScaleMode: 'auto',
+          timerFrameStyle: 'glass', timerFrameColor: '#FFFFFF', timerFrameOpacity: 10,
+          timerFrameBorderPx: 1, timerFrameRadiusPx: 28, timerFramePaddingPx: 32,
+          timerFrameBrackets: false, timerFrameGrid: false, timerFrameScanlines: false,
+          timerTextOutlinePx: 0, timerTextOutlineColor: '#000000',
+          timerTimeSeparator: '\u00b7', timerShowHours: true,
+          timerWarnSeconds: 60, timerDangerSeconds: 10, timerDangerEffect: 'flash',
+          timerProgressStyle: 'ring', timerProgressThicknessPx: 4, timerProgressColorAuto: true,
+          timerParticlesEnabled: false, timerParticlesStyle: 'none',
+          timerParticlesBudget: 120, timerParticlesDensity: 1, timerParticlesForce: false,
+          timerTitleFontFamily: '"JetBrains Mono", monospace',
+          timerCounterFontFamily: '"Space Mono", monospace',
+          timerSubtitleFontFamily: '"JetBrains Mono", monospace',
+          timerTitleFontSize: 22, timerCounterFontSize: 170, timerSubtitleFontSize: 18,
+          timerTitleFontColor: '#F7F9FC', timerCounterFontColor: '#E8FFFF',
+          timerSubtitleFontColor: '#B0C4DE',
+          timerTitleBold: false, timerCounterBold: true, timerSubtitleBold: false,
+          timerTitleEffect: 'float', timerCounterEffect: 'none', timerSubtitleEffect: 'none',
+          timerTitleGlow: false, timerCounterGlow: false, timerSubtitleGlow: false,
+          timerGlowColor: '#6EE7F9', timerGlowIntensity: '4', timerPulseSpeed: '1.5',
+          timerDigitEffect: 'odometer', timerColorPreset: 'clean-white',
+        },
+      },
+      sticker: {
+        label: 'Pegatina Brutal',
+        controls: {
+          timerScaleMode: 'auto',
+          timerFrameStyle: 'card', timerFrameColor: '#F4F0E6', timerFrameOpacity: 94,
+          timerFrameBorderPx: 4, timerFrameRadiusPx: 20, timerFramePaddingPx: 24,
+          timerFrameBrackets: false, timerFrameGrid: false, timerFrameScanlines: false,
+          timerTextOutlinePx: 0, timerTextOutlineColor: '#111111',
+          timerTimeSeparator: ':', timerShowHours: true,
+          timerWarnSeconds: 60, timerDangerSeconds: 10, timerDangerEffect: 'flash',
+          timerProgressStyle: 'bar', timerProgressThicknessPx: 12, timerProgressColorAuto: true,
+          timerParticlesEnabled: true, timerParticlesStyle: 'confetti',
+          timerParticlesBudget: 60, timerParticlesDensity: 0.75, timerParticlesForce: false,
+          timerTitleFontFamily: 'Impact, sans-serif',
+          timerCounterFontFamily: '"JetBrains Mono", monospace',
+          timerSubtitleFontFamily: '"Chakra Petch", sans-serif',
+          timerTitleFontSize: 30, timerCounterFontSize: 130, timerSubtitleFontSize: 22,
+          timerTitleFontColor: '#111111', timerCounterFontColor: '#33FF66',
+          timerSubtitleFontColor: '#008080',
+          timerTitleBold: false, timerCounterBold: true, timerSubtitleBold: false,
+          timerTitleEffect: 'none', timerCounterEffect: 'pop', timerSubtitleEffect: 'none',
+          timerTitleGlow: false, timerCounterGlow: false, timerSubtitleGlow: false,
+          timerGlowColor: '#FFD700', timerGlowIntensity: '8', timerPulseSpeed: '1.5',
+          timerDigitEffect: 'pop', timerColorPreset: 'rose-gold',
+        },
+      },
+      classic: {
+        label: 'Cl\u00e1sico',
+        controls: {
+          timerScaleMode: 'auto',
+          timerFrameStyle: 'none', timerFrameColor: '#00FFFF', timerFrameOpacity: 55,
+          timerFrameBorderPx: 1, timerFrameRadiusPx: 4, timerFramePaddingPx: 28,
+          timerFrameBrackets: false, timerFrameGrid: false, timerFrameScanlines: false,
+          timerTextOutlinePx: 0, timerTextOutlineColor: '#000000',
+          timerTimeSeparator: ':', timerShowHours: true,
+          timerWarnSeconds: 60, timerDangerSeconds: 10, timerDangerEffect: 'pulse',
+          timerProgressStyle: 'none', timerProgressThicknessPx: 6, timerProgressColorAuto: true,
+          timerParticlesEnabled: false, timerParticlesStyle: 'none',
+          timerParticlesBudget: 120, timerParticlesDensity: 1, timerParticlesForce: false,
+          timerTitleFontFamily: 'Segoe UI, sans-serif',
+          timerCounterFontFamily: 'Segoe UI, monospace',
+          timerSubtitleFontFamily: 'Segoe UI, sans-serif',
+          timerTitleFontSize: 48, timerCounterFontSize: 120, timerSubtitleFontSize: 32,
+          timerTitleFontColor: '#FFFFFF', timerCounterFontColor: '#00FF88',
+          timerSubtitleFontColor: '#AAAAAA',
+          timerTitleBold: false, timerCounterBold: false, timerSubtitleBold: false,
+          timerTitleEffect: 'none', timerCounterEffect: 'none', timerSubtitleEffect: 'none',
+          timerTitleGlow: false, timerCounterGlow: false, timerSubtitleGlow: false,
+          timerGlowColor: '#FFD700', timerGlowIntensity: '8', timerPulseSpeed: '1.5',
+          timerDigitEffect: 'none', timerColorPreset: 'neon-green',
+        },
+      },
+    };
+
+    let designStatusToken = 0;
+
+    function setDesignStatus(texto) {
+      if (!els.timerDesignStatus) return;
+      els.timerDesignStatus.textContent = texto;
+      const token = ++designStatusToken;
+      if (texto) {
+        window.setTimeout(() => {
+          if (designStatusToken === token && els.timerDesignStatus) {
+            els.timerDesignStatus.textContent = '';
+          }
+        }, 4000);
+      }
+    }
+
+    async function applyDesignPreset(name) {
+      const preset = DESIGN_PRESETS[name];
+      if (!preset) return;
+      const controls = preset.controls;
+      for (const key of Object.keys(controls)) {
+        const el = els[key];
+        if (!el) continue;
+        if (el.type === 'checkbox') el.checked = !!controls[key];
+        else el.value = controls[key];
+      }
+      if (typeof updateGlowToggles === 'function') updateGlowToggles();
+      updateVisualCoherence();
+      if (typeof updateSubtitlePreview === 'function') updateSubtitlePreview();
+      setDesignStatus(preset.label + ': aplicando...');
+      const ok = await sendTimerConfigHot();
+      setDesignStatus(ok ? preset.label + ' aplicado' : preset.label + ': no se pudo aplicar');
+    }
+
+    Object.keys(DESIGN_PRESETS).forEach(name => {
+      const btn = document.getElementById('timer-design-' + name);
+      if (btn) btn.addEventListener('click', () => { void applyDesignPreset(name); });
     });
   }
 

@@ -163,6 +163,42 @@ Aplicable a todos los proveedores (tiktools, euler, direct).
 | `LIVEPANEL_BRIDGE_HEARTBEAT_INTERVAL_SEC` | Heartbeat interval (default 15s) |
 | `LIVEPANEL_BRIDGE_HEARTBEAT_WARNING_AFTER_SEC` | Warning tras Ns sin eventos (default 60s) |
 | `LIVEPANEL_BRIDGE_SILENCE_TIMEOUT_SEC` | Desconectar tras Ns silencio (0=auto) |
+| `LIVEPANEL_BRIDGE_SOUND_ALERTS_ENABLED` | `false` desactiva las alertas sonoras (default `true`) |
+| `LIVEPANEL_BRIDGE_SOUND_ALERTS_REQUIRE_PANEL` | `false` emite las alertas aunque no haya panel (default `true`) |
+
+## Alertas sonoras
+
+El bridge pita en los cambios de estado de conexión (dos tonos ascendentes al
+conectar, tres descendentes al desconectar, un tono al reconectar).
+
+**Sin panel conectado no suenan.** La alerta existe para avisar al operador, y el
+operador está mirando el panel: si el panel no está, el pitido no tiene
+destinatario. Esto importa porque el bridge **sobrevive al panel a propósito**
+(resiliencia ante reinicios, con buffer de eventos), así que antes se quedaba
+pitando en cada intento de reconexión con el panel ya cerrado. Cuando se silencia,
+queda contabilizado en la métrica `sound_alerts_suppressed_total`.
+
+Comportamiento por defecto, en `bridge_config.yaml`:
+
+```yaml
+sound_alerts:
+  enabled: true
+  require_panel: true
+```
+
+Alternativas:
+
+```bash
+# Silencio total, pase lo que pase
+python run_tiktok_bridge.py --no-sound-alerts ...
+
+# Aviso incondicional (comportamiento anterior: pita aunque no haya panel)
+python run_tiktok_bridge.py --sound-alerts-without-panel ...
+```
+
+Si lo que quieres es que el bridge **no sobreviva** al panel, la vía soportada es
+`POST /shutdown` en el puerto de control — que es lo que hace el panel al cerrarse
+(`ExternalBridgeRunner::stop`).
 
 ## Validación de Entorno
 

@@ -18,14 +18,19 @@ class TikTokBridgeService:
         self.config = config
         self.metrics = MetricsRegistry()
         self.logger = configure_logger(level=config.logging.level, log_path=config.logging.log_path)
+        # El sink se guarda aparte para que el ConnectionManager pueda consultar
+        # si el panel sigue escuchando antes de emitir alertas sonoras.
+        panel_ws_sink = (
+            PanelWsSink(config.output.panel_ws_url, connect_websocket)
+            if config.output.panel_ws_url
+            else None
+        )
         self.dispatcher = AsyncEventDispatcher(
             metrics=self.metrics,
             queue_size=config.buffer.size,
             batch_size=config.buffer.batch_size,
             overflow_policy=config.buffer.overflow_policy,
-            panel_ws_sink=PanelWsSink(config.output.panel_ws_url, connect_websocket)
-            if config.output.panel_ws_url
-            else None,
+            panel_ws_sink=panel_ws_sink,
             jsonl_path=config.output.output_jsonl,
             inbox_dir=config.output.inbox_dir,
             session_name=config.output.session_name,
@@ -53,6 +58,9 @@ class TikTokBridgeService:
             metrics=self.metrics,
             event_callback=self._publish_event,
             status_callback=self._publish_status,
+            panel_attached=(lambda: panel_ws_sink.is_attached)
+            if panel_ws_sink is not None
+            else None,
         )
         self._connection_task = None
         self._replay_task = None

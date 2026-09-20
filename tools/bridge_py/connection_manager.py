@@ -125,6 +125,7 @@ class ConnectionManager:
         metrics: MetricsRegistry,
         event_callback: EventCallback,
         status_callback: StatusCallback,
+        panel_attached: Callable[[], bool] | None = None,
     ) -> None:
         self._config = config
         self._logger = logger
@@ -135,13 +136,32 @@ class ConnectionManager:
         self._reconnect_limiter = ReconnectRateLimiter(
             config.retry_policy.max_reconnect_per_hour
         )
-        self._sound = SoundAlerts(enabled=True)
+        self._sound = SoundAlerts(enabled=config.sound_alerts.enabled)
+        self._sound_requires_panel = config.sound_alerts.require_panel
+        self._panel_attached = panel_attached
         self._last_played_state = ""
         # Pool de credenciales: se rota cuando el proveedor agota la cuota.
         self._api_keys = self._config.connection.effective_api_keys()
         self._key_index = 0
         # Indice de key -> instante (monotonic) hasta el que queda en cuarentena.
         self._key_cooldown_until: dict[int, float] = {}
+
+    def _panel_allows_sound(self) -> bool:
+        """False cuando no hay panel a quien avisar.
+
+        El bridge puede sobrevivir al panel a proposito (resiliencia ante
+        reinicios), pero entonces las alertas sonoras no tienen destinatario y
+        solo molestan. Ante la duda se permite sonar: nunca silenciar por un
+        fallo del propio predicado.
+        """
+        if not self._sound_requires_panel:
+            return True
+        if self._panel_attached is None:
+            return True
+        try:
+            return bool(self._panel_attached())
+        except Exception:
+            return True
 
     def _key_cooldown_seconds(self) -> float:
         configured_minutes = float(getattr(self._config.retry_policy, "key_cooldown_minutes", 0) or 0)
@@ -217,7 +237,9 @@ class ConnectionManager:
             # Play sound on meaningful state transitions
             state_key = status.connection_state.value
             if state_key != self._last_played_state and self._sound.should_alert(state_key):
-                if state_key == "connected":
+                if not self._panel_allows_sound():
+                    self._metrics.increment("sound_alerts_suppressed_total")
+                elif state_key == "connected":
                     await self._sound.play_connected()
                     log_json(self._logger, "info", "sound_alert", "play: connected")
                 elif state_key in ("disconnected", "faulted"):
