@@ -1997,8 +1997,16 @@ body::-webkit-scrollbar-corner,
 
 .activity-panel {
   display: grid;
-  grid-template-rows: auto auto auto auto minmax(360px, auto);
+  grid-template-rows: auto auto minmax(360px, auto);
   gap: 12px;
+}
+
+/* Estado y alertas de la conexion TikTok: viven en el panel de Connection,
+   debajo del boton Conectar, para que el operador los vea donde actua. */
+.connection-panel {
+  display: grid;
+  gap: 12px;
+  align-content: start;
 }
 
 /* Franja de estado del live: fase, detalle y cronometro de sesion. */

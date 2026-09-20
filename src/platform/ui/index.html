@@ -110,19 +110,6 @@
               <button class="secondary-button" id="disconnect-button" type="button" hidden>Desconectar</button>
             </div>
           </form>
-        </section>
-
-        <section class="panel activity-panel" aria-labelledby="activity-title">
-          <header class="panel-header panel-header-compact">
-            <div class="panel-title-group">
-              <p class="panel-kicker">Monitor</p>
-              <h2 id="activity-title">Actividad del live</h2>
-            </div>
-            <div class="panel-header-actions">
-              <span class="summary-note" id="activity-updated">Esperando</span>
-              <button class="secondary-button activity-clear-button" id="activity-clear-button" type="button">Limpiar eventos</button>
-            </div>
-          </header>
 
           <div class="live-status-strip" id="live-status-strip" data-tone="idle">
             <span class="live-status-dot" id="live-status-dot" aria-hidden="true"></span>
@@ -140,6 +127,19 @@
             </div>
             <ul class="live-alerts-list" id="live-alerts-list"></ul>
           </div>
+        </section>
+
+        <section class="panel activity-panel" aria-labelledby="activity-title">
+          <header class="panel-header panel-header-compact">
+            <div class="panel-title-group">
+              <p class="panel-kicker">Monitor</p>
+              <h2 id="activity-title">Actividad del live</h2>
+            </div>
+            <div class="panel-header-actions">
+              <span class="summary-note" id="activity-updated">Esperando</span>
+              <button class="secondary-button activity-clear-button" id="activity-clear-button" type="button">Limpiar eventos</button>
+            </div>
+          </header>
 
           <div class="activity-feed-meta">
             <span>Usuario: <strong id="activity-feed-user">@-</strong></span>

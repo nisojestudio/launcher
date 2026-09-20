@@ -269,6 +269,22 @@ int main() {
     if (!require(html.find("auth-meta-grid") != std::string::npos, "html auth meta grid")) return 1;
     if (!require(html.find("auth-brand-copy-group") != std::string::npos, "html auth brand copy group")) return 1;
     if (!require(html.find("/game-previews.js") != std::string::npos, "html game previews asset")) return 1;
+    // El estado y las alertas del live deben vivir en el panel de conexion
+    // TikTok (debajo del boton Conectar), no en el monitor de actividad.
+    if (!require(html.find("live-status-strip") != std::string::npos, "html live status strip")) return 1;
+    if (!require(html.find("live-status-phase") != std::string::npos, "html live status phase")) return 1;
+    if (!require(html.find("live-alerts-list") != std::string::npos, "html live alerts list")) return 1;
+    const auto connection_section = html.find("Conexi&oacute;n</h2>");
+    const auto activity_section = html.find("Actividad del live</h2>");
+    const auto live_strip_position = html.find("id=\"live-status-strip\"");
+    if (!require(connection_section != std::string::npos, "html connection section")) return 1;
+    if (!require(activity_section != std::string::npos, "html activity section")) return 1;
+    if (!require(live_strip_position != std::string::npos, "html live strip position")) return 1;
+    if (!require(
+            connection_section < live_strip_position && live_strip_position < activity_section,
+            "html live status strip lives inside the connection panel")) {
+        return 1;
+    }
 
     const auto css = issue_request(panel_app, kPort, make_get_request("/app.css"));
     if (!require(css.find("HTTP/1.1 200 OK") != std::string::npos, "css 200")) return 1;
@@ -286,6 +302,8 @@ int main() {
     if (!require(css.find("position: sticky;") != std::string::npos, "css sticky action areas")) return 1;
     if (!require(css.find("body::-webkit-scrollbar") != std::string::npos, "css body scrollbar")) return 1;
     if (!require(css.find(".metric-danger") != std::string::npos, "css latency tone")) return 1;
+    if (!require(css.find(".live-status-strip") != std::string::npos, "css live status strip")) return 1;
+    if (!require(css.find(".live-alerts") != std::string::npos, "css live alerts banner")) return 1;
 
     const auto js = issue_request(panel_app, kPort, make_get_request("/app.js"));
     if (!require(js.find("HTTP/1.1 200 OK") != std::string::npos, "js 200")) return 1;
