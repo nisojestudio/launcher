@@ -166,3 +166,24 @@ Cada etapa debe terminar con:
 - No borrar código heredado útil sin justificarlo.
 - No mezclar core y render en la misma responsabilidad si puede evitarse.
 - No introducir cambios grandes sin dejar una ruta de reversión o comparación.
+
+## 11. Estado del release (baseline actual)
+
+- Versión en `master`: **0.3.0** (2026-09-20). Tag: `v0.3.0`.
+- Artefactos: `dist/releases/0.3.0/installer/panel-live-0.3.0-win-x64.exe`,
+  `dist/releases/0.3.0/panel-live-0.3.0-win-x64-portable.zip`, `SHA256SUMS.txt` y
+  `release-manifest-0.3.0.json` (gates build/tests/installer/backup = `passed`).
+- Para lanzar un release, ejecutar el script (Hard Rules de
+  `docs/releases/RELEASE_PROTOCOL.md`), cargando ANTES el entorno MSVC: en este
+  equipo el paso `cmake --build --preset release` no lo hereda por sí solo y
+  falla con `fatal error C1083: 'cstddef'` (Rule 2).
+
+  ```powershell
+  cmd /c "call \"C:\Program Files (x86)\Microsoft Visual Studio\2022\BuildTools\VC\Auxiliary\Build\vcvars64.bat\" >nul && powershell -ExecutionPolicy Bypass -File .\scripts\release\prepare_release.ps1 -Version X.Y.Z -BackupMode code"
+  ```
+
+- `-BackupMode full` falla en este equipo (robocopy exit 8 por archivos
+  bloqueados); usar `code` y registrar el desvío si el protocolo pide `full`.
+- El release sincroniza `tools/bridge_py/*.py` hacia el paquete: era el desfase
+  que causó el incidente de la API key en 0.2.28/0.2.29.
+
