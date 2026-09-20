@@ -78,6 +78,9 @@ class RetryPolicyConfig:
     max_attempts: int = 5
     max_reconnect_per_hour: int = 10
     jitter_sec: float = 1.0
+    # Cuanto tiempo esperar a que la cuenta empiece el vivo antes de rendirse.
+    # 0 = esperar indefinidamente.
+    waiting_for_live_max_minutes: int = 30
 
 
 @dataclass(slots=True)
@@ -250,6 +253,13 @@ def load_bridge_config(path: str | Path | None = None) -> BridgeConfig:
                 1.0,
                 min_value=0.0,
                 max_value=10.0,
+            ),
+            waiting_for_live_max_minutes=_parse_int(
+                _env("LIVEPANEL_TIKTOK_WAIT_FOR_LIVE_MINUTES")
+                or retry_policy.get("waiting_for_live_max_minutes"),
+                30,
+                min_value=0,
+                max_value=1440,
             ),
         ),
         buffer=BufferConfig(

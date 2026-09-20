@@ -440,6 +440,46 @@ std::string make_simple_result(bool ok, std::string_view message) {
         + "}";
 }
 
+// Respuesta del bridge con codigo de error estable para la UI (`error`) y texto
+// humano ya listo para mostrar (`message`), mas el detalle del sondeo de entorno
+// para que el panel pueda explicar el motivo real en el monitor del live.
+std::string make_bridge_result(
+    bool ok,
+    std::string_view error_code,
+    std::string_view message,
+    const nlp3::platform::ExternalBridgeRunnerStatus* runner) {
+    std::string payload = "{"
+        "\"ok\":" + bool_json(ok) + ","
+        "\"error\":" + json_quote(error_code) + ","
+        "\"message\":" + json_quote(message);
+
+    if (runner != nullptr) {
+        payload += ",\"runnerRunning\":" + bool_json(runner->running);
+        payload += ",\"runnerError\":" + json_quote(runner->last_error);
+        payload += ",\"runtimeChecked\":" + bool_json(runner->runtime_checked);
+        payload += ",\"runtimeReady\":" + bool_json(runner->runtime_ready);
+        payload += ",\"runtimeSummary\":" + json_quote(runner->runtime_summary);
+        payload += ",\"runtimeAlerts\":[";
+        for (std::size_t index = 0; index < runner->runtime_alerts.size(); ++index) {
+            if (index > 0) {
+                payload += ",";
+            }
+            payload += json_quote(runner->runtime_alerts[index]);
+        }
+        payload += "],\"runtimeWarnings\":[";
+        for (std::size_t index = 0; index < runner->runtime_warnings.size(); ++index) {
+            if (index > 0) {
+                payload += ",";
+            }
+            payload += json_quote(runner->runtime_warnings[index]);
+        }
+        payload += "]";
+    }
+
+    payload += "}";
+    return payload;
+}
+
 std::string license_status_text(nlp3::platform::LicenseStatus status) {
     switch (status) {
     case nlp3::platform::LicenseStatus::active:
@@ -1358,7 +1398,7 @@ std::string handle_bridge_connect(PanelApp* app, std::string_view body) {
     target_user = normalize_tiktok_user(target_user);
 
     if (!is_valid_tiktok_user(target_user)) {
-        return make_simple_result(false, "invalid_tiktok_user");
+        return make_bridge_result(false, "invalid_tiktok_user", "Ese usuario de TikTok no es valido. Revisa el @ y volve a intentar.", nullptr);
     }
 
     auto api_key = parse_json_string(body, "api_key").value_or("");
@@ -1367,7 +1407,7 @@ std::string handle_bridge_connect(PanelApp* app, std::string_view body) {
         provider = "direct";
     }
     if (provider != "tiktools" && provider != "direct" && provider != "euler") {
-        return make_simple_result(false, "invalid_tiktok_provider");
+        return make_bridge_result(false, "invalid_tiktok_provider", "Proveedor no valido. Opciones: tik.tools, Euler Stream o directo.", nullptr);
     }
 
     // 1. Guardar en config persistente (siempre, sin importar bridge mode)
@@ -1383,7 +1423,11 @@ std::string handle_bridge_connect(PanelApp* app, std::string_view body) {
     if (!app->is_external_bridge_mode()) {
         app->config().bridge_mode = "external";
         app->save_config();
-        return make_simple_result(false, "bridge_not_external_mode_saved");
+        return make_bridge_result(
+            false,
+            "bridge_not_external_mode_saved",
+            "Configuracion guardada. El panel necesita reiniciarse en modo external para conectar.",
+            nullptr);
     }
 
     app->save_config();
@@ -1394,7 +1438,12 @@ std::string handle_bridge_connect(PanelApp* app, std::string_view body) {
     auto ws = app->external_ws_status();
     if (!ws.running || ws.port != port) {
         if (!app->start_external_ws(port)) {
-            return make_simple_result(false, "ws_start_failed");
+            return make_bridge_result(
+                false,
+                "ws_start_failed",
+                "No se pudo abrir el WebSocket interno del panel (puerto " + std::to_string(port)
+                    + "). Puede estar ocupado por una conexion anterior: cerra el panel y volve a intentar.",
+                nullptr);
         }
     }
 
@@ -1402,11 +1451,18 @@ std::string handle_bridge_connect(PanelApp* app, std::string_view body) {
     auto runner = app->external_runner_status();
     if (!runner.running) {
         if (!app->start_external_runner(target_user, 0)) {
-            return make_simple_result(false, "runner_start_failed");
+            const auto failed_runner = app->external_runner_status();
+            std::string reason = !failed_runner.runtime_summary.empty()
+                ? failed_runner.runtime_summary
+                : failed_runner.last_error;
+            if (reason.empty()) {
+                reason = "No se pudo iniciar el bridge de TikTok.";
+            }
+            return make_bridge_result(false, "runner_start_failed", reason, &failed_runner);
         }
     }
 
-    return make_simple_result(true, "bridge_connected");
+    return make_bridge_result(true, "bridge_connected", "Bridge conectado. Escuchando el live de TikTok.", nullptr);
 }
 
 std::string handle_bridge_disconnect(PanelApp* app) {
@@ -1453,6 +1509,14 @@ std::string handle_bridge_status(PanelApp* app) {
         << "\"runtime_ready\":" << (runner.runtime_ready ? "true" : "false") << ","
         << "\"runtime_checked\":" << (runner.runtime_checked ? "true" : "false") << ","
         << "\"runtime_summary\":" << json_quote(runner.runtime_summary) << ","
+        << "\"runtime_warnings\":[";
+    for (std::size_t index = 0; index < runner.runtime_warnings.size(); ++index) {
+        if (index > 0) {
+            out << ",";
+        }
+        out << json_quote(runner.runtime_warnings[index]);
+    }
+    out << "],"
         << "\"connection_state\":" << json_quote(app->external_bridge_manifest().connection_state)
         << "}";
     return out.str();
@@ -1727,6 +1791,14 @@ bool PanelHttpServer::start(std::uint16_t port) {
         status_.last_error = "socket create failed";
         return false;
     }
+
+    // Winsock crea sockets heredables y el panel lanza hijos con
+    // bInheritHandles=TRUE: sin esto el listener queda en el hijo y el puerto
+    // sobrevive como zombie cuando el panel termina.
+    SetHandleInformation(
+        reinterpret_cast<HANDLE>(listen_socket),
+        HANDLE_FLAG_INHERIT,
+        0);
 
     u_long nonblocking = 1;
     ioctlsocket(listen_socket, FIONBIO, &nonblocking);

@@ -241,6 +241,37 @@ int main() {
     assert(snapshot_after_direct_payload.external_bridge.last_status_message == "Direct WS status connected");
     assert(snapshot_after_direct_payload.external_bridge.last_status_timestamp_ms == 1710000005005);
 
+    // Diagnostico del monitor del live: la fase y la alerta llegan al snapshot.
+    const auto alert_status_payload = status_codec.encode_json(nlp3::bridge::TikTokExternalSessionStatus{
+        "ws_alert_target",
+        "",
+        nlp3::bridge::TikTokExternalSessionConnectionState::faulted,
+        "La cuenta no esta en vivo todavia. El panel sigue intentando.",
+        1710000006000,
+        "waiting",
+        "info",
+        "NOT_LIVE",
+        20.0,
+    });
+    assert(panel_app.submit_external_ws_payload(alert_status_payload));
+    const auto snapshot_after_alert = panel_app.snapshot();
+    assert(snapshot_after_alert.external_bridge.connection_state == "faulted");
+    assert(snapshot_after_alert.external_bridge.last_phase == "waiting");
+    assert(snapshot_after_alert.external_bridge.last_alert_code == "NOT_LIVE");
+    assert(snapshot_after_alert.external_bridge.last_alert_severity == "info");
+    assert(snapshot_after_alert.external_bridge.retry_in_sec == 20.0);
+
+    // El bridge puede mandar decimales (retry_in_sec); el parser no debe
+    // rechazar el mensaje completo por eso.
+    const auto fractional_payload =
+        "{\"message_type\":\"session_status\",\"target_user\":\"ws_alert_target\","
+        "\"connection_state\":\"reconnecting\",\"message\":\"Reintentando\","
+        "\"timestamp_ms\":1710000007000,\"retry_in_sec\":4.72,\"alert_code\":\"NETWORK_ERROR\"}";
+    const auto decoded_fractional = status_codec.decode_json(fractional_payload);
+    assert(decoded_fractional.has_value());
+    assert(decoded_fractional->alert_code == "NETWORK_ERROR");
+    assert(decoded_fractional->retry_in_sec >= 4.0 && decoded_fractional->retry_in_sec < 5.0);
+
     std::istringstream console_input;
     std::ostringstream console_output;
     nlp3::platform::PanelConsole panel_console{

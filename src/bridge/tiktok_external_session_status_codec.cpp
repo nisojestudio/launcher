@@ -150,10 +150,45 @@ private:
             return std::nullopt;
         }
 
+        // Parte fraccionaria y exponente: el bridge puede mandar decimales
+        // (p. ej. retry_in_sec: 4.72). Se consume la sintaxis completa para no
+        // rechazar el mensaje; el valor se guarda truncado porque el panel solo
+        // muestra segundos enteros.
+        const auto integer_end = position_;
+        if (position_ < input_.size() && input_[position_] == '.') {
+            ++position_;
+            const auto fraction_start = position_;
+            while (position_ < input_.size()
+                && std::isdigit(static_cast<unsigned char>(input_[position_])) != 0) {
+                ++position_;
+            }
+            if (fraction_start == position_) {
+                return std::nullopt;
+            }
+        }
+        if (position_ < input_.size()
+            && (input_[position_] == 'e' || input_[position_] == 'E')) {
+            auto exponent_position = position_ + 1;
+            if (exponent_position < input_.size()
+                && (input_[exponent_position] == '+' || input_[exponent_position] == '-')) {
+                ++exponent_position;
+            }
+            const auto exponent_digits_start = exponent_position;
+            while (exponent_position < input_.size()
+                && std::isdigit(static_cast<unsigned char>(input_[exponent_position])) != 0) {
+                ++exponent_position;
+            }
+            if (exponent_digits_start == exponent_position) {
+                return std::nullopt;
+            }
+            position_ = exponent_position;
+        }
+
         try {
             JsonValue number_value{};
             number_value.kind = JsonValueKind::number_value;
-            number_value.number_value = std::stoll(std::string(input_.substr(start, position_ - start)));
+            number_value.number_value = std::stoll(
+                std::string(input_.substr(start, integer_end - start)));
             return number_value;
         } catch (...) {
             return std::nullopt;
@@ -285,14 +320,31 @@ std::optional<std::int64_t> as_number(const JsonValue* value) {
 } // namespace
 
 std::string TikTokExternalSessionStatusCodec::encode_json(const TikTokExternalSessionStatus& status) const {
-    return "{"
+    std::string payload = "{"
         "\"message_type\":\"session_status\","
         "\"target_user\":\"" + escape_json_string(status.target_user) + "\","
         "\"room_id\":\"" + escape_json_string(status.room_id) + "\","
         "\"connection_state\":\"" + std::string(to_string(status.connection_state)) + "\","
         "\"message\":\"" + escape_json_string(status.message) + "\","
-        "\"timestamp_ms\":" + std::to_string(status.timestamp_ms)
-        + "}";
+        "\"timestamp_ms\":" + std::to_string(status.timestamp_ms);
+
+    // Campos opcionales de diagnostico: se emiten solo cuando tienen valor para
+    // mantener el payload compatible con paneles viejos.
+    if (!status.phase.empty()) {
+        payload += ",\"phase\":\"" + escape_json_string(status.phase) + "\"";
+    }
+    if (!status.severity.empty()) {
+        payload += ",\"severity\":\"" + escape_json_string(status.severity) + "\"";
+    }
+    if (!status.alert_code.empty()) {
+        payload += ",\"alert_code\":\"" + escape_json_string(status.alert_code) + "\"";
+    }
+    if (status.retry_in_sec > 0.0) {
+        payload += ",\"retry_in_sec\":" + std::to_string(status.retry_in_sec);
+    }
+
+    payload += "}";
+    return payload;
 }
 
 std::optional<TikTokExternalSessionStatus> TikTokExternalSessionStatusCodec::decode_json(
@@ -329,6 +381,20 @@ std::optional<TikTokExternalSessionStatus> TikTokExternalSessionStatusCodec::dec
     }
     if (const auto timestamp_ms = as_number(find_field(root->object_value, "timestamp_ms")); timestamp_ms.has_value()) {
         status.timestamp_ms = *timestamp_ms;
+    }
+    // Campos opcionales de diagnostico: un bridge viejo no los envia y el
+    // panel debe seguir funcionando igual.
+    if (const auto phase = as_string(find_field(root->object_value, "phase")); phase.has_value()) {
+        status.phase = std::move(*phase);
+    }
+    if (const auto severity = as_string(find_field(root->object_value, "severity")); severity.has_value()) {
+        status.severity = std::move(*severity);
+    }
+    if (const auto alert_code = as_string(find_field(root->object_value, "alert_code")); alert_code.has_value()) {
+        status.alert_code = std::move(*alert_code);
+    }
+    if (const auto retry_in_sec = as_number(find_field(root->object_value, "retry_in_sec")); retry_in_sec.has_value()) {
+        status.retry_in_sec = static_cast<double>(*retry_in_sec);
     }
 
     return status;

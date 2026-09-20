@@ -1098,6 +1098,10 @@ PanelSnapshot PanelApp::snapshot() const {
         empty_snapshot.external_bridge.last_status_message = external_manifest.last_status_message;
         empty_snapshot.external_bridge.last_status_timestamp_ms =
             external_manifest.last_status_timestamp_ms;
+        empty_snapshot.external_bridge.last_phase = external_manifest.last_phase;
+        empty_snapshot.external_bridge.last_alert_code = external_manifest.last_alert_code;
+        empty_snapshot.external_bridge.last_alert_severity = external_manifest.last_alert_severity;
+        empty_snapshot.external_bridge.retry_in_sec = external_manifest.retry_in_sec;
         empty_snapshot.external_bridge.current_room_id = external_manifest.current_room_id;
         empty_snapshot.external_bridge.last_event_kind = external_manifest.last_event_kind;
         empty_snapshot.external_bridge.last_event_actor = external_manifest.last_event_actor;
@@ -1122,6 +1126,7 @@ PanelSnapshot PanelApp::snapshot() const {
             external_manifest.runtime_checked_timestamp_ms;
         empty_snapshot.external_bridge.runtime_summary = external_manifest.runtime_summary;
         empty_snapshot.external_bridge.runtime_alerts = external_manifest.runtime_alerts;
+        empty_snapshot.external_bridge.runtime_warnings = external_manifest.runtime_warnings;
         empty_snapshot.external_bridge.runner_has_exit_code = external_manifest.runner_has_exit_code;
         empty_snapshot.external_bridge.runner_last_exit_code = external_manifest.runner_last_exit_code;
         empty_snapshot.external_bridge.runner_last_error = external_manifest.runner_last_error;
@@ -1327,6 +1332,10 @@ ExternalBridgeManifest PanelApp::external_bridge_manifest() const {
         external_bridge_connection_state_,
         external_bridge_last_status_message_,
         external_bridge_last_status_timestamp_ms_,
+        external_bridge_last_phase_,
+        external_bridge_last_alert_code_,
+        external_bridge_last_alert_severity_,
+        external_bridge_retry_in_sec_,
         external_bridge_current_room_id_,
         external_bridge_last_event_kind_,
         external_bridge_last_event_actor_,
@@ -1350,6 +1359,7 @@ ExternalBridgeManifest PanelApp::external_bridge_manifest() const {
         runner_status.runtime_checked_timestamp_ms,
         runner_status.runtime_summary,
         runner_status.runtime_alerts,
+        runner_status.runtime_warnings,
         runner_status.has_exit_code,
         runner_status.last_exit_code,
         runner_status.last_error,
@@ -1491,6 +1501,10 @@ bool PanelApp::submit_external_session_status(const bridge::TikTokExternalSessio
     external_bridge_connection_state_ = std::string(bridge::to_string(status.connection_state));
     external_bridge_last_status_message_ = status.message;
     external_bridge_last_status_timestamp_ms_ = status.timestamp_ms;
+    external_bridge_last_phase_ = status.phase;
+    external_bridge_last_alert_code_ = status.alert_code;
+    external_bridge_last_alert_severity_ = status.severity;
+    external_bridge_retry_in_sec_ = status.retry_in_sec;
     if (!status.room_id.empty()) {
         external_bridge_current_room_id_ = status.room_id;
     }

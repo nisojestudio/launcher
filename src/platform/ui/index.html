@@ -124,6 +124,23 @@
             </div>
           </header>
 
+          <div class="live-status-strip" id="live-status-strip" data-tone="idle">
+            <span class="live-status-dot" id="live-status-dot" aria-hidden="true"></span>
+            <div class="live-status-copy">
+              <strong id="live-status-phase">Sin conexi&oacute;n</strong>
+              <small id="live-status-detail">Ingres&aacute; un usuario y presion&aacute; Conectar.</small>
+            </div>
+            <span class="live-status-timer mono" id="live-status-timer" hidden>00:00</span>
+          </div>
+
+          <div class="live-alerts" id="live-alerts" hidden>
+            <div class="live-alerts-header">
+              <strong id="live-alerts-title">Alertas del live</strong>
+              <button class="secondary-button live-alerts-clear" id="live-alerts-clear" type="button">Limpiar</button>
+            </div>
+            <ul class="live-alerts-list" id="live-alerts-list"></ul>
+          </div>
+
           <div class="activity-feed-meta">
             <span>Usuario: <strong id="activity-feed-user">@-</strong></span>
             <span>&Uacute;ltimo: <strong id="activity-feed-last-type">-</strong></span>

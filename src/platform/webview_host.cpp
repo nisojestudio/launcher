@@ -213,6 +213,13 @@ bool probe_http_health(
         return false;
     }
 
+    // Los sockets de Winsock son heredables: marcarlo no-heredable evita que un
+    // proceso hijo (bridge/cloudflared) mantenga vivo el puerto del overlay.
+    SetHandleInformation(
+        reinterpret_cast<HANDLE>(socket_handle),
+        HANDLE_FLAG_INHERIT,
+        0);
+
     const DWORD timeout_ms = 40;
     setsockopt(
         socket_handle,

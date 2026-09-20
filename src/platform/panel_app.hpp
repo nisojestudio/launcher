@@ -206,6 +206,11 @@ private:
     std::string external_bridge_connection_state_{};
     std::string external_bridge_last_status_message_{};
     std::int64_t external_bridge_last_status_timestamp_ms_ = 0;
+    // Diagnostico del ultimo estado recibido del bridge (monitor del live).
+    std::string external_bridge_last_phase_{};
+    std::string external_bridge_last_alert_code_{};
+    std::string external_bridge_last_alert_severity_{};
+    double external_bridge_retry_in_sec_ = 0.0;
     std::string external_bridge_current_room_id_{};
     std::string external_bridge_last_event_kind_{};
     std::string external_bridge_last_event_actor_{};

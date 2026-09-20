@@ -64,12 +64,19 @@ class TikToolsConnectionTests(unittest.IsolatedAsyncioTestCase):
             api_key="test-key",
         )
         with mock.patch("tiktools_connection.websockets.connect", side_effect=connect_closed_socket):
-            await connection.open()
-            with self.assertRaises(TikToolsConnectionError) as raised:
-                await connection.wait_closed()
+            # `open()` ahora espera el handshake: si la sesion muere antes de
+            # confirmar la sala, el error sale de open() y no queda diferido.
+            try:
+                await connection.open()
+            except TikToolsConnectionError as exc:
+                raised = exc
+            else:
+                with self.assertRaises(TikToolsConnectionError) as context:
+                    await connection.wait_closed()
+                raised = context.exception
 
-        self.assertEqual(raised.exception.code, "API_SESSION_ENDED")
-        self.assertIn("4429", raised.exception.raw_error)
+        self.assertEqual(raised.code, "API_SESSION_ENDED")
+        self.assertIn("4429", raised.raw_error)
 
     async def test_live_end_event_is_classified_as_not_live(self) -> None:
         connection = TikToolsConnection(
@@ -82,11 +89,60 @@ class TikToolsConnectionTests(unittest.IsolatedAsyncioTestCase):
             api_key="test-key",
         )
         with mock.patch("tiktools_connection.websockets.connect", side_effect=connect_live_end_socket):
-            await connection.open()
-            with self.assertRaises(TikToolsConnectionError) as raised:
-                await connection.wait_closed()
+            try:
+                await connection.open()
+            except TikToolsConnectionError as exc:
+                raised = exc
+            else:
+                with self.assertRaises(TikToolsConnectionError) as context:
+                    await connection.wait_closed()
+                raised = context.exception
 
-        self.assertEqual(raised.exception.code, "NOT_LIVE")
+        self.assertEqual(raised.code, "NOT_LIVE")
+
+    async def test_connection_is_not_reported_connected_before_room_handshake(self) -> None:
+        """Sin evento roomInfo la sesion sigue en CONNECTING, no en CONNECTED."""
+
+        class SilentSocket(ClosedSocket):
+            close_code = None
+            close_reason = ""
+
+            def __init__(self) -> None:
+                self._release = asyncio.Event()
+
+            async def __anext__(self):
+                await self._release.wait()
+                raise StopAsyncIteration
+
+        socket_holder: dict[str, SilentSocket] = {}
+
+        async def connect_silent_socket(*_args, **_kwargs) -> SilentSocket:
+            socket_holder["socket"] = SilentSocket()
+            return socket_holder["socket"]
+
+        states: list[str] = []
+
+        async def status_callback(status) -> None:
+            states.append(status.connection_state.value)
+
+        connection = TikToolsConnection(
+            logger=logging.getLogger("test.tiktools_connection.handshake"),
+            legacy_bridge_root="",
+            connect_timeout_sec=1,
+            event_callback=noop_callback,
+            status_callback=status_callback,
+            target_user="alice",
+            api_key="test-key",
+            handshake_timeout_sec=1,
+        )
+
+        with mock.patch("tiktools_connection.websockets.connect", side_effect=connect_silent_socket):
+            handshake = await asyncio.wait_for(connection.open(), timeout=20)
+
+        self.assertFalse(handshake is True)
+        self.assertFalse(connection.handshake_complete)
+        self.assertNotIn("connected", states)
+        self.assertIn("connecting", states)
 
 
 if __name__ == "__main__":

@@ -167,6 +167,13 @@
     recentActivityMarkup: "",
     gamesMarkup: "",
     advancedLogText: "",
+    liveAlerts: [],
+    liveAlertsMarkup: "",
+    liveStatusMarkup: "",
+    liveStatusPhase: "",
+    liveStatusSinceMs: 0,
+    liveStatusUser: "",
+    lastBridgeAlertKey: "",
     activityClearBeforeMs: 0,
     selectedGiftValue: ACTIVITY_GIFT_PRESETS[0].value,
     terminalLines: [
@@ -185,6 +192,15 @@
     liveRoom: $("#live-room"),
     connectionNote: $("#connection-note"),
     connectForm: $("#connect-form"),
+    liveStatusStrip: $("#live-status-strip"),
+    liveStatusDot: $("#live-status-dot"),
+    liveStatusPhase: $("#live-status-phase"),
+    liveStatusDetail: $("#live-status-detail"),
+    liveStatusTimer: $("#live-status-timer"),
+    liveAlerts: $("#live-alerts"),
+    liveAlertsTitle: $("#live-alerts-title"),
+    liveAlertsList: $("#live-alerts-list"),
+    liveAlertsClear: $("#live-alerts-clear"),
     tiktokUser: $("#tiktok-user"),
     tiktoolsApiKey: $("#tiktools-api-key"),
     tiktokProvider: $("#tiktok-provider"),
@@ -800,6 +816,179 @@
     renderAdvancedLogs();
   }
 
+  // Alertas visibles del live. Cada alerta tiene severidad, titulo y detalle, y
+  // se muestran en el monitor del live (no solo en el log avanzado).
+  function pushLiveAlert(severity, title, detail = "") {
+    const tone = ["info", "warn", "error"].includes(severity) ? severity : "info";
+    const cleanTitle = String(title ?? "").trim();
+    if (!cleanTitle) {
+      return;
+    }
+    const cleanDetail = String(detail ?? "").trim();
+    const key = `${tone}|${cleanTitle}|${cleanDetail}`;
+    const existing = state.liveAlerts.find((alert) => alert.key === key);
+    if (existing) {
+      existing.count = Number(existing.count || 1) + 1;
+      existing.timestampMs = Date.now();
+      renderLiveAlerts();
+      return;
+    }
+    state.liveAlerts.unshift({
+      key,
+      tone,
+      title: cleanTitle,
+      detail: cleanDetail,
+      count: 1,
+      timestampMs: Date.now(),
+    });
+    state.liveAlerts = state.liveAlerts.slice(0, 8);
+    renderLiveAlerts();
+  }
+
+  function clearLiveAlerts() {
+    state.liveAlerts = [];
+    renderLiveAlerts();
+  }
+
+  function livePhaseFromSnapshot(external) {
+    if (!external) {
+      return null;
+    }
+    // El bridge nuevo manda la fase explicita; el viejo solo connection_state.
+    const phase = String(external.lastPhase || "");
+    if (phase === "waiting") return "waiting";
+    if (phase === "connected") return "connected";
+    if (phase === "starting") return "starting";
+    if (phase === "connecting") return "connecting";
+    if (phase === "error") return "error";
+
+    const connectionState = String(external.connectionState || "");
+    const runnerRunning = !!external.runnerRunning;
+    if (connectionState === "connected") return "connected";
+    if (connectionState === "connecting" || connectionState === "resolving_room") return "connecting";
+    if (connectionState === "preparing") return "starting";
+    if (connectionState === "faulted") return "error";
+    if (connectionState === "stopped" || connectionState === "disconnected") return runnerRunning ? "waiting" : "idle";
+    return runnerRunning ? "launching" : null;
+  }
+
+  function livePhaseView(phase) {
+    switch (phase) {
+      case "starting":
+        return { tone: "warn", label: "Iniciando", detail: "Validando el entorno del bridge de TikTok." };
+      case "launching":
+        return { tone: "warn", label: "Conectando", detail: "Abriendo el bridge y esperando respuesta del proveedor." };
+      case "connecting":
+        return { tone: "warn", label: "Conectando", detail: "Estableciendo la sesion con TikTok." };
+      case "waiting":
+        return { tone: "warn", label: "Esperando el vivo", detail: "La cuenta no esta en vivo todavia. El panel sigue intentando." };
+      case "connected":
+        return { tone: "live", label: "Conectado", detail: "Escuchando eventos del live en tiempo real." };
+      case "error":
+        return { tone: "danger", label: "Error de conexion", detail: "Revisa las alertas de abajo para ver el motivo." };
+      default:
+        return { tone: "idle", label: "Sin conexion", detail: "Ingresa un usuario y presiona Conectar." };
+    }
+  }
+
+  function setLivePhase(phase, user = "") {
+    const nextPhase = phase || "idle";
+    if (state.liveStatusPhase !== nextPhase) {
+      state.liveStatusSinceMs = Date.now();
+    }
+    state.liveStatusPhase = nextPhase;
+    state.liveStatusUser = String(user || "").replace(/^@+/, "");
+    renderLiveStatus();
+  }
+
+  function formatLiveUptime(ms) {
+    const totalSeconds = Math.max(0, Math.floor(Number(ms || 0) / 1000));
+    const hours = Math.floor(totalSeconds / 3600);
+    const minutes = Math.floor((totalSeconds % 3600) / 60);
+    const seconds = totalSeconds % 60;
+    const pad = (value) => String(value).padStart(2, "0");
+    return hours > 0 ? `${hours}:${pad(minutes)}:${pad(seconds)}` : `${pad(minutes)}:${pad(seconds)}`;
+  }
+
+  function renderLiveStatus() {
+    const external = state.payload?.snapshot?.externalBridge || {};
+    const snapshotPhase = livePhaseFromSnapshot(external);
+    const phase = state.liveStatusPhase || snapshotPhase || "idle";
+    const view = livePhaseView(snapshotPhase === "connected" ? "connected" : phase);
+    const user = external.targetUser ? `@${external.targetUser}` : (state.liveStatusUser ? `@${state.liveStatusUser}` : "");
+    if (els.liveStatusStrip) {
+      els.liveStatusStrip.dataset.tone = view.tone;
+    }
+    setText(els.liveStatusPhase, view.label);
+    setText(els.liveStatusDetail, user ? `${view.detail} ${user}` : view.detail);
+    renderLiveTimer();
+  }
+
+  function renderLiveTimer() {
+    if (!els.liveStatusTimer) {
+      return;
+    }
+    const phase = state.liveStatusPhase || "";
+    const tracking = ["connected", "waiting", "connecting", "launching", "starting"].includes(phase);
+    if (!tracking || !state.liveStatusSinceMs) {
+      els.liveStatusTimer.hidden = true;
+      return;
+    }
+    els.liveStatusTimer.hidden = false;
+    els.liveStatusTimer.textContent = formatLiveUptime(Date.now() - state.liveStatusSinceMs);
+  }
+
+  function renderLiveAlerts() {
+    if (!els.liveAlerts || !els.liveAlertsList) {
+      return;
+    }
+    const alerts = state.liveAlerts || [];
+    if (!alerts.length) {
+      els.liveAlerts.hidden = true;
+      if (state.liveAlertsMarkup !== "") {
+        els.liveAlertsList.innerHTML = "";
+        state.liveAlertsMarkup = "";
+      }
+      return;
+    }
+
+    const errorCount = alerts.filter((alert) => alert.tone === "error").length;
+    const warnCount = alerts.filter((alert) => alert.tone === "warn").length;
+    els.liveAlerts.hidden = false;
+    if (els.liveAlertsTitle) {
+      const parts = [];
+      if (errorCount) parts.push(`${errorCount} error${errorCount === 1 ? "" : "es"}`);
+      if (warnCount) parts.push(`${warnCount} aviso${warnCount === 1 ? "" : "s"}`);
+      els.liveAlertsTitle.textContent = parts.length
+        ? `Alertas del live (${parts.join(", ")})`
+        : "Alertas del live";
+    }
+
+    const markup = alerts
+      .map((alert) => {
+        const stamp = new Date(alert.timestampMs || Date.now()).toLocaleTimeString([], {
+          hour: "2-digit",
+          minute: "2-digit",
+        });
+        const repeat = alert.count > 1 ? ` <span class="live-alert-count">x${alert.count}</span>` : "";
+        const detail = alert.detail
+          ? `<span class="live-alert-detail">${escapeHtml(alert.detail)}</span>`
+          : "";
+        return (
+          `<li class="live-alert live-alert-${escapeHtml(alert.tone)}">` +
+          `<span class="live-alert-time">${escapeHtml(stamp)}</span>` +
+          `<span class="live-alert-title">${escapeHtml(alert.title)}${repeat}</span>` +
+          detail +
+          `</li>`
+        );
+      })
+      .join("");
+    if (markup !== state.liveAlertsMarkup) {
+      state.liveAlertsList.innerHTML = markup;
+      state.liveAlertsMarkup = markup;
+    }
+  }
+
   function renderAdvancedLogs() {
     if (!els.advancedLogOutput) {
       return;
@@ -906,6 +1095,7 @@
 
   function updateTitlebarClock() {
     setText(els.titlebarClockText, formatCurrentTime());
+    renderLiveTimer();
   }
 
   function formatLatency(value) {
@@ -1175,6 +1365,24 @@
         "tiktok_runtime_missing",
         `Diagnóstico TikTok: ${external.runtimeSummary}`
       );
+    }
+
+    // Alertas del bridge (cuota agotada, usuario inexistente, espera por el
+    // vivo, fallos del proveedor): se muestran en el monitor del live.
+    const bridgeAlertCode = String(external?.lastAlertCode || "");
+    const bridgeAlertSeverity = String(external?.lastAlertSeverity || "");
+    if (bridgeAlertCode) {
+      const bridgeAlertKey = `${bridgeAlertCode}|${external?.lastStatusMessage || ""}`;
+      if (state.lastBridgeAlertKey !== bridgeAlertKey) {
+        state.lastBridgeAlertKey = bridgeAlertKey;
+        pushLiveAlert(
+          bridgeAlertSeverity === "error" ? "error" : (bridgeAlertSeverity === "warn" ? "warn" : "info"),
+          String(external?.lastStatusMessage || bridgeAlertCode),
+          `Código: ${bridgeAlertCode}`
+        );
+      }
+    } else if (state.lastBridgeAlertKey) {
+      state.lastBridgeAlertKey = "";
     }
 
     const runnerIssue = humanizeRunnerIssue(external);
@@ -2292,6 +2500,8 @@
     renderTimer(payload);
     renderAdvancedLogs();
     renderCatalogAlert();
+    renderLiveStatus();
+    renderLiveAlerts();
   }
 
   async function loadState(force = false) {
@@ -2645,27 +2855,63 @@
     const apiKey = (els.tiktoolsApiKey?.value || "").trim();
     const needsApiKey = provider === "tiktools" || provider === "euler";
 
+    if (needsApiKey && !apiKey) {
+      const alert = "Falta la API key del proveedor seleccionado.";
+      appendLog(alert);
+      pushLiveAlert("warn", "Falta la API key", "Ingresá la API key de tik.tools o Euler Stream y volvé a conectar.");
+      return;
+    }
+
+    setLivePhase("starting", user);
+
     try {
       const response = await postJsonAction(
         "/api/bridge/connect",
         { target_user: user, provider, api_key: needsApiKey ? apiKey : "" },
         "conectar live"
       );
-      if (response?.error === "bridge_not_external_mode_saved") {
-        appendLog("Configuraci\u00f3n guardada. El panel necesita reiniciarse en modo external. Reinicia el panel para conectar.");
-      } else if (response?.error === "invalid_tiktok_provider") {
-        appendLog("Proveedor no v\u00e1lido. Opciones: tiktools, euler, direct.");
-      } else if (response?.error === "ws_start_failed") {
-        appendLog("No se pudo iniciar el WebSocket. El puerto 8765 puede estar ocupado. Ejecut\u00e1 clear_ports.bat y reinici\u00e1 el panel.");
-      } else if (response?.error === "runner_start_failed") {
-        appendLog("No se pudo iniciar el bridge Python. Verific\u00e1 que Python y las dependencias est\u00e9n instaladas.");
-      } else if (!response?.ok) {
-        appendLog("Error de conexi\u00f3n: " + (response?.error || "desconocido"));
-      } else if (response?.ok) {
-        appendLog("Bridge conectado correctamente.");
+      const errorCode = String(response?.error || "");
+      const serverMessage = String(response?.message || "").trim();
+      const runtimeWarnings = response?.runtimeWarnings || [];
+
+      if (response?.ok) {
+        appendLog(serverMessage || "Bridge conectado correctamente.");
+        for (const warning of runtimeWarnings) {
+          pushLiveAlert("info", String(warning), "");
+        }
+        setLivePhase("launching", user);
+        return;
+      }
+
+      if (errorCode === "bridge_not_external_mode_saved") {
+        pushLiveAlert("warn", "Reinicio necesario", serverMessage || "El panel debe reiniciarse en modo external.");
+      } else if (errorCode === "invalid_tiktok_provider") {
+        pushLiveAlert("warn", "Proveedor no válido", serverMessage || "Opciones: tik.tools, Euler Stream o directo.");
+      } else if (errorCode === "invalid_tiktok_user") {
+        pushLiveAlert("warn", "Usuario de TikTok inválido", serverMessage || "Revisá el @ del usuario.");
+        els.tiktokUser.focus();
+      } else if (errorCode === "ws_start_failed") {
+        pushLiveAlert("error", "No se pudo abrir el canal interno", serverMessage || "El puerto del WebSocket está ocupado.");
+      } else if (errorCode === "runner_start_failed") {
+        pushLiveAlert(
+          "error",
+          "No se pudo iniciar el bridge de TikTok",
+          serverMessage || "Revisá el runtime del bridge en Diagnóstico."
+        );
+        for (const alert of response?.runtimeAlerts || []) {
+          pushLiveAlert("error", String(alert), "");
+        }
+        await exportSupportBundle("tiktok_runner_launch_error", { silent: true });
+      } else {
+        pushLiveAlert(
+          "error",
+          "No se pudo conectar con TikTok",
+          serverMessage || errorCode || "Error desconocido."
+        );
       }
     } catch (error) {
       appendLog(`No se pudo conectar: ${error}`);
+      pushLiveAlert("error", "No se pudo conectar con TikTok", String(error || ""));
       await exportSupportBundle("tiktok_runner_launch_error", { silent: true });
     }
   }
@@ -3076,6 +3322,10 @@
     els.activityClearButton?.addEventListener("click", () => {
       state.activityClearBeforeMs = Date.now();
       renderRecentActivity(state.payload);
+    });
+
+    els.liveAlertsClear?.addEventListener("click", () => {
+      clearLiveAlerts();
     });
 
     els.activityGiftMenu?.addEventListener("click", (event) => {

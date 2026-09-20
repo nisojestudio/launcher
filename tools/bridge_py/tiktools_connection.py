@@ -7,6 +7,7 @@ from typing import Any, Awaitable, Callable
 from urllib.parse import urlencode
 
 from event_models import CanonicalActor, CanonicalEvent, CanonicalEventType, CanonicalGift, CanonicalMetadata, ConnectionState, SessionStatus
+from error_catalog import classify_close_code, classify_error_text, message_for
 from structured_logging import log_json, utc_now_ms
 
 try:
@@ -16,10 +17,11 @@ except ImportError:
 
 TIKTOOLS_WS_BASE = "wss://api.tik.tools"
 
-# tik.tools close codes
-_NOT_LIVE_CLOSE_CODES = {4005, 4006, 4404, 4555}
+# Codigos de cierre que el catalogo de errores reconoce. Se mantienen aqui por
+# compatibilidad de lectura; la clasificacion vive en error_catalog.
+_NOT_LIVE_CLOSE_CODES = {4005, 4006, 4404}
 _SESSION_LIMIT_CLOSE_CODE = 4429
-_SERVER_INITIATED_CLOSE_CODES = {4404, 4429, 4555, 4500, 4556}
+_SERVER_INITIATED_CLOSE_CODES = {4404, 4429, 4555, 4556, 4500, 1012}
 
 
 class TikToolsConnectionError(RuntimeError):
@@ -31,22 +33,8 @@ class TikToolsConnectionError(RuntimeError):
 
 
 def classify_tiktools_error(raw_error: str) -> tuple[str, str]:
-    lower = str(raw_error or "").lower()
-    if "4429" in lower or "demo session ended" in lower or "concurrent websocket" in lower:
-        return "API_SESSION_ENDED", "tik.tools cerro la sesion por limite de plan o de WebSockets."
-    if "invalid" in lower and ("key" in lower or "api" in lower):
-        return "INVALID_API_KEY", "La API key de tik.tools es invalida."
-    if "not found" in lower or "user not found" in lower:
-        return "USER_NOT_FOUND", "No se encontro ese usuario en TikTok."
-    if "not live" in lower or "not currently live" in lower or "offline" in lower:
-        return "NOT_LIVE", "El usuario no esta en vivo en este momento."
-    if "4404" in lower and ("live" in lower or "not" in lower):
-        return "NOT_LIVE", "El usuario no esta en vivo en este momento."
-    if "rate" in lower and "limit" in lower:
-        return "RATE_LIMIT", "Se agoto el limite de la API de tik.tools."
-    if "timeout" in lower or "network" in lower or "connection" in lower:
-        return "NETWORK_ERROR", "No se pudo conectar por un problema de red."
-    return "UNKNOWN", "No se pudo completar la conexion con tik.tools."
+    code = classify_error_text(raw_error)
+    return code, message_for(code)
 
 
 _WS_EVENT_MAP: dict[str, CanonicalEventType] = {
@@ -134,10 +122,12 @@ class TikToolsConnection:
         room_id: str = "",
         session_id: int = 0,
         api_key: str = "",
+        handshake_timeout_sec: float = 0.0,
     ) -> None:
         self._logger = logger
         self._legacy_bridge_root = legacy_bridge_root
         self._connect_timeout_sec = connect_timeout_sec
+        self._handshake_timeout_sec = float(handshake_timeout_sec or 0.0)
         self._event_callback = event_callback
         self._status_callback = status_callback
         self._target_user = target_user.strip().lstrip("@").lower()
@@ -148,6 +138,8 @@ class TikToolsConnection:
         self._remote_live_ended = False
         self._ws_task: asyncio.Task[None] | None = None
         self._websocket: Any | None = None
+        self._handshake_complete = False
+        self._handshake_event: asyncio.Event | None = None
         # Session metrics
         self._session_started_at: float = 0.0
         self._session_events_received: int = 0
@@ -157,6 +149,15 @@ class TikToolsConnection:
     @property
     def room_id(self) -> str:
         return self._room_id
+
+    @property
+    def handshake_complete(self) -> bool:
+        """True solo cuando el proveedor ya confirmo la sala del live.
+
+        Mientras sea False la sesion esta abierta pero NO conectada: el panel
+        debe mostrar 'Conectando', no 'Conectado'.
+        """
+        return self._handshake_complete
 
     async def open(self) -> None:
         if websockets is None:
@@ -178,7 +179,55 @@ class TikToolsConnection:
         self._session_events_received = 0
         self._session_gifts_received = 0
         self._session_chat_received = 0
+        self._handshake_complete = False
+        self._handshake_event = asyncio.Event()
         self._ws_task = asyncio.create_task(self._ws_loop(), name="tiktools-ws")
+        await self._wait_for_handshake()
+
+    async def _wait_for_handshake(self) -> bool:
+        """Espera la confirmacion de sala (evento roomInfo) del proveedor.
+
+        Devuelve True si el live quedo confirmado. Si el proveedor todavia no
+        responde la sala, devuelve False sin cortar la sesion: seguir conectando
+        es justamente lo que se espera cuando el vivo esta por empezar.
+        """
+        if self._handshake_event is None:
+            return False
+
+        loop = asyncio.get_running_loop()
+        # El relay de tik.tools puede tardar en confirmar la sala; nunca menos
+        # de 30s para no declarar un falso timeout (configurable para tests).
+        timeout_sec = self._handshake_timeout_sec or max(float(self._connect_timeout_sec or 0.0), 30.0)
+        deadline = loop.time() + timeout_sec
+
+        while True:
+            if self._handshake_complete:
+                return True
+            if self._ws_task is not None and self._ws_task.done():
+                # Propaga el error real de la sesion (cierre, cuota, no live).
+                await self._ws_task
+                return self._handshake_complete
+            if loop.time() >= deadline:
+                log_json(
+                    self._logger,
+                    "warning",
+                    "tiktools_connection",
+                    "handshake timeout waiting for room info",
+                    target_user=self._target_user,
+                    timeout_sec=timeout_sec,
+                    session_uptime_ms=self._session_uptime_ms(),
+                )
+                await self._status_callback(
+                    SessionStatus(
+                        target_user=self._target_user,
+                        connection_state=ConnectionState.CONNECTING,
+                        room_id=self._room_id,
+                        message="Esperando que TikTok confirme la sala del live...",
+                        timestamp_ms=utc_now_ms(),
+                    )
+                )
+                return False
+            await asyncio.sleep(0.05)
 
     def _session_uptime_ms(self) -> int:
         if self._session_started_at <= 0:
@@ -228,6 +277,12 @@ class TikToolsConnection:
                         top_level_room_id = str(msg.get("roomId", ""))
                         if top_level_room_id and not self._room_id:
                             self._room_id = top_level_room_id
+
+                        # Recien aca la sala existe: hasta este punto el panel
+                        # debe mostrar "Conectando".
+                        self._handshake_complete = True
+                        if self._handshake_event is not None:
+                            self._handshake_event.set()
 
                         await self._status_callback(
                             SessionStatus(
@@ -314,18 +369,16 @@ class TikToolsConnection:
                     if close_code == _SESSION_LIMIT_CLOSE_CODE:
                         raise TikToolsConnectionError(
                             "API_SESSION_ENDED",
-                            "tik.tools cerro la sesion por limite de plan o de WebSockets.",
+                            message_for("API_SESSION_ENDED"),
                             raw_error=f"close code {close_code}: {close_reason}",
                         )
-                    if close_code in _NOT_LIVE_CLOSE_CODES:
-                        raise TikToolsConnectionError(
-                            "NOT_LIVE",
-                            "El usuario no esta en vivo en este momento.",
-                            raw_error=f"close code {close_code}: {close_reason}",
-                        )
+
+                    # El catalogo decide: 4404 -> NOT_LIVE (transitorio),
+                    # 4555 -> cuota agotada, 4556 -> relay, 1012 -> reinicio.
+                    classified_code = classify_close_code(close_code, close_reason)
                     raise TikToolsConnectionError(
-                        "STREAM_DISCONNECTED",
-                        "La conexion con tik.tools se cerro.",
+                        classified_code,
+                        message_for(classified_code),
                         raw_error=f"close code {close_code}: {close_reason}",
                     )
             except Exception as exc:

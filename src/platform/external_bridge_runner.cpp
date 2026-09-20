@@ -226,6 +226,7 @@ struct BridgeRuntimeProbeResult {
     std::int64_t checked_timestamp_ms = 0;
     std::string summary{};
     std::vector<std::string> alerts{};
+    std::vector<std::string> warnings{};
 };
 bool ensure_winsock_initialized() {
     static bool initialized = false;
@@ -571,6 +572,14 @@ BridgeRuntimeProbeResult run_bridge_runtime_probe(const std::string& api_key = "
         }
     }
 
+    if (payload.contains("warnings") && payload["warnings"].is_array()) {
+        for (const auto& item : payload["warnings"]) {
+            if (item.is_string()) {
+                result.warnings.push_back(item.get<std::string>());
+            }
+        }
+    }
+
     if (result.alerts.empty() && !result.ok && !stderr_text.empty()) {
         result.alerts.push_back(stderr_text);
     }
@@ -604,6 +613,7 @@ void apply_runtime_probe_to_status(
     status.runtime_checked_timestamp_ms = probe.checked_timestamp_ms;
     status.runtime_summary = probe.summary;
     status.runtime_alerts = probe.alerts;
+    status.runtime_warnings = probe.warnings;
 }
 
 bool post_local_shutdown_request(std::uint16_t port) {
@@ -949,6 +959,7 @@ void ExternalBridgeRunner::refresh_runtime_status(bool force, const std::string&
     status_.runtime_checked_timestamp_ms = now_wall_clock_ms();
     status_.runtime_summary = "TikTok solo esta disponible en Windows.";
     status_.runtime_alerts = {status_.runtime_summary};
+    status_.runtime_warnings.clear();
 #endif
 }
 

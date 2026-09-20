@@ -209,6 +209,10 @@ std::string external_bridge_json(const PanelExternalBridgeStatus& status) {
            << "\"connectionState\":" << quote(status.connection_state) << ","
            << "\"lastStatusMessage\":" << quote(status.last_status_message) << ","
            << "\"lastStatusTimestampMs\":" << status.last_status_timestamp_ms << ","
+           << "\"lastPhase\":" << quote(status.last_phase) << ","
+           << "\"lastAlertCode\":" << quote(status.last_alert_code) << ","
+           << "\"lastAlertSeverity\":" << quote(status.last_alert_severity) << ","
+           << "\"retryInSec\":" << status.retry_in_sec << ","
            << "\"currentRoomId\":" << quote(status.current_room_id) << ","
            << "\"lastEventKind\":" << quote(status.last_event_kind) << ","
            << "\"lastEventActor\":" << quote(status.last_event_actor) << ","
@@ -237,6 +241,14 @@ std::string external_bridge_json(const PanelExternalBridgeStatus& status) {
             output << ",";
         }
         output << quote(status.runtime_alerts[index]);
+    }
+    output << "],"
+           << "\"runtimeWarnings\":[";
+    for (std::size_t index = 0; index < status.runtime_warnings.size(); ++index) {
+        if (index > 0) {
+            output << ",";
+        }
+        output << quote(status.runtime_warnings[index]);
     }
     output << "],"
            << "\"runnerHasExitCode\":" << bool_json(status.runner_has_exit_code) << ","

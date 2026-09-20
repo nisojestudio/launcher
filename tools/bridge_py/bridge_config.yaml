@@ -21,6 +21,8 @@ retry_policy:
   max_attempts: 5
   max_reconnect_per_hour: 10
   jitter_sec: 1.0
+  # Tiempo maximo esperando a que la cuenta empiece el vivo (0 = sin limite).
+  waiting_for_live_max_minutes: 30
 
 buffer:
   size: 8192

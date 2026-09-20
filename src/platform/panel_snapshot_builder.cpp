@@ -52,6 +52,10 @@ PanelSnapshot build_panel_snapshot(
     snapshot.external_bridge.connection_state = std::move(external_bridge_manifest.connection_state);
     snapshot.external_bridge.last_status_message = std::move(external_bridge_manifest.last_status_message);
     snapshot.external_bridge.last_status_timestamp_ms = external_bridge_manifest.last_status_timestamp_ms;
+    snapshot.external_bridge.last_phase = std::move(external_bridge_manifest.last_phase);
+    snapshot.external_bridge.last_alert_code = std::move(external_bridge_manifest.last_alert_code);
+    snapshot.external_bridge.last_alert_severity = std::move(external_bridge_manifest.last_alert_severity);
+    snapshot.external_bridge.retry_in_sec = external_bridge_manifest.retry_in_sec;
     snapshot.external_bridge.current_room_id = std::move(external_bridge_manifest.current_room_id);
     snapshot.external_bridge.last_event_kind = std::move(external_bridge_manifest.last_event_kind);
     snapshot.external_bridge.last_event_actor = std::move(external_bridge_manifest.last_event_actor);
@@ -76,6 +80,7 @@ PanelSnapshot build_panel_snapshot(
         external_bridge_manifest.runtime_checked_timestamp_ms;
     snapshot.external_bridge.runtime_summary = std::move(external_bridge_manifest.runtime_summary);
     snapshot.external_bridge.runtime_alerts = std::move(external_bridge_manifest.runtime_alerts);
+    snapshot.external_bridge.runtime_warnings = std::move(external_bridge_manifest.runtime_warnings);
     snapshot.external_bridge.runner_has_exit_code = external_bridge_manifest.runner_has_exit_code;
     snapshot.external_bridge.runner_last_exit_code = external_bridge_manifest.runner_last_exit_code;
     snapshot.external_bridge.runner_last_error = std::move(external_bridge_manifest.runner_last_error);

@@ -22,6 +22,17 @@ std::optional<TikTokExternalSessionConnectionState> parse_external_session_conne
     if (state == "faulted") {
         return TikTokExternalSessionConnectionState::faulted;
     }
+    // Estados que el bridge Python ya emite. Sin estos, el panel descartaba el
+    // mensaje completo: no se mostraba "Reintentando" ni las alertas asociadas.
+    if (state == "reconnecting") {
+        return TikTokExternalSessionConnectionState::reconnecting;
+    }
+    if (state == "stopped") {
+        return TikTokExternalSessionConnectionState::stopped;
+    }
+    if (state == "idle") {
+        return TikTokExternalSessionConnectionState::idle;
+    }
     if (state == "unknown") {
         return TikTokExternalSessionConnectionState::unknown;
     }

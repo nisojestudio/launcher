@@ -142,6 +142,14 @@ class SessionStatus:
     retry_count: int = 0
     uptime_ms: int = 0
     last_event_timestamp_ms: int = 0
+    # Campos de diagnostico visible en el panel (monitor del live).
+    severity: str = ""
+    alert_code: str = ""
+    alert_action: str = ""
+    phase: str = ""
+    provider: str = ""
+    key_label: str = ""
+    retry_in_sec: float = 0.0
 
     def to_panel_payload(self) -> dict[str, Any]:
         payload = {
@@ -158,6 +166,21 @@ class SessionStatus:
             payload["uptime_ms"] = self.uptime_ms
         if self.last_event_timestamp_ms > 0:
             payload["last_event_timestamp_ms"] = self.last_event_timestamp_ms
+        # Solo se envian los campos presentes: el panel tolera payloads viejos.
+        if self.severity:
+            payload["severity"] = self.severity
+        if self.alert_code:
+            payload["alert_code"] = self.alert_code
+        if self.alert_action:
+            payload["alert_action"] = self.alert_action
+        if self.phase:
+            payload["phase"] = self.phase
+        if self.provider:
+            payload["provider"] = self.provider
+        if self.key_label:
+            payload["key_label"] = self.key_label
+        if self.retry_in_sec > 0:
+            payload["retry_in_sec"] = round(float(self.retry_in_sec), 2)
         return payload
 
 

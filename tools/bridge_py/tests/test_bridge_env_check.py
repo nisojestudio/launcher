@@ -93,6 +93,57 @@ class BridgeEnvCheckTests(unittest.TestCase):
         self.assertTrue(report["configRemoteAuthReady"])
         self.assertEqual(report["configMissingRemoteAuthFields"], [])
 
+    def test_missing_tiktools_api_key_is_a_warning_not_a_blocker(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            bridge_root = Path(temp_dir) / "bridge_py"
+            bridge_root.mkdir()
+            (bridge_root / "bridge_config.yaml").write_text(
+                "connection_mode: tiktools\nconnection:\n  api_key: \"\"\n",
+                encoding="utf-8",
+            )
+            config_path = Path(temp_dir) / "panel_config.json"
+            config_path.write_text(
+                json.dumps({"bridge_mode": "external", "auth": {"required": False}}, indent=2),
+                encoding="utf-8",
+            )
+
+            report = perform_bridge_env_check(bridge_root, config_path=config_path)
+
+        # La credencial llega por peticion desde la UI: su ausencia no debe
+        # impedir arrancar el bridge, solo avisar.
+        tiktools_check = next(
+            check for check in report["checks"]
+            if check.get("type") == "provider_connectivity" and check.get("id") == "tiktools"
+        )
+        self.assertFalse(tiktools_check["ok"])
+        self.assertFalse(tiktools_check["blocking"])
+        self.assertIn("Falta la API key de tik.tools", " ".join(report["warnings"]))
+        self.assertNotIn("Falta la API key de tik.tools", " ".join(report["alerts"]))
+
+    def test_missing_euler_api_key_is_a_warning_not_a_blocker(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            bridge_root = Path(temp_dir) / "bridge_py"
+            bridge_root.mkdir()
+            (bridge_root / "bridge_config.yaml").write_text(
+                "connection_mode: euler\nconnection:\n  api_key: \"\"\n",
+                encoding="utf-8",
+            )
+            config_path = Path(temp_dir) / "panel_config.json"
+            config_path.write_text(
+                json.dumps({"bridge_mode": "external", "auth": {"required": False}}, indent=2),
+                encoding="utf-8",
+            )
+
+            report = perform_bridge_env_check(bridge_root, config_path=config_path)
+
+        euler_check = next(
+            check for check in report["checks"]
+            if check.get("type") == "provider_connectivity" and check.get("id") == "euler_stream"
+        )
+        self.assertFalse(euler_check["ok"])
+        self.assertFalse(euler_check["blocking"])
+        self.assertTrue(any("Euler" in warning for warning in report["warnings"]))
+
     def test_cli_can_write_report_without_stdout(self) -> None:
         bridge_root = Path(__file__).resolve().parents[1]
         script_path = bridge_root / "bridge_env_check.py"

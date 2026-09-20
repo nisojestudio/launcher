@@ -53,6 +53,10 @@ struct PanelExternalBridgeStatus {
     std::string connection_state{};
     std::string last_status_message{};
     std::int64_t last_status_timestamp_ms = 0;
+    std::string last_phase{};
+    std::string last_alert_code{};
+    std::string last_alert_severity{};
+    double retry_in_sec = 0.0;
     std::string current_room_id{};
     std::string last_event_kind{};
     std::string last_event_actor{};
@@ -76,6 +80,7 @@ struct PanelExternalBridgeStatus {
     std::int64_t runtime_checked_timestamp_ms = 0;
     std::string runtime_summary{};
     std::vector<std::string> runtime_alerts{};
+    std::vector<std::string> runtime_warnings{};
     bool runner_has_exit_code = false;
     std::int32_t runner_last_exit_code = 0;
     std::string runner_last_error{};

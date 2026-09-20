@@ -6,6 +6,14 @@ import time
 from typing import Any, Awaitable, Callable
 
 from bridge_config import BridgeConfig
+from error_catalog import (
+    ACTION_ROTATE_KEY,
+    ACTION_WAIT_FOR_LIVE,
+    action_for,
+    message_for,
+    severity_for,
+    spec_for,
+)
 from event_models import CanonicalEvent, ConnectionState, SessionStatus
 from metrics_registry import MetricsRegistry
 from session_manager import HeartbeatMonitor, SessionSupervisor
@@ -24,39 +32,40 @@ except ImportError:
 EventCallback = Callable[[CanonicalEvent], Awaitable[bool]]
 StatusCallback = Callable[[SessionStatus], Awaitable[None]]
 
-# Error codes that should NOT trigger a reconnect (permanent failures)
-# Includes codes from TikTools, TikTokLive (direct), and Euler providers
-_NON_RETRYABLE_CODES = frozenset({
-    "INVALID_USERNAME",
-    "USER_NOT_FOUND",
-    "AGE_RESTRICTED",
-    "ACCESS_BLOCKED",
-    "RATE_LIMIT",
-    "INVALID_API_KEY",
-    "API_SESSION_ENDED",
-    "NOT_LIVE",
-    "BOOTSTRAP_FAILED",      # Euler: websockets not installed
-    "INVALID_JWT",           # Euler: JWT token invalid
-})
 
-# Error codes that indicate the server deliberately closed the connection
-_SERVER_CLOSE_CODES = frozenset({
-    "STREAM_DISCONNECTED",
-    "NOT_LIVE",
-    "API_SESSION_ENDED",     # Provider ended session (limit reached)
-})
+def compute_retry_delay(
+    config: BridgeConfig,
+    code: str,
+    attempt_index: int,
+    waiting_for_live_seconds: float = 0.0,
+) -> float | None:
+    """Delay antes del siguiente intento. None = no reintentar.
 
-
-def compute_retry_delay(config: BridgeConfig, code: str, attempt_index: int) -> float | None:
-    """Compute delay before next reconnect attempt. Returns None if should not retry."""
+    La politica vive en `error_catalog`: aca solo se aplica el tiempo.
+    - `wait_for_live` (la cuenta no esta en vivo) espera `not_live_delay_sec`
+      durante `waiting_for_live_max_minutes`, sin consumir el presupuesto de
+      intentos ni el limite de reconexiones: el objetivo es conectar cuando el
+      vivo empiece, no rendirse.
+    - El resto de errores reintentables usa backoff exponencial con jitter.
+    """
     if not config.retry_policy.enabled:
         return None
-    if code in _NON_RETRYABLE_CODES:
+
+    spec = spec_for(code)
+
+    if action_for(code) == ACTION_WAIT_FOR_LIVE:
+        waiting_budget_seconds = float(
+            getattr(config.retry_policy, "waiting_for_live_max_minutes", 0) or 0
+        ) * 60.0
+        if waiting_budget_seconds > 0 and waiting_for_live_seconds >= waiting_budget_seconds:
+            return None
+        return max(1.0, config.retry_policy.not_live_delay_sec)
+
+    if not spec.retryable:
         return None
+
     if config.retry_policy.max_attempts > 0 and attempt_index >= config.retry_policy.max_attempts:
         return None
-    if code == "NOT_LIVE":
-        return max(1.0, config.retry_policy.not_live_delay_sec)
 
     # Exponential backoff with jitter
     base_delay = config.retry_policy.base_delay_sec * (2 ** max(0, attempt_index))
@@ -137,6 +146,8 @@ class ConnectionManager:
         started_at = time.monotonic()
         final_message = "Bridge stopped"
         exit_code = 0
+        # Momento en que empezo la espera por el vivo (0 = no estamos esperando).
+        waiting_for_live_since = 0.0
         heartbeat_monitor = HeartbeatMonitor(
             warning_after_sec=self._config.connection.heartbeat_warning_after_sec,
             interval_sec=self._config.connection.heartbeat_interval_sec,
@@ -202,9 +213,11 @@ class ConnectionManager:
                         target_user=target_user,
                         connection_state=ConnectionState.PREPARING,
                         room_id=room_id,
-                        message="Preparing TikTok connection",
+                        message="Preparando la conexion con TikTok...",
                         timestamp_ms=utc_now_ms(),
                         retry_count=attempt,
+                        phase="starting",
+                        provider=self._config.connection_mode,
                     )
                 )
                 connection_args = {
@@ -248,18 +261,62 @@ class ConnectionManager:
 
                 heartbeat_monitor.set_state(ConnectionState.CONNECTING, retry_count=attempt)
                 await connection.open()
-                heartbeat_monitor.set_state(ConnectionState.CONNECTED, retry_count=attempt)
-                self._metrics.increment("session_starts_total")
-                self._metrics.set_gauge("connected", 1)
-                log_json(
-                    self._logger,
-                    "info",
-                    "connection_manager",
-                    "session connected",
-                    target_user=target_user,
-                    provider=self._config.connection_mode,
-                    attempt=attempt,
-                )
+
+                # Solo se declara conectado cuando el proveedor confirmo la sala.
+                # Antes de eso la sesion esta abierta pero el panel debe seguir
+                # mostrando "Conectando".
+                handshake_ok = bool(getattr(connection, "handshake_complete", True))
+                if handshake_ok:
+                    # La sesion quedo confirmada: la espera por el vivo se reinicia.
+                    waiting_for_live_since = 0.0
+                    heartbeat_monitor.set_state(ConnectionState.CONNECTED, retry_count=attempt)
+                    self._metrics.increment("session_starts_total")
+                    self._metrics.set_gauge("connected", 1)
+                    log_json(
+                        self._logger,
+                        "info",
+                        "connection_manager",
+                        "session connected",
+                        target_user=target_user,
+                        provider=self._config.connection_mode,
+                        attempt=attempt,
+                    )
+                    await emit_status(
+                        SessionStatus(
+                            target_user=target_user,
+                            connection_state=ConnectionState.CONNECTED,
+                            room_id=connection.room_id,
+                            message="Conectado al live de TikTok.",
+                            timestamp_ms=utc_now_ms(),
+                            retry_count=attempt,
+                            severity="info",
+                            phase="connected",
+                            provider=self._config.connection_mode,
+                        )
+                    )
+                else:
+                    log_json(
+                        self._logger,
+                        "info",
+                        "connection_manager",
+                        "session open, waiting for live room confirmation",
+                        target_user=target_user,
+                        provider=self._config.connection_mode,
+                        attempt=attempt,
+                    )
+                    await emit_status(
+                        SessionStatus(
+                            target_user=target_user,
+                            connection_state=ConnectionState.CONNECTING,
+                            room_id=connection.room_id,
+                            message="Conectando: esperando que la sala del live quede disponible.",
+                            timestamp_ms=utc_now_ms(),
+                            retry_count=attempt,
+                            severity="info",
+                            phase="connecting",
+                            provider=self._config.connection_mode,
+                        )
+                    )
                 await supervisor.start_heartbeat(
                     target_user=target_user,
                     room_id_provider=lambda: connection.room_id,
@@ -306,17 +363,31 @@ class ConnectionManager:
                 self._metrics.increment("session_failures_total")
                 self._metrics.set_gauge("connected", 0)
                 heartbeat_monitor.set_state(ConnectionState.FAULTED, retry_count=attempt, error=exc.message)
+
+                provider = self._config.connection_mode
+                error_action = action_for(exc.code)
+                waiting_for_live = error_action == ACTION_WAIT_FOR_LIVE
+                if waiting_for_live and waiting_for_live_since <= 0:
+                    waiting_for_live_since = time.monotonic()
+                waiting_for_live_seconds = (
+                    time.monotonic() - waiting_for_live_since if waiting_for_live_since > 0 else 0.0
+                )
+
                 await emit_status(
                     SessionStatus(
                         target_user=target_user,
                         connection_state=ConnectionState.FAULTED,
                         room_id=connection.room_id if connection is not None else room_id,
-                        message=f"DESCONECTADO: {exc.message}",
+                        message=exc.message,
                         timestamp_ms=utc_now_ms(),
                         retry_count=attempt,
+                        severity=severity_for(exc.code),
+                        alert_code=exc.code,
+                        alert_action=error_action,
+                        phase="waiting" if waiting_for_live else "error",
+                        provider=provider,
                     )
                 )
-                provider = self._config.connection_mode
                 log_json(
                     self._logger,
                     "error",
@@ -324,15 +395,22 @@ class ConnectionManager:
                     "session failed",
                     code=exc.code,
                     error_message=exc.message,
+                    error_action=error_action,
                     retry_count=attempt,
                     target_user=target_user,
                     raw_error=exc.raw_error,
                     provider=provider,
+                    waiting_for_live_seconds=round(waiting_for_live_seconds, 1),
                     reconnects_remaining=self._reconnect_limiter.remaining(provider),
                 )
 
                 # Check if we should retry
-                retry_delay = compute_retry_delay(self._config, exc.code, attempt)
+                retry_delay = compute_retry_delay(
+                    self._config,
+                    exc.code,
+                    attempt,
+                    waiting_for_live_seconds=waiting_for_live_seconds,
+                )
                 if retry_delay is None:
                     log_json(
                         self._logger,
@@ -341,13 +419,15 @@ class ConnectionManager:
                         "no more retries for this error code",
                         code=exc.code,
                         attempt=attempt,
+                        waiting_for_live_seconds=round(waiting_for_live_seconds, 1),
                     )
                     final_message = f"permanent failure: {exc.message}"
                     exit_code = 1
                     break
 
-                # Check rate limiter (per provider)
-                if not self._reconnect_limiter.can_reconnect(provider):
+                # El limite de reconexiones por hora protege la cuota del
+                # proveedor, pero esperar a que empiece el vivo no la consume.
+                if not waiting_for_live and not self._reconnect_limiter.can_reconnect(provider):
                     log_json(
                         self._logger,
                         "warning",
@@ -367,18 +447,34 @@ class ConnectionManager:
                     break
 
                 attempt += 1
-                self._reconnect_limiter.record_reconnect(provider)
+                if not waiting_for_live:
+                    self._reconnect_limiter.record_reconnect(provider)
                 self._metrics.increment("reconnect_total")
                 self._metrics.set_gauge("reconnects_remaining", float(self._reconnect_limiter.remaining(provider)))
                 heartbeat_monitor.set_state(ConnectionState.RECONNECTING, retry_count=attempt, error=exc.message)
+                if waiting_for_live:
+                    retry_message = (
+                        f"Esperando a que @{target_user} empiece el vivo. "
+                        f"Nuevo intento en {retry_delay:.0f}s."
+                    )
+                    retry_phase = "waiting"
+                else:
+                    retry_message = f"Reintentando conexion ({attempt}) en {retry_delay:.0f}s..."
+                    retry_phase = "connecting"
                 await emit_status(
                     SessionStatus(
                         target_user=target_user,
                         connection_state=ConnectionState.RECONNECTING,
                         room_id=connection.room_id if connection is not None else room_id,
-                        message=f"RECONECTANDO: reintento {attempt} en {retry_delay:.0f}s...",
+                        message=retry_message,
                         timestamp_ms=utc_now_ms(),
                         retry_count=attempt,
+                        severity=severity_for(exc.code),
+                        alert_code=exc.code,
+                        alert_action=error_action,
+                        phase=retry_phase,
+                        provider=provider,
+                        retry_in_sec=retry_delay,
                     )
                 )
                 log_json(

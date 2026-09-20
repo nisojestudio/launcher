@@ -75,30 +75,37 @@ def _module_version(module_name: str, module: Any | None = None) -> str:
     return "unknown"
 
 
-def _check_euler_connectivity(bridge_config) -> tuple[bool, str, dict[str, Any]]:
+def _check_euler_connectivity(bridge_config) -> tuple[bool, str, dict[str, Any], bool]:
     """Check if Euler Stream is reachable and API key is configured.
-    Returns (ok, message, details)."""
+
+    Returns (ok, message, details, blocking).
+
+    `blocking=False` significa que el problema NO debe impedir arrancar el bridge:
+    la credencial llega por peticion desde la UI del panel, asi que su ausencia o
+    formato solo se reporta como advertencia. El bridge es quien informa el error
+    preciso al usuario si la credencial realmente no sirve.
+    """
     provider = getattr(bridge_config, "connection_mode", "tiktools")
     if provider != "euler":
-        return True, "Provider is not Euler, skipping Euler connectivity check", {"skipped": True}
+        return True, "Provider is not Euler, skipping Euler connectivity check", {"skipped": True}, False
 
     api_key = getattr(bridge_config.connection, "api_key", "") or ""
     if not api_key:
-        return False, "Euler provider selected but no API key (JWT) configured", {
+        return False, "Falta la API key de Euler Stream (JWT) para esta sesion.", {
             "provider": "euler",
             "api_key_configured": False,
             "endpoint": EULER_WS_BASE,
-        }
+        }, False
 
     # Check API key format (basic JWT check: should have 3 parts separated by dots)
     jwt_parts = api_key.split(".")
     if len(jwt_parts) != 3:
-        return False, "Euler API key does not appear to be a valid JWT (expected 3 parts)", {
+        return False, "La API key de Euler no parece un JWT valido (se esperan 3 partes).", {
             "provider": "euler",
             "api_key_configured": True,
             "api_key_format_valid": False,
             "endpoint": EULER_WS_BASE,
-        }
+        }, False
 
     # Try to resolve DNS for Euler endpoints (non-blocking check)
     import socket
@@ -110,13 +117,13 @@ def _check_euler_connectivity(bridge_config) -> tuple[bool, str, dict[str, Any]]
         dns_ok = True
     except Exception as exc:
         dns_ok = False
-        return False, f"Cannot resolve Euler endpoints DNS: {exc}", {
+        return False, f"No se pudo resolver el DNS de Euler Stream: {exc}", {
             "provider": "euler",
             "api_key_configured": True,
             "api_key_format_valid": True,
             "endpoint": EULER_WS_BASE,
             "dns_error": str(exc),
-        }
+        }, True
 
     return True, "Euler connectivity check passed (DNS resolution OK)", {
         "provider": "euler",
@@ -124,23 +131,27 @@ def _check_euler_connectivity(bridge_config) -> tuple[bool, str, dict[str, Any]]
         "api_key_format_valid": True,
         "endpoint": EULER_WS_BASE,
         "dns_ok": dns_ok,
-    }
+    }, False
 
 
-def _check_tiktools_connectivity(bridge_config) -> tuple[bool, str, dict[str, Any]]:
+def _check_tiktools_connectivity(bridge_config) -> tuple[bool, str, dict[str, Any], bool]:
     """Check if tik.tools is reachable and API key is configured.
-    Returns (ok, message, details)."""
+
+    Returns (ok, message, details, blocking). Ver la nota de
+    `_check_euler_connectivity`: la ausencia de key es una advertencia, no un
+    bloqueo, porque la key llega por peticion desde la UI del panel.
+    """
     provider = getattr(bridge_config, "connection_mode", "tiktools")
     if provider != "tiktools":
-        return True, "Provider is not tiktools, skipping tiktools connectivity check", {"skipped": True}
+        return True, "Provider is not tiktools, skipping tiktools connectivity check", {"skipped": True}, False
 
     api_key = getattr(bridge_config.connection, "api_key", "") or ""
     if not api_key:
-        return False, "tiktools provider selected but no API key configured", {
+        return False, "Falta la API key de tik.tools para esta sesion.", {
             "provider": "tiktools",
             "api_key_configured": False,
             "endpoint": "wss://api.tik.tools",
-        }
+        }, False
 
     # Try to resolve DNS for tik.tools endpoint
     import socket
@@ -150,19 +161,19 @@ def _check_tiktools_connectivity(bridge_config) -> tuple[bool, str, dict[str, An
         dns_ok = True
     except Exception as exc:
         dns_ok = False
-        return False, f"Cannot resolve tik.tools endpoint DNS: {exc}", {
+        return False, f"No se pudo resolver el DNS de tik.tools: {exc}", {
             "provider": "tiktools",
             "api_key_configured": True,
             "endpoint": "wss://api.tik.tools",
             "dns_error": str(exc),
-        }
+        }, True
 
     return True, "tiktools connectivity check passed (DNS resolution OK)", {
         "provider": "tiktools",
         "api_key_configured": True,
         "endpoint": "wss://api.tik.tools",
         "dns_ok": dns_ok,
-    }
+    }, False
 
 
 def _build_report(
@@ -183,7 +194,10 @@ def _build_report(
     elif current_python == dev_python.resolve() if dev_python.exists() else False:
         runtime_mode = "venv"
 
+    # `alerts` bloquean el arranque del bridge; `warnings` solo se informan al
+    # usuario (por ejemplo una credencial que todavia no se ingreso en el panel).
     alerts: list[str] = []
+    warnings: list[str] = []
     checks: list[dict[str, Any]] = []
 
     packaged_runtime_available = runtime_python.exists()
@@ -365,28 +379,36 @@ def _build_report(
             )
 
     # Euler connectivity check (only if provider is euler)
-    euler_ok, euler_msg, euler_details = _check_euler_connectivity(bridge_config)
+    euler_ok, euler_msg, euler_details, euler_blocking = _check_euler_connectivity(bridge_config)
     checks.append({
         "type": "provider_connectivity",
         "id": "euler_stream",
         "ok": euler_ok,
+        "blocking": euler_blocking,
         "message": euler_msg,
         **euler_details,
     })
     if not euler_ok:
-        alerts.append(euler_msg)
+        if euler_blocking:
+            alerts.append(euler_msg)
+        else:
+            warnings.append(euler_msg)
 
     # TikTools connectivity check (only if provider is tiktools)
-    tiktools_ok, tiktools_msg, tiktools_details = _check_tiktools_connectivity(bridge_config)
+    tiktools_ok, tiktools_msg, tiktools_details, tiktools_blocking = _check_tiktools_connectivity(bridge_config)
     checks.append({
         "type": "provider_connectivity",
         "id": "tiktools",
         "ok": tiktools_ok,
+        "blocking": tiktools_blocking,
         "message": tiktools_msg,
         **tiktools_details,
     })
     if not tiktools_ok:
-        alerts.append(tiktools_msg)
+        if tiktools_blocking:
+            alerts.append(tiktools_msg)
+        else:
+            warnings.append(tiktools_msg)
 
     ok = not alerts
     if ok:
@@ -396,6 +418,10 @@ def _build_report(
             summary = "TikTok listo: entorno local de desarrollo verificado."
         else:
             summary = "TikTok listo: Python activo verificado."
+        if warnings:
+            # El resumen viaja al panel: incluir el aviso evita que la falta de
+            # credencial quede invisible en instalaciones que solo leen el summary.
+            summary = f"{summary} Aviso: {warnings[0]}"
     else:
         summary = alerts[0]
 
@@ -403,6 +429,7 @@ def _build_report(
         "ok": ok,
         "summary": summary,
         "alerts": alerts,
+        "warnings": warnings,
         "bridgeRoot": str(bridge_root),
         "pythonExecutable": str(current_python),
         "pythonVersion": sys.version.split()[0],
@@ -440,6 +467,8 @@ def render_text_report(report: dict[str, Any]) -> str:
     lines = [report.get("summary") or "Sin resumen."]
     for alert in report.get("alerts") or []:
         lines.append(f"- {alert}")
+    for warning in report.get("warnings") or []:
+        lines.append(f"- (aviso) {warning}")
     if report.get("ok"):
         lines.append(f"Python: {report.get('pythonExecutable', '')}")
         lines.append(f"Modo: {report.get('runtimeMode', '')}")

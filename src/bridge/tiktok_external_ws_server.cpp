@@ -427,6 +427,21 @@ bool TikTokExternalWsServer::start(std::uint16_t port) {
         return false;
     }
 
+    // Winsock crea los sockets HEREDABLES. El panel lanza sus hijos (python del
+    // bridge, cloudflared) con bInheritHandles=TRUE para los pipes, asi que sin
+    // esto el listener queda duplicado en el proceso hijo: si el panel muere, el
+    // hijo mantiene el puerto en LISTEN con un PID ya inexistente y el panel
+    // nuevo NO puede volver a bindear (SO_EXCLUSIVEADDRUSE). Verificado con un
+    // experimento controlado: puerto en LISTEN con PID muerto, liberado recien
+    // al matar al hijo que heredo el handle.
+    if (SetHandleInformation(
+            reinterpret_cast<HANDLE>(listen_socket),
+            HANDLE_FLAG_INHERIT,
+            0) == FALSE) {
+        close_socket(listen_socket);
+        return false;
+    }
+
     u_long nonblocking = 1;
     ioctlsocket(listen_socket, FIONBIO, &nonblocking);
 
@@ -532,6 +547,12 @@ std::size_t TikTokExternalWsServer::poll() {
             reinterpret_cast<sockaddr*>(&client_address),
             &client_address_size);
         if (accepted_socket != INVALID_SOCKET) {
+            // Mismo motivo que el listener: un socket de cliente heredable por
+            // los hijos mantendria la conexion viva despues de cerrar el panel.
+            SetHandleInformation(
+                reinterpret_cast<HANDLE>(accepted_socket),
+                HANDLE_FLAG_INHERIT,
+                0);
             u_long nonblocking = 1;
             ioctlsocket(accepted_socket, FIONBIO, &nonblocking);
             impl_->client_socket = accepted_socket;

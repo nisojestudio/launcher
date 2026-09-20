@@ -15,6 +15,11 @@ enum class TikTokExternalSessionConnectionState {
     connected,
     disconnected,
     faulted,
+    // Emitidos por el bridge Python; deben decodificarse para que el monitor
+    // del live pueda mostrar la reconexion y el cierre de la sesion.
+    reconnecting,
+    stopped,
+    idle,
 };
 
 struct TikTokExternalSessionStatus {
@@ -24,6 +29,11 @@ struct TikTokExternalSessionStatus {
         TikTokExternalSessionConnectionState::unknown;
     std::string message{};
     std::int64_t timestamp_ms = 0;
+    // Diagnostico visible en el panel (opcionales: el bridge viejo no los manda).
+    std::string phase{};        // starting | connecting | waiting | connected | error
+    std::string severity{};     // info | warn | error
+    std::string alert_code{};   // codigo del catalogo de errores del bridge
+    double retry_in_sec = 0.0;  // segundos hasta el proximo intento
 };
 
 constexpr std::string_view to_string(TikTokExternalSessionConnectionState state) noexcept {
@@ -40,6 +50,12 @@ constexpr std::string_view to_string(TikTokExternalSessionConnectionState state)
         return "disconnected";
     case TikTokExternalSessionConnectionState::faulted:
         return "faulted";
+    case TikTokExternalSessionConnectionState::reconnecting:
+        return "reconnecting";
+    case TikTokExternalSessionConnectionState::stopped:
+        return "stopped";
+    case TikTokExternalSessionConnectionState::idle:
+        return "idle";
     case TikTokExternalSessionConnectionState::unknown:
         break;
     }

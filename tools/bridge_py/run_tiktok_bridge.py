@@ -172,7 +172,11 @@ async def run() -> int:
                 status = service.status_payload()
                 last_session = status.get("last_session_status") or {}
                 connection_state = str(last_session.get("connection_state") or "unknown")
-                if connection_state != "connected":
+                # Solo es una anomalia real si la sesion NUNCA llego a conectar.
+                # Mirar el ultimo estado daba un falso positivo en cada cierre
+                # normal (siempre termina en "stopped").
+                ever_connected = bool(status.get("ever_connected", False))
+                if not ever_connected and connection_state not in ("connected", "stopped", "disconnected"):
                     log_json(
                         logger,
                         "warning",

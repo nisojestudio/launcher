@@ -26,6 +26,9 @@ struct ExternalBridgeRunnerStatus {
     std::int64_t runtime_checked_timestamp_ms = 0;
     std::string runtime_summary{};
     std::vector<std::string> runtime_alerts{};
+    // Avisos no bloqueantes del sondeo de entorno (p. ej. credencial que todavia
+    // no se ingreso en el panel). No impiden arrancar el bridge.
+    std::vector<std::string> runtime_warnings{};
     bool has_exit_code = false;
     std::int32_t last_exit_code = 0;
     std::string last_error{};

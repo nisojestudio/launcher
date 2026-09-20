@@ -59,6 +59,7 @@ class TikTokBridgeService:
         self._last_replay_result: dict[str, Any] = {}
         self._last_status_message = "idle"
         self._last_session_status: dict[str, Any] = {}
+        self._ever_connected = False
         self._shutdown_requested = False
 
     async def start(self) -> None:
@@ -137,6 +138,10 @@ class TikTokBridgeService:
     async def _publish_status(self, status: SessionStatus) -> None:
         self._last_session_status = status.to_panel_payload()
         self._last_status_message = status.message or status.connection_state.value
+        if status.connection_state.value == "connected":
+            # Marca historica: se uso para saber si la sesion llego a conectar,
+            # en vez de mirar solo el ultimo estado (que siempre termina en stop).
+            self._ever_connected = True
         self.metrics.set_gauge("connected", 1 if status.connection_state.value == "connected" else 0)
         await self.dispatcher.emit_status(status)
 
@@ -163,6 +168,7 @@ class TikTokBridgeService:
             "last_replay_result": self._last_replay_result,
             "last_status_message": self._last_status_message,
             "last_session_status": self._last_session_status,
+            "ever_connected": self._ever_connected,
             "shutdown_requested": self._shutdown_requested,
         }
 
