@@ -9,6 +9,7 @@ PanelActivityLog::PanelActivityLog(std::size_t capacity) noexcept
 }
 
 void PanelActivityLog::push(PanelActivityEntry entry) {
+    std::lock_guard<std::mutex> lock(mutex_);
     entries_.push_back(std::move(entry));
 
     while (entries_.size() > capacity_) {
@@ -17,10 +18,12 @@ void PanelActivityLog::push(PanelActivityEntry entry) {
 }
 
 std::vector<PanelActivityEntry> PanelActivityLog::entries() const {
+    std::lock_guard<std::mutex> lock(mutex_);
     return {entries_.begin(), entries_.end()};
 }
 
-std::size_t PanelActivityLog::size() const noexcept {
+std::size_t PanelActivityLog::size() const {
+    std::lock_guard<std::mutex> lock(mutex_);
     return entries_.size();
 }
 
@@ -28,7 +31,8 @@ std::size_t PanelActivityLog::capacity() const noexcept {
     return capacity_;
 }
 
-void PanelActivityLog::clear() noexcept {
+void PanelActivityLog::clear() {
+    std::lock_guard<std::mutex> lock(mutex_);
     entries_.clear();
 }
 

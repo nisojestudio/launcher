@@ -1,5 +1,17 @@
 # Remote Games Worker
 
+> ## ⚠️ NO DESPLEGAR en producción
+>
+> Este worker usa el **mismo nombre** (`nisoje-api-dev`) que el worker canónico
+> que sí sirve en producción (`nisoje-api-dev.js` en el repo del sitio,
+> `panel-live-master/sitio`). Si se ejecuta `wrangler deploy` desde aquí,
+> **sobreescribe la API en vivo y rompe el overlay del timer** (este archivo no
+> tiene la ruta `POST/GET /api/overlay/session` que el panel necesita para
+> publicar la URL del túnel) y apunta a `database_name: nisoje-db`, distinto
+> del real (`nisoje-studio-db`).
+>
+> Mantenido solo como referencia histórica del catálogo remoto.
+
 Artefactos operativos para publicar el catalogo remoto licenciado de juegos en Cloudflare Workers + R2.
 
 ## Archivos

@@ -1,10 +1,13 @@
 #pragma once
 
 #include <cstddef>
+#include <condition_variable>
 #include <cstdint>
 #include <filesystem>
 #include <memory>
+#include <mutex>
 #include <string>
+#include <thread>
 #include <vector>
 
 #include "events/host_event.hpp"
@@ -133,6 +136,13 @@ public:
     /// Fase 3: publica en el Worker la URL base del tunel vigente. Best-effort:
     /// si falla, el panel sigue arrancando igual (nunca bloquea ni lanza).
     bool publish_overlay_session(const std::string& public_base_url);
+    /// Heartbeat: inicia (si no corre ya) el hilo que republica la sesion del
+    /// overlay en el Worker mientras el tunel este vivo. La sesion del Worker
+    /// caduca a los 900 s: sin republicar, la pagina publica se queda en
+    /// "esperando al panel" a mitad de la transmision.
+    void start_overlay_session_publisher();
+    /// Bucle del heartbeat. Se detiene (join) desde stop_http_ui().
+    void overlay_session_publish_loop();
     bool submit_external_ws_payload(const std::string& payload);
     bridge::TikTokExternalInboxResult process_external_inbox(const std::string& inbox_dir);
     bridge::TikTokExternalInboxResult process_external_inbox_and_tick(
@@ -209,7 +219,22 @@ private:
     std::unique_ptr<PanelHttpServer> overlay_tunnel_server_{};
     /// Fase 3: URL publica base del tunel vigente. Es estado de ejecucion, no
     /// configuracion del usuario: nunca se persiste en panel_config.json.
+    /// Protegida por `overlay_publish_mutex_`: la escribe el hilo lector de
+    /// cloudflared, la lee el hilo del heartbeat y la limpia stop_http_ui().
     std::string overlay_public_base_url_{};
+    /// Heartbeat de la sesion del overlay. El mutex protege tambien
+    /// `overlay_publish_stop_`; el HTTP se lanza SIEMPRE sin el lock para que
+    /// stop_http_ui() solo espere como maximo una peticion en vuelo
+    /// (WinHttp timeouts: 10 s connect / 30 s receive).
+    std::thread overlay_publish_thread_{};
+    std::mutex overlay_publish_mutex_{};
+    std::condition_variable overlay_publish_cv_{};
+    bool overlay_publish_stop_ = true;
+    /// Ultimo resultado de publicacion registrado en el activity log:
+    /// -1 sin publicar todavia, 0 fallo, 1 ok. Protegido por
+    /// `overlay_publish_mutex_`. Sirve para logear solo TRANSICIONES y no
+    /// inundar el feed con una entrada del heartbeat cada 5 minutos.
+    int overlay_publish_last_status_ = -1;
 
     std::unique_ptr<tts::ITtsBackend> tts_backend_{};
     std::unique_ptr<tts::HostTtsService> tts_service_{};

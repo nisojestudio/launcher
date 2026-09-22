@@ -473,6 +473,10 @@ constexpr std::string_view kOverlaySessionPath = "/api/overlay/session";
 // Caducidad de la publicacion. Corta a proposito: una URL de tunel muerta no
 // debe seguir sirviendose. El panel republica en cada arranque.
 constexpr int kOverlaySessionTtlSeconds = 900;
+// Heartbeat: el panel republica la sesion mientras el tunel este vivo. Con el
+// TTL en 900 s, cada 300 s deja ~3 oportunidades antes de caducar; el Worker
+// admite como minimo 5 s entre publicaciones, asi que hay margen de sobra.
+constexpr int kOverlaySessionRepublishMs = 5 * 60 * 1000;
 
 /// El panel solo publica URLs https limpias: rechaza cualquier caracter que no
 /// pertenezca a una URL, para no poder inyectar nada en el JSON del Worker.
@@ -1966,19 +1970,43 @@ bool PanelApp::start_http_ui(std::uint16_t port) {
     // ejecucion) y se publica en el Worker para que la pagina estatica publica
     // sepa a que panel apuntar. Si la publicacion falla, el arranque continua.
     tunnel_service_->start_tunnel(overlay_port, [this](const std::string& url) {
-        overlay_public_base_url_ = url;
+        {
+            // Escritura protegida: el hilo del heartbeat lee este string.
+            std::lock_guard<std::mutex> lock(overlay_publish_mutex_);
+            overlay_public_base_url_ = url;
+        }
         publish_overlay_session(url);
     });
+    // Heartbeat: a partir de aqui la sesion se republica sola cada
+    // kOverlaySessionRepublishMs hasta que stop_http_ui() la detenga.
+    start_overlay_session_publisher();
 
     return true;
 }
 
 void PanelApp::stop_http_ui() {
-    // Orden CRÍTICO: primero túnel (libera cloudflared), luego HTTP server
+    // Orden CRÍTICO: 1) heartbeat (evita republicar a medio apagado y evita
+    // que join() espere tras parar los demas), 2) túnel (libera cloudflared),
+    // 3) HTTP servers.
+    {
+        std::lock_guard<std::mutex> lock(overlay_publish_mutex_);
+        overlay_publish_stop_ = true;
+    }
+    overlay_publish_cv_.notify_all();
+    if (overlay_publish_thread_.joinable()) {
+        overlay_publish_thread_.join();
+    }
     if (tunnel_service_ != nullptr) {
         tunnel_service_->stop_tunnel();
     }
-    overlay_public_base_url_.clear();
+    {
+        std::lock_guard<std::mutex> lock(overlay_publish_mutex_);
+        overlay_public_base_url_.clear();
+        // Rearma el log por transicion: un `ui start` posterior debe volver a
+        // registrar "overlay_session_published" aunque la ultima publicacion
+        // de la sesion anterior hubiera sido ok.
+        overlay_publish_last_status_ = -1;
+    }
     if (overlay_tunnel_server_ != nullptr) {
         overlay_tunnel_server_->stop();
     }
@@ -1995,17 +2023,46 @@ bool PanelApp::publish_overlay_session(const std::string& public_base_url) {
     // Best-effort por diseno: esto corre en el hilo lector de cloudflared y no
     // puede bloquear ni tumbar el arranque del panel. Si falla, la pagina
     // estatica se queda en "esperando al panel" y queda el modo local directo.
+    //
+    // Logging por TRANSICION (ok <-> fallo): el heartbeat reintenta cada 5 min
+    // y un push por vuelta llenaria el feed (capped en 20). Cubre TAMBIEN las
+    // salidas por precondicion, que antes fallaban en silencio y nos dejaron
+    // sin diagnosticos cuando no habia license_key.
+    auto record = [this](bool ok, const std::string& details) {
+        bool should_log = false;
+        {
+            std::lock_guard<std::mutex> lock(overlay_publish_mutex_);
+            const int status = ok ? 1 : 0;
+            if (overlay_publish_last_status_ != status) {
+                overlay_publish_last_status_ = status;
+                should_log = true;
+            }
+        }
+        if (should_log && activity_log_ != nullptr) {
+            activity_log_->push({
+                PanelActivityKind::unknown,
+                ok ? "overlay_session_published" : "overlay_session_publish_failed",
+                "system",
+                "",
+                ok ? std::string{} : details,
+                now_wall_clock_ms()});
+        }
+    };
+
     try {
         if (!is_publishable_base_url(public_base_url)) {
+            record(false, "tunnel URL invalida o vacia");
             return false;
         }
         if (license_service_ == nullptr || !access_granted()) {
+            record(false, "acceso de licencia no concedido");
             return false;
         }
 
         const auto auth = license_service_->auth_snapshot();
         const auto license_key = trim_copy(auth.license_key);
         if (license_key.empty()) {
+            record(false, "sin license_key: inicia sesion en el panel para publicar el overlay");
             return false;
         }
 
@@ -2014,6 +2071,7 @@ bool PanelApp::publish_overlay_session(const std::string& public_base_url) {
             base.pop_back();
         }
         if (base.empty()) {
+            record(false, "nisoje_api_base vacio");
             return false;
         }
 
@@ -2031,18 +2089,52 @@ bool PanelApp::publish_overlay_session(const std::string& public_base_url) {
             "POST", endpoint, body, "application/json", headers);
 
         const bool ok = response.status_code >= 200 && response.status_code < 300;
-        if (activity_log_ != nullptr) {
-            activity_log_->push({
-                PanelActivityKind::unknown,
-                ok ? "overlay_session_published" : "overlay_session_publish_failed",
-                "system",
-                "",
-                ok ? std::string{} : ("HTTP " + std::to_string(response.status_code) + " " + response.error),
-                now_wall_clock_ms()});
-        }
+        record(ok, "HTTP " + std::to_string(response.status_code) + " " + response.error);
         return ok;
-    } catch (...) {
+    } catch (const std::exception& e) {
+        record(false, e.what());
         return false;
+    } catch (...) {
+        record(false, "excepcion desconocida");
+        return false;
+    }
+}
+
+void PanelApp::start_overlay_session_publisher() {
+    std::lock_guard<std::mutex> lock(overlay_publish_mutex_);
+    if (overlay_publish_thread_.joinable()) {
+        // Ya corriendo (p. ej. `ui start` repetido): solo rearmamos el flag y
+        // despertamos al hilo; no se crea un segundo heartbeat.
+        overlay_publish_stop_ = false;
+        overlay_publish_cv_.notify_one();
+        return;
+    }
+    overlay_publish_stop_ = false;
+    overlay_publish_thread_ = std::thread(&PanelApp::overlay_session_publish_loop, this);
+}
+
+void PanelApp::overlay_session_publish_loop() {
+    std::unique_lock<std::mutex> lock(overlay_publish_mutex_);
+    while (!overlay_publish_stop_) {
+        overlay_publish_cv_.wait_for(
+            lock,
+            std::chrono::milliseconds(kOverlaySessionRepublishMs),
+            [this] { return overlay_publish_stop_; });
+        if (overlay_publish_stop_) {
+            break;
+        }
+        const std::string url = overlay_public_base_url_;
+        if (url.empty()) {
+            // El tunel aun no ha entregado URL (o ya se paro): nada que
+            // republicar, seguimos esperando el siguiente intervalo.
+            continue;
+        }
+        // El HTTP bloquea (WinHttp: 10 s connect / 30 s receive): se lanza sin
+        // el lock para que stop_http_ui() solo tenga que esperar como maximo
+        // una peticion en vuelo, nunca el ciclo completo del heartbeat.
+        lock.unlock();
+        publish_overlay_session(url);
+        lock.lock();
     }
 }
 
@@ -2219,6 +2311,19 @@ PanelAuthLoginResult PanelApp::authenticate_access(const PanelAuthLoginRequest& 
         sync_remote_distribution_auth_context(true, &catalog_error);
         if (!catalog_error.empty()) {
             result.remote_catalog_error = std::move(catalog_error);
+        }
+
+        // El arranque intenta publicar la sesion del overlay ANTES de que el
+        // auto-login entregue la license_key (y ahi falla por precondicion).
+        // Este es el momento exacto en que la key pasa a existir: publicamos
+        // ya, sin esperar al siguiente latido del heartbeat (5 min).
+        std::string tunnel_url{};
+        {
+            std::lock_guard<std::mutex> lock(overlay_publish_mutex_);
+            tunnel_url = overlay_public_base_url_;
+        }
+        if (!tunnel_url.empty()) {
+            publish_overlay_session(tunnel_url);
         }
     } else {
         sync_remote_distribution_auth_context(false);
