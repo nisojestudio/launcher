@@ -4,6 +4,34 @@ All notable Panel Live changes should be recorded here.
 
 Format follows a lightweight Keep a Changelog style. Versions use SemVer.
 
+## 0.3.2 - 2026-09-20
+
+### Added — Live Timer Fase 5: Motor visual completo y 3 diseños
+
+- **Motor visual completo (27 claves nuevas)**: escala relativa, marco con 6 estilos (none/card/glass/neon/ribbon/badge), border, radius, padding, brackets, grid, scanlines, text outline, time separator, show hours, warn/danger thresholds, danger effect, progress (ring/bar/none), particles con presupuesto y auto-apagado por FPS.
+- **Diseños predefinidos**: 4 botones en el panel que aplican configuraciones validadas:
+  - **HUD Órbita** (futurista): neón cian, brackets, grid, scanlines, glitch, chispas
+  - **Cristal Líquido** (moderna): glassmorphism, anillo de progreso, radio 28px, sin partículas
+  - **Pegatina Brutal** (divertida): tarjeta negra con papel claro, 4px border, confeti activo
+  - **Clásico** (restaura defaults anteriores a Fase 5)
+- **Panel UI**: nueva sección "🖥 Diseño (motor visual)" con 36 controles visuales y 4 botones de diseño.
+- **Coherencia visual automática**: sub-controles que no aplican se desactivan (ej: contorno desaparece cuando el marco está OFF).
+- **Validación cliente mejorada**: ahora reciega valores de efectos, tamaños y rangos para evitar sorpresas con el servidor.
+- **Tests nuevos**: 18 secciones de test en `live_timer_visual_config_test.cpp`, más cp7 HTTP round-trip real en `live_timer_api_smoke_test.cpp`.
+
+### Fixed — Live Timer
+
+- **Bug `on_complete_text_size`**: ya no se define como `double` y se acota correctamente 8..400.
+- **Bug `glow_intensity_px`**: mismo problema, corregido a clamp 1..60.
+- **Allow-list de efectos extendido**: ahora incluye `heartbeat`, `float`, `flicker`, `shake`, `odometer`, `typewriter`, `blur`.
+- **Coherencia de partículas**: `particles_style = none` ⇒ `particles_enabled = false` automáticamente.
+
+### Verificación
+
+- 17 capturas Playwright en `reports/fase5-visual/` con medidas verificadas.
+- 33/33 tests C++ pasados, 63/63 tests Python pasados.
+- Contrato UI↔backend verificado con `scripts/dev/verify_visual_wiring.mjs`: **CONTRATO OK**.
+
 ## 0.3.1 - 2026-09-20
 
 ### Fixed
