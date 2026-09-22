@@ -23,15 +23,43 @@ function Assert-SemVer {
     }
 }
 
+function Quote-NativeArgument {
+    param([string]$Arg)
+    if ($Arg -match '\s|"') {
+        # CmdLineToArgvW rules: escape backslashes before the closing quote, then the quote.
+        return '"' + ($Arg -replace '(\\+)("|$)', '$1$1$2' -replace '"', '\"') + '"'
+    }
+    return $Arg
+}
+
 function Invoke-GitHub {
     param([string[]]$Arguments)
-    $output = & gh @Arguments 2>&1
-    $exitCode = $LASTEXITCODE
-    if ($exitCode -ne 0) {
-        $errorText = ($output | Out-String).Trim()
-        throw "gh command failed (exit $exitCode): gh $($Arguments -join ' ')`n$errorText"
+    # Native arg parsing in PowerShell 5.1 silently splits arguments that
+    # contain spaces (like "Panel live 3.0" paths). Quote them ourselves and
+    # launch gh via System.Diagnostics.Process instead of relying on splatting.
+    # Stdout is drained asynchronously to avoid pipe-buffer deadlocks on long
+    # upload progress output.
+    $argv = @($Arguments | ForEach-Object { Quote-NativeArgument $_ })
+    $psi = New-Object System.Diagnostics.ProcessStartInfo
+    $psi.FileName = "gh"
+    $psi.Arguments = ($argv -join ' ')
+    $psi.RedirectStandardOutput = $true
+    $psi.RedirectStandardError = $true
+    $psi.UseShellExecute = $false
+    $psi.CreateNoWindow = $true
+    $process = [System.Diagnostics.Process]::Start($psi)
+    try {
+        $outTask = $process.StandardOutput.ReadToEndAsync()
+        $err = $process.StandardError.ReadToEnd()
+        $process.WaitForExit()
+        $out = $outTask.Result
+        if ($process.ExitCode -ne 0) {
+            throw "gh command failed (exit $($process.ExitCode)): gh $($Arguments -join ' ')`n$(("$out $err").Trim())"
+        }
+        return ($out -as [string]).Trim()
+    } finally {
+        $process.Dispose()
     }
-    return ($output | Out-String).Trim()
 }
 
 function Get-ReleaseInfo {
@@ -79,18 +107,21 @@ if ($assets.Count -eq 0) {
 $tag = "v$Version"
 $existingRelease = Get-ReleaseInfo -Tag $tag
 if ($null -ne $existingRelease) {
-    throw "Release $tag already exists at $($existingRelease.url). Use a new version or clean the draft manually before retrying."
+    if (-not $existingRelease.isDraft) {
+        throw "Release $tag already exists and is published at $($existingRelease.url). Use a new version or clean it manually before retrying."
+    }
+    Write-Host "[github] Reusing existing draft release: $tag (resuming upload)"
+} else {
+    Write-Host "[github] Creating draft release: $tag"
+    Invoke-GitHub -Arguments @(
+        "release", "create", $tag,
+        "--repo", $Repo,
+        "--title", "Panel Live $Version",
+        "--notes", $Changelog,
+        "--draft",
+        "--prerelease"
+    )
 }
-
-Write-Host "[github] Creating draft release: $tag"
-Invoke-GitHub @(
-    "release", "create", $tag,
-    "--repo", $Repo,
-    "--title", "Panel Live $Version",
-    "--notes", $Changelog,
-    "--draft",
-    "--prerelease"
-)
 
 Write-Host "[github] Uploading $($assets.Count) assets..."
 $uploadArgs = @(
@@ -98,7 +129,9 @@ $uploadArgs = @(
     "--repo", $Repo,
     "--clobber"
 ) + $assets
-Invoke-GitHub @uploadArgs
+# Explicit -Arguments: array splatting (@uploadArgs) binds each element as a
+# positional parameter of Invoke-GitHub instead of as [string[]]$Arguments.
+Invoke-GitHub -Arguments $uploadArgs
 
 Write-Host "[github] Verifying upload..."
 Start-Sleep -Seconds 3
@@ -109,7 +142,9 @@ if ($null -eq $info) {
 $assetNames = @($info.assets | ForEach-Object { $_.name })
 $expectedFiles = @((Split-Path -Leaf $exeFile), (Split-Path -Leaf $zipFile), (Split-Path -Leaf $shaFile))
 foreach ($expectedFile in $expectedFiles) {
-    if (Test-Path (Join-Path $ReleaseDir $expectedFile) -or (Test-Path (Join-Path $installerDir $expectedFile))) {
+    $existsInReleaseDir = (Test-Path -Path (Join-Path $ReleaseDir $expectedFile))
+    $existsInInstallerDir = (Test-Path -Path (Join-Path $installerDir $expectedFile))
+    if ($existsInReleaseDir -or $existsInInstallerDir) {
         if ($assetNames -notcontains $expectedFile) {
             Write-Warning "[github] Missing expected asset from release: $expectedFile"
         }
@@ -117,7 +152,7 @@ foreach ($expectedFile in $expectedFiles) {
 }
 
 Write-Host "[github] Publishing release..."
-Invoke-GitHub @(
+Invoke-GitHub -Arguments @(
     "release", "edit", $tag,
     "--repo", $Repo,
     "--draft=false",
