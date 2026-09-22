@@ -138,7 +138,11 @@ std::string build_live_timer_state_json(const games::LiveTimerGame* game) {
             << "\"icon\":" << json_quote(ev.icon) << ","
             << "\"label\":" << json_quote(ev.label) << ","
             << "\"delta\":" << ev.delta_seconds << ","
-            << "\"isAddition\":" << (ev.is_addition ? "true" : "false")
+            << "\"isAddition\":" << (ev.is_addition ? "true" : "false") << ","
+            // Bloque A / M1: nombre del actor (vacio = anonimo o no aplica).
+            << "\"actorName\":" << json_quote(ev.actor_name) << ","
+            // Bloque A / M5: el delta fue recortado por un tope.
+            << "\"capped\":" << (ev.capped ? "true" : "false")
             << "}";
     }
     events_json << "]";

@@ -1000,6 +1000,16 @@ std::string build_live_timer_config_json(const nlp3::games::LiveTimerGame* game)
     add("time_per_follow_s"); out << ",";
     add("time_per_gift_coin_s"); out << ",";
     add("time_per_chat_s"); out << ",";
+    // Bloque A — reglas de eventos.
+    add("like_use_magnitude"); out << ",";
+    add("mult_subscriber"); out << ",";
+    add("mult_follower"); out << ",";
+    add("mult_moderator"); out << ",";
+    add("cap_per_event_s"); out << ",";
+    add("cap_per_user_per_minute_s"); out << ",";
+    add("cap_total_per_minute_s"); out << ",";
+    add("floor_time_s"); out << ",";
+    add("gift_tiers"); out << ",";
     add("title_text"); out << ",";
     add("subtitle_text"); out << ",";
     add("on_complete_sound_path"); out << ",";
@@ -1117,6 +1127,28 @@ std::string handle_timer_configure(PanelApp* app, std::string_view body) {
     if (maybe_d.has_value()) config.set("time_per_gift_coin_s", std::clamp(*maybe_d, -3600.0, 3600.0));
     maybe_d = parse_json_double(body, "time_per_chat_s");
     if (maybe_d.has_value()) config.set("time_per_chat_s", std::clamp(*maybe_d, -3600.0, 3600.0));
+
+    // Bloque A — reglas de eventos. Los topes y multiplicadores no pueden ser
+    // negativos (signos se gestionan en el propio time_per_*).
+    {
+        auto maybe_b = parse_json_bool(body, "like_use_magnitude");
+        if (maybe_b.has_value()) config.set("like_use_magnitude", *maybe_b);
+    }
+    maybe_d = parse_json_double(body, "mult_subscriber");
+    if (maybe_d.has_value()) config.set("mult_subscriber", std::clamp(*maybe_d, 0.0, 1000.0));
+    maybe_d = parse_json_double(body, "mult_follower");
+    if (maybe_d.has_value()) config.set("mult_follower", std::clamp(*maybe_d, 0.0, 1000.0));
+    maybe_d = parse_json_double(body, "mult_moderator");
+    if (maybe_d.has_value()) config.set("mult_moderator", std::clamp(*maybe_d, 0.0, 1000.0));
+    maybe_d = parse_json_double(body, "cap_per_event_s");
+    if (maybe_d.has_value()) config.set("cap_per_event_s", std::clamp(*maybe_d, 0.0, 86400.0));
+    maybe_d = parse_json_double(body, "cap_per_user_per_minute_s");
+    if (maybe_d.has_value()) config.set("cap_per_user_per_minute_s", std::clamp(*maybe_d, 0.0, 86400.0));
+    maybe_d = parse_json_double(body, "cap_total_per_minute_s");
+    if (maybe_d.has_value()) config.set("cap_total_per_minute_s", std::clamp(*maybe_d, 0.0, 86400.0));
+    maybe_d = parse_json_double(body, "floor_time_s");
+    if (maybe_d.has_value()) config.set("floor_time_s", std::clamp(*maybe_d, 0.0, 31536000.0));
+
     maybe_d = parse_json_double(body, "on_complete_volume");
     if (maybe_d.has_value()) config.set("on_complete_volume", std::clamp(*maybe_d, 0.0, 2.0));
 
@@ -1124,6 +1156,9 @@ std::string handle_timer_configure(PanelApp* app, std::string_view body) {
     if (maybe_str.has_value()) config.set("title_text", maybe_str->substr(0, 256));
     maybe_str = parse_json_string(body, "subtitle_text");
     if (maybe_str.has_value()) config.set("subtitle_text", maybe_str->substr(0, 512));
+    // Bloque A / M4: tramos de regalo (texto multilinea).
+    maybe_str = parse_json_string(body, "gift_tiers");
+    if (maybe_str.has_value()) config.set("gift_tiers", maybe_str->substr(0, 4096));
     maybe_str = parse_json_string(body, "on_complete_sound_path");
     if (maybe_str.has_value()) config.set("on_complete_sound_path", *maybe_str);
     maybe_str = parse_json_string(body, "title_font_color");

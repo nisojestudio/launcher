@@ -322,6 +322,16 @@
     timerInitialTime: $("#timer-initial-time"),
     timerMaxTime: $("#timer-max-time"),
     timerPerLike: $("#timer-per-like"),
+    // Bloque A — reglas de eventos
+    timerLikeUseMagnitude: $("#timer-like-use-magnitude"),
+    timerMultSubscriber: $("#timer-mult-subscriber"),
+    timerMultFollower: $("#timer-mult-follower"),
+    timerMultModerator: $("#timer-mult-moderator"),
+    timerCapEvent: $("#timer-cap-event"),
+    timerCapUserMin: $("#timer-cap-user-min"),
+    timerCapTotalMin: $("#timer-cap-total-min"),
+    timerFloorTime: $("#timer-floor-time"),
+    timerGiftTiers: $("#timer-gift-tiers"),
     timerPerShare: $("#timer-per-share"),
     timerPerFollow: $("#timer-per-follow"),
     timerPerGiftCoin: $("#timer-per-gift-coin"),
@@ -3685,10 +3695,13 @@
           if (ev.id > maxId) maxId = ev.id;
           const cls = ev.isAddition ? 'add' : 'sub';
           const sign = ev.isAddition ? '+' : '';
+          // Bloque A / M1: el nombre del actor es lo que agradece en directo.
+          const actorTxt = ev.actorName ? escapeHtml(ev.actorName) + ' ' : '';
+          const cappedTxt = ev.capped ? ' ⚠' : '';
           html += '<div class="timer-event-item">'
             + '<span class="timer-event-icon">' + (ev.icon || '') + '</span>'
-            + '<span class="timer-event-label">' + (ev.label || '') + '</span>'
-            + '<span class="timer-event-delta ' + cls + '">' + sign + ev.delta + 's</span>'
+            + '<span class="timer-event-label">' + actorTxt + (ev.label || '') + '</span>'
+            + '<span class="timer-event-delta ' + cls + '">' + sign + ev.delta + 's' + cappedTxt + '</span>'
             + '</div>';
         });
         if (!html) {
@@ -3801,6 +3814,16 @@
         time_per_follow_s: parseTimerNum(els.timerPerFollow?.value, 10.0),
         time_per_gift_coin_s: parseTimerNum(els.timerPerGiftCoin?.value, 0.5),
         time_per_chat_s: parseTimerNum(els.timerPerChat?.value, 0.0),
+        // Bloque A — reglas de eventos
+        like_use_magnitude: !!els.timerLikeUseMagnitude?.checked,
+        mult_subscriber: parseTimerNum(els.timerMultSubscriber?.value, 1.0),
+        mult_follower: parseTimerNum(els.timerMultFollower?.value, 1.0),
+        mult_moderator: parseTimerNum(els.timerMultModerator?.value, 1.0),
+        cap_per_event_s: parseTimerNum(els.timerCapEvent?.value, 0),
+        cap_per_user_per_minute_s: parseTimerNum(els.timerCapUserMin?.value, 0),
+        cap_total_per_minute_s: parseTimerNum(els.timerCapTotalMin?.value, 0),
+        floor_time_s: parseTimerNum(els.timerFloorTime?.value, 0),
+        gift_tiers: els.timerGiftTiers?.value || "",
         title_text: els.timerTitleText?.value ?? "🎯 Extiende el Live",
         subtitle_text: els.timerSubtitleText?.value ?? "📌 Cada coin suma {time_per_gift_coin}s",
         popup_add_color: els.timerPopupAddColor?.value || "#00AAFF",
@@ -4133,6 +4156,16 @@
         if (config.time_per_follow_s !== undefined) els.timerPerFollow.value = config.time_per_follow_s;
         if (config.time_per_gift_coin_s !== undefined) els.timerPerGiftCoin.value = config.time_per_gift_coin_s;
         if (config.time_per_chat_s !== undefined) els.timerPerChat.value = config.time_per_chat_s;
+        // Bloque A — reglas de eventos
+        if (config.like_use_magnitude !== undefined) els.timerLikeUseMagnitude.checked = !!config.like_use_magnitude;
+        if (config.mult_subscriber !== undefined) els.timerMultSubscriber.value = config.mult_subscriber;
+        if (config.mult_follower !== undefined) els.timerMultFollower.value = config.mult_follower;
+        if (config.mult_moderator !== undefined) els.timerMultModerator.value = config.mult_moderator;
+        if (config.cap_per_event_s !== undefined) els.timerCapEvent.value = config.cap_per_event_s;
+        if (config.cap_per_user_per_minute_s !== undefined) els.timerCapUserMin.value = config.cap_per_user_per_minute_s;
+        if (config.cap_total_per_minute_s !== undefined) els.timerCapTotalMin.value = config.cap_total_per_minute_s;
+        if (config.floor_time_s !== undefined) els.timerFloorTime.value = config.floor_time_s;
+        if (config.gift_tiers !== undefined && els.timerGiftTiers) els.timerGiftTiers.value = config.gift_tiers;
         if (config.title_text !== undefined) els.timerTitleText.value = config.title_text;
         if (config.subtitle_text !== undefined) els.timerSubtitleText.value = config.subtitle_text;
         if (config.popup_add_color !== undefined) els.timerPopupAddColor.value = config.popup_add_color;
@@ -4408,6 +4441,16 @@
             // V3: digit effect, palette
             digit_effect: els.timerDigitEffect?.value || "none",
             color_preset: els.timerColorPreset?.value || "neon-green",
+            // Bloque A — reglas de eventos (mismo POST hot que los otros).
+            like_use_magnitude: !!els.timerLikeUseMagnitude?.checked,
+            mult_subscriber: parseTimerNum(els.timerMultSubscriber?.value, 1.0),
+            mult_follower: parseTimerNum(els.timerMultFollower?.value, 1.0),
+            mult_moderator: parseTimerNum(els.timerMultModerator?.value, 1.0),
+            cap_per_event_s: parseTimerNum(els.timerCapEvent?.value, 0),
+            cap_per_user_per_minute_s: parseTimerNum(els.timerCapUserMin?.value, 0),
+            cap_total_per_minute_s: parseTimerNum(els.timerCapTotalMin?.value, 0),
+            floor_time_s: parseTimerNum(els.timerFloorTime?.value, 0),
+            gift_tiers: els.timerGiftTiers?.value || "",
             // Fase 5 — motor visual (mismas 27 claves que el camino "Aplicar").
             ...readVisualEngineFromForm(),
           };
@@ -4453,7 +4496,12 @@
       'timerProgressStyle', 'timerProgressThicknessPx',
       'timerProgressColor', 'timerProgressColorAuto',
       'timerParticlesEnabled', 'timerParticlesStyle',
-      'timerParticlesBudget', 'timerParticlesDensity', 'timerParticlesForce'
+      'timerParticlesBudget', 'timerParticlesDensity', 'timerParticlesForce',
+      // Bloque A — reglas de eventos
+      'timerLikeUseMagnitude',
+      'timerMultSubscriber', 'timerMultFollower', 'timerMultModerator',
+      'timerCapEvent', 'timerCapUserMin', 'timerCapTotalMin',
+      'timerFloorTime', 'timerGiftTiers'
     ];
     hotControls.forEach(id => {
       const el = els[id];

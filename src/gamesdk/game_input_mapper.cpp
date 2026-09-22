@@ -11,6 +11,9 @@ GameInputEvent GameInputEventMapper::map(const events::HostEvent& event) const {
         "",
         event.actor.display_name,
         event.actor.avatar_url,
+        event.actor.is_follower,
+        event.actor.is_subscriber,
+        event.actor.is_moderator,
     };
     mapped.text = event.message;
     mapped.metadata = GameInputMetadata{

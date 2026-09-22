@@ -26,6 +26,10 @@ struct GameInputActor {
     std::string username;
     std::string display_name;
     std::string avatar_url;
+    // Live Timer Bloque A (M3): reglas por tipo de espectador
+    bool is_follower = false;
+    bool is_subscriber = false;
+    bool is_moderator = false;
 };
 
 struct GameInputGift {

@@ -4,6 +4,30 @@ All notable Panel Live changes should be recorded here.
 
 Format follows a lightweight Keep a Changelog style. Versions use SemVer.
 
+## 0.3.3 - 2026-09-22
+
+### Added — Live Timer Bloque A: reglas de eventos (M1, M2, M3, M4, M5)
+
+De `specs/live-timer-mejoras/sugerencias.md`: el timer deja de comportarse como juguete.
+
+- **M2 · Likes por magnitud**: un lote de N likes suma N × `time_per_like_s` (antes solo sumaba una vez por lote, sin importar la magnitud). El backend ya recibía la magnitud del bridge pero la ignoraba. Configuración `like_use_magnitude` (default `true`; desactivar para el comportamiento anterior).
+- **M3 · Multiplicadores por tipo de espectador**: `mult_subscriber`, `mult_follower`, `mult_moderator` (doubles, default 1.0, acotados 0..1000). Se aplican solo a deltas positivos. Si el actor tiene varios roles, gana el multiplicador **más alto** (máximo, no producto). Un actor sin roles sigue a 1.0.
+- **M1 · Nombre del actor en popup y feed**: los popups del overlay y el feed del panel ahora muestran el nombre del espectador (y la etiqueta del tramo de regalo si aplica). El backend propaga `GameInputActor.display_name` y expone `actorName` + `capped` en cada evento del overlay JSON.
+- **M5 · Topes, suelo y antispam**: `cap_per_event_s` (tope bruto por evento), `cap_per_user_per_minute_s` (ventana deslizante de 60 s por actor), `cap_total_per_minute_s` (ventana deslizante global) y `floor_time_s` (suelo del reloj; 0 = completable como siempre). Cuando un delta se recorta por tope, el popup se marca con `capped:true`. Las ventanas se vacían al armar/activar (son de sesión, no persisten entre directos).
+- **M4 · Tramos de regalo por valor**: `gift_tiers` acepta una regla por línea (`10-99: 15`, `100+: 300`, `Rosa: 3`). Si una regla casa, sustituye **por completo** la fórmula `coins × time_per_gift_coin`. Excepciones por nombre (contiene, case-insensitive) tienen prioridad sobre los rangos. Reglas malformadas se ignoran (no rompen la sesión).
+
+### Fixed — Interno
+
+- **Ventana de topes ya no se borra sola**: `ContributionWindow::push` purgaba entradas más viejas que la ventana, pero la llamada errada con `window_s=0` vaciaba todo antes de acumular. La ventana real (`kCapWindowS = 60 s`) se pasa explícita.
+- **build_windows_installer.ps1 robustez**: `gh` se invoca con arg escaping adecuado para rutas con espacios y con drains asíncronos de stdout/stderr (la corrida de Fase 5 se colgaba en el upload del instalador de 245 MB).
+- **`scripts/release/github_release.ps1` reanudable**: si el draft ya existe (por una subida a medias), se reutiliza en vez de fallar; los assets se suben con `--clobber`.
+
+### Verificación
+
+- 33/33 tests C++ (`nlp3_live_timer_game_test`, `nlp3_live_timer_api_smoke_test`, …), 63/63 tests Python.
+- Contrato UI↔backend: `scripts/dev/verify_visual_wiring.mjs` → CONTRATO OK.
+- End-to-end de publicación validado con release de litera `v9.9.9` (borrado después).
+
 ## 0.3.2 - 2026-09-20
 
 ### Added — Live Timer Fase 5: Motor visual completo y 3 diseños

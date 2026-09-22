@@ -308,6 +308,58 @@
                 </div>
               </details>
 
+              <!-- ===== Section 1b: Reglas de eventos (Bloque A) ===== -->
+              <details class="tv-section">
+                <summary class="tv-summary">⚖️ Reglas</summary>
+                <div class="tv-body">
+                  <div class="tv-row" style="flex-wrap:wrap;gap:12px">
+                    <label class="tv-group" title="M2: si está encendido, una ráfaga de N likes suma N × segundos por like">
+                      <input type="checkbox" id="timer-like-use-magnitude">
+                      <span class="tv-label">Likes por magnitud</span>
+                    </label>
+                  </div>
+                  <div class="tv-row">
+                    <div class="tv-group" title="M3: multiplica el tiempo que suman los suscriptores">
+                      <span class="tv-label">× Suscriptor</span>
+                      <input class="timer-input tv-num" id="timer-mult-subscriber" type="number" step="0.1" min="0" max="1000" value="1.0">
+                    </div>
+                    <div class="tv-group" title="M3: multiplica el tiempo que suman los seguidores">
+                      <span class="tv-label">× Seguidor</span>
+                      <input class="timer-input tv-num" id="timer-mult-follower" type="number" step="0.1" min="0" max="1000" value="1.0">
+                    </div>
+                    <div class="tv-group" title="M3: valor para moderadores (0 = no suman)">
+                      <span class="tv-label">× Moderador</span>
+                      <input class="timer-input tv-num" id="timer-mult-moderator" type="number" step="0.1" min="0" max="1000" value="1.0">
+                    </div>
+                  </div>
+                  <div class="tv-row">
+                    <div class="tv-group" title="M5: tope de segundos que puede sumar UN evento (0 = sin tope)">
+                      <span class="tv-label">Tope por evento (s)</span>
+                      <input class="timer-input tv-num" id="timer-cap-event" type="number" step="1" min="0" max="86400" value="0">
+                    </div>
+                    <div class="tv-group" title="M5: tope por usuario en la ventana del último minuto (0 = sin tope)">
+                      <span class="tv-label">Tope/usuario/min (s)</span>
+                      <input class="timer-input tv-num" id="timer-cap-user-min" type="number" step="1" min="0" max="86400" value="0">
+                    </div>
+                    <div class="tv-group" title="M5: tope global de todos los eventos en el último minuto (0 = sin tope)">
+                      <span class="tv-label">Tope total/min (s)</span>
+                      <input class="timer-input tv-num" id="timer-cap-total-min" type="number" step="1" min="0" max="86400" value="0">
+                    </div>
+                    <div class="tv-group" title="M5: suelo del reloj — no baja de aquí (0 = puede llegar a 0)">
+                      <span class="tv-label">Suelo del reloj (s)</span>
+                      <input class="timer-input tv-num" id="timer-floor-time" type="number" step="1" min="0" max="31536000" value="0">
+                    </div>
+                  </div>
+                  <div class="tv-row" style="flex-wrap:wrap">
+                    <div class="tv-group tv-group-grow" title="M4: tramos de regalo por valor. Una regla por línea: &#10;10-99: 15&#10;100+: 300&#10;Rosa: 3">
+                      <span class="tv-label">Tramos de regalo</span>
+                      <textarea class="tv-text-input" id="timer-gift-tiers" rows="4" spellcheck="false"
+                        placeholder="10-99: 15&#10;100+: 300&#10;Rosa: 3"></textarea>
+                    </div>
+                  </div>
+                </div>
+              </details>
+
               <!-- ===== Section 2: Visual ===== -->
               <details class="tv-section" open>
                 <summary class="tv-summary">🎨 Visual</summary>

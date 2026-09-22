@@ -975,6 +975,260 @@ void test_v3_fields_round_trip() {
     std::cout << "PASS: v3_fields_round_trip\n";
 }
 
+// ============================================================================
+// Bloque A — reglas de eventos (M1, M2, M3, M4, M5)
+// ============================================================================
+
+void test_m2_likes_por_magnitud() {
+    LiveTimerGame game;
+    auto cfg = game.default_config();
+    cfg.set("initial_time_s", 300.0);
+    cfg.set("time_per_like_s", 2.0);
+    cfg.set("like_use_magnitude", true);
+    game.apply_config(cfg);
+    game.on_activated();
+
+    auto like5 = make_test_event(GameInputEventKind::like);
+    like5.like_count = 5;
+    game.on_game_input_event(like5, kEmptySnapshot);
+    // 5 likes a 2 s c/u = 10 s (no 2 s como antes del flag).
+    assert(std::abs(game.state().remaining_seconds - 300.0 - 10.0) < 0.5);
+    assert(!game.state().recent_events.empty());
+    assert(std::abs(game.state().recent_events.back().delta_seconds - 10.0) < 0.01);
+
+    std::cout << "PASS: m2_likes_por_magnitud\n";
+}
+
+void test_m2_likes_sin_magnitud_legacy() {
+    LiveTimerGame game;
+    auto cfg = game.default_config();
+    cfg.set("initial_time_s", 100.0);
+    cfg.set("time_per_like_s", 2.0);
+    cfg.set("like_use_magnitude", false);
+    game.apply_config(cfg);
+    game.on_activated();
+
+    auto like5 = make_test_event(GameInputEventKind::like);
+    like5.like_count = 5;
+    game.on_game_input_event(like5, kEmptySnapshot);
+    // Modo historico: un solo cargo por lote.
+    assert(std::abs(game.state().remaining_seconds - 100.0 - 2.0) < 0.5);
+
+    std::cout << "PASS: m2_likes_sin_magnitud_legacy\n";
+}
+
+void test_m3_multiplicador_suscriptor() {
+    LiveTimerGame game;
+    auto cfg = game.default_config();
+    cfg.set("initial_time_s", 300.0);
+    cfg.set("time_per_follow_s", 10.0);
+    cfg.set("mult_subscriber", 2.0);
+    game.apply_config(cfg);
+    game.on_activated();
+
+    auto ev = make_test_event(GameInputEventKind::follow);
+    ev.actor.is_subscriber = true;
+    game.on_game_input_event(ev, kEmptySnapshot);
+    assert(std::abs(game.state().remaining_seconds - 300.0 - 20.0) < 0.5);
+
+    std::cout << "PASS: m3_multiplicador_suscriptor\n";
+}
+
+void test_m3_moderador_gana_al_suscriptor_mas_barato() {
+    LiveTimerGame game;
+    auto cfg = game.default_config();
+    cfg.set("initial_time_s", 300.0);
+    cfg.set("time_per_follow_s", 10.0);
+    cfg.set("mult_subscriber", 5.0);
+    cfg.set("mult_moderator", 1.0);
+    game.apply_config(cfg);
+    game.on_activated();
+
+    // Actor moderador + suscriptor: el multiplicador MAS ALTO gana (la regla
+    // beneficia al generoso; no castiga).
+    auto ev = make_test_event(GameInputEventKind::follow);
+    ev.actor.is_moderator = true;
+    ev.actor.is_subscriber = true;
+    game.on_game_input_event(ev, kEmptySnapshot);
+    assert(std::abs(game.state().remaining_seconds - 300.0 - 50.0) < 0.5);
+
+    std::cout << "PASS: m3_moderador_gana_al_suscriptor_mas_barato\n";
+}
+
+void test_m1_popup_con_nombre_actor() {
+    LiveTimerGame game;
+    auto cfg = game.default_config();
+    cfg.set("initial_time_s", 300.0);
+    cfg.set("time_per_follow_s", 10.0);
+    game.apply_config(cfg);
+    game.on_activated();
+
+    auto ev = make_test_event(GameInputEventKind::follow);
+    ev.actor.display_name = "musitogamer";
+    game.on_game_input_event(ev, kEmptySnapshot);
+    assert(!game.state().recent_events.empty());
+    assert(game.state().recent_events.back().actor_name == "musitogamer");
+
+    std::cout << "PASS: m1_popup_con_nombre_actor\n";
+}
+
+void test_m4_tramo_por_valor_sustituye_multiplicador() {
+    LiveTimerGame game;
+    auto cfg = game.default_config();
+    cfg.set("initial_time_s", 300.0);
+    cfg.set("time_per_gift_coin_s", 0.5);   // seria 50 s por 100 coins
+    cfg.set("gift_tiers", std::string("1-9: 5\n10-99: 60\n100+: 300\n"));
+    game.apply_config(cfg);
+    game.on_activated();
+
+    game.on_game_input_event(make_gift_event(100), kEmptySnapshot);
+    assert(std::abs(game.state().remaining_seconds - 300.0 - 300.0) < 0.5);
+
+    std::cout << "PASS: m4_tramo_por_valor_sustituye_multiplicador\n";
+}
+
+void test_m4_excepcion_por_nombre_sobre_tramo() {
+    LiveTimerGame game;
+    auto cfg = game.default_config();
+    cfg.set("initial_time_s", 300.0);
+    cfg.set("time_per_gift_coin_s", 0.5);
+    cfg.set("gift_tiers", std::string("1-9: 5\n10-99: 60\n100+: 300\nRosa: 3\n"));
+    game.apply_config(cfg);
+    game.on_activated();
+
+    auto ev = make_gift_event(1);
+    ev.gift->gift_name = "Rosa";
+    game.on_game_input_event(ev, kEmptySnapshot);
+    assert(std::abs(game.state().remaining_seconds - 300.0 - 3.0) < 0.5);
+
+    std::cout << "PASS: m4_excepcion_por_nombre_sobre_tramo\n";
+}
+
+void test_m4_regla_vacia_no_cambia_comportamiento() {
+    LiveTimerGame game;
+    auto cfg = game.default_config();
+    cfg.set("initial_time_s", 300.0);
+    cfg.set("time_per_gift_coin_s", 0.5);
+    game.apply_config(cfg);
+    game.on_activated();
+
+    game.on_game_input_event(make_gift_event(100), kEmptySnapshot);
+    assert(std::abs(game.state().remaining_seconds - 300.0 - 50.0) < 0.5);
+
+    std::cout << "PASS: m4_regla_vacia_no_cambia_comportamiento\n";
+}
+
+void test_m5_tope_por_evento() {
+    LiveTimerGame game;
+    auto cfg = game.default_config();
+    cfg.set("initial_time_s", 300.0);
+    cfg.set("time_per_gift_coin_s", 1.0);
+    cfg.set("cap_per_event_s", 10.0);
+    game.apply_config(cfg);
+    game.on_activated();
+
+    game.on_game_input_event(make_gift_event(500), kEmptySnapshot); // seria 500 s
+    assert(std::abs(game.state().remaining_seconds - 300.0 - 10.0) < 0.5);
+    assert(!game.state().recent_events.empty());
+    assert(game.state().recent_events.back().capped);
+
+    std::cout << "PASS: m5_tope_por_evento\n";
+}
+
+void test_m5_tope_por_usuario() {
+    LiveTimerGame game;
+    auto cfg = game.default_config();
+    cfg.set("initial_time_s", 300.0);
+    cfg.set("time_per_like_s", 20.0);
+    cfg.set("like_use_magnitude", true);
+    cfg.set("cap_per_user_per_minute_s", 30.0);
+    game.apply_config(cfg);
+    game.on_activated();
+
+    auto like = make_test_event(GameInputEventKind::like);
+    like.like_count = 1;
+    game.on_game_input_event(like, kEmptySnapshot);   // +20 s (quedan 10)
+    game.on_game_input_event(like, kEmptySnapshot);   // +10 s (alcanza tope)
+    game.on_game_input_event(like, kEmptySnapshot);   // +0 s (tope)
+    assert(std::abs(game.state().remaining_seconds - 300.0 - 30.0) < 0.5);
+    assert(game.state().recent_events.size() == 2);   // el tercero no genera popup
+
+    std::cout << "PASS: m5_tope_por_usuario\n";
+}
+
+void test_m5_tope_total_global() {
+    LiveTimerGame game;
+    auto cfg = game.default_config();
+    cfg.set("initial_time_s", 300.0);
+    cfg.set("time_per_like_s", 10.0);
+    cfg.set("cap_total_per_minute_s", 25.0);
+    game.apply_config(cfg);
+    game.on_activated();
+
+    auto like = make_test_event(GameInputEventKind::like);
+    like.like_count = 1;
+    game.on_game_input_event(like, kEmptySnapshot);
+    like.actor.id = "user_2";
+    like.actor.display_name = "Otros";
+    game.on_game_input_event(like, kEmptySnapshot);
+    like.actor.id = "user_3";
+    like.actor.display_name = "Tercero";
+    game.on_game_input_event(like, kEmptySnapshot);
+    // 10 + 10 + 5 = 25 s total (el tercero se recorta al resto).
+    assert(std::abs(game.state().remaining_seconds - 300.0 - 25.0) < 0.5);
+
+    std::cout << "PASS: m5_tope_total_global\n";
+}
+
+void test_m5_suelo_no_completa() {
+    LiveTimerGame game;
+    auto cfg = game.default_config();
+    cfg.set("initial_time_s", 300.0);
+    cfg.set("time_per_like_s", -800.0);   // resta brutal
+    cfg.set("floor_time_s", 60.0);
+    game.apply_config(cfg);
+    game.on_activated();
+
+    game.on_game_input_event(make_test_event(GameInputEventKind::like), kEmptySnapshot);
+    // El reloj llego a 60 s (suelo), se mantiene corriendo: no completa.
+    assert(std::abs(game.state().remaining_seconds - 60.0) < 0.5);
+    assert(game.state().running);
+    assert(!game.state().completed);
+
+    std::cout << "PASS: m5_suelo_no_completa\n";
+}
+
+void test_bloque_a_serializacion_en_json() {
+    LiveTimerGame game;
+    auto cfg = game.default_config();
+    cfg.set("initial_time_s", 300.0);
+    cfg.set("time_per_follow_s", 10.0);
+    cfg.set("mult_subscriber", 2.0);
+    cfg.set("cap_per_event_s", 5.0);
+    cfg.set("floor_time_s", 30.0);
+    cfg.set("gift_tiers", std::string("100+: 300"));
+    game.apply_config(cfg);
+    game.on_activated();
+
+    // Un evento con actor para que el JSON lleve su nombre en el popup.
+    auto ev = make_test_event(GameInputEventKind::follow);
+    ev.actor.display_name = "viewer99";
+    game.on_game_input_event(ev, kEmptySnapshot);
+    const std::string json = nlp3::platform::build_live_timer_state_json(&game);
+    // Los popups serializan actor + "capped" en el estado del overlay.
+    assert(json.find("\"actorName\":\"viewer99\"") != std::string::npos);
+    // El evento suma 10 s pero cap_per_event_s = 5: queda recortado y marcado.
+    assert(json.find("\"capped\":true") != std::string::npos);
+
+    // Config expone las nuevas claves al panel.
+    const auto& c = game.config();
+    assert(c.get_double("mult_subscriber", 0.0) == 2.0);
+    assert(c.get_double("cap_per_event_s", 0.0) == 5.0);
+    assert(c.get_string("gift_tiers", "") == "100+: 300");
+
+    std::cout << "PASS: bloque_a_serializacion_en_json\n";
+}
+
 } // namespace
 
 int main() {
@@ -1019,6 +1273,21 @@ int main() {
     test_v3_digit_effect_validation();
     test_v3_color_preset_validation();
     test_v3_fields_round_trip();
+
+    // Bloque A — reglas de eventos
+    test_m2_likes_por_magnitud();
+    test_m2_likes_sin_magnitud_legacy();
+    test_m3_multiplicador_suscriptor();
+    test_m3_moderador_gana_al_suscriptor_mas_barato();
+    test_m1_popup_con_nombre_actor();
+    test_m4_tramo_por_valor_sustituye_multiplicador();
+    test_m4_excepcion_por_nombre_sobre_tramo();
+    test_m4_regla_vacia_no_cambia_comportamiento();
+    test_m5_tope_por_evento();
+    test_m5_tope_por_usuario();
+    test_m5_tope_total_global();
+    test_m5_suelo_no_completa();
+    test_bloque_a_serializacion_en_json();
 
     std::cout << "\nAll tests passed!\n";
     return 0;

@@ -784,7 +784,7 @@ function formatCompactDelta(d) {
   return (d >= 0 ? '+' : '') + (Math.round(d * 100) / 100).toString();
 }
 
-function showPopup(icon, label, delta) {
+function showPopup(icon, label, delta, actorName, capped) {
   const container = document.getElementById('event-container');
   if (!container) return;
   // T3.4: keep the popup stack bounded so rapid event bursts don't pile up
@@ -803,7 +803,13 @@ function showPopup(icon, label, delta) {
   // avoid duplicating the icon already in the manual marker.
   const showLabel = label !== 'manual';
   const labelText = showLabel ? icon + ' ' + label + ' ' + deltaText : icon + ' ' + deltaText;
-  el.textContent = labelText;
+  // Bloque A / M1: el nombre del actor, si vino, es lo que hace gracias al directo.
+  // Bloque A / M5: si el tope recortó, el operador lo ve marcado de inmediato.
+  const parts = [];
+  if (actorName) parts.push(actorName);
+  if (capped) parts.push('(tope)');
+  const finalText = parts.length > 0 ? parts.join(' ') + ' · ' + labelText : labelText;
+  el.textContent = finalText;
   el.setAttribute('aria-label', (label || 'evento') + ' ' + deltaText);
   // V2: la lane lateral apila los popups por flex. Ya no se calcula `top` ni
   // offsets por indice, y el tamano se acota para que la cola no desborde.
@@ -1656,7 +1662,7 @@ function updateOverlay() {
       if (data.recentEvents) {
         data.recentEvents.forEach(function(ev) {
           if (!ev.id || ev.id > lastShownEventId) {
-            showPopup(ev.icon, ev.label, ev.delta);
+            showPopup(ev.icon, ev.label, ev.delta, ev.actorName, ev.capped);
             if (ev.id) lastShownEventId = ev.id;
             if (ev.isAddition && ev.delta > 0) { playAddSound(data); triggerCounterBump(); }
             // V11: solo los regalos grandes sueltan particulas. 200 coins

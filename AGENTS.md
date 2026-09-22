@@ -169,21 +169,22 @@ Cada etapa debe terminar con:
 
 ## 11. Estado del release (baseline actual)
 
-- Versión en `master`: **0.3.2** (2026-09-20). Tag público más reciente: `v0.3.1`
-  (0.3.2 se publicó oficialmente con Fase 3 completa + Fase 5 motor visual).
-- Artefactos 0.3.2: `dist/releases/0.3.2/installer/panel-live-0.3.2-win-x64.exe`,
-  `panel-live-0.3.2-win-x64-portable.zip`, `NisojeStudio\NisojeStudio.exe`,
-  `SHA256SUMS.txt` y `release-manifest-0.3.2.json` (gates
+- Versión en `master`: **0.3.3** (2026-09-22). Tag público más reciente: `v0.3.2`
+  (0.3.3 añade Bloque A de reglas del timer: likes por magnitud, multiplicadores
+  por tipo de espectador, tramos de regalo, topes y suelo).
+- Artefactos 0.3.3: `dist/releases/0.3.3/installer/panel-live-0.3.3-win-x64.exe`,
+  `panel-live-0.3.3-win-x64-portable.zip`, `NisojeStudio\NisojeStudio.exe`,
+  `SHA256SUMS.txt` y `release-manifest-0.3.3.json` (gates
   build/tests/installer/backup = `passed`).
 - El panel de escritorio (`Panel Live 3.0.lnk` → `panel_desktop_launcher.py`)
   arranca el `NisojeStudio.exe` **más reciente** de `dist/releases/*/NisojeStudio/`
   y `build/release-*/src/platform/` (ojo: el glob es `release-*`, así que
-  `build/release/` **no** entra). Tras 0.3.2 arranca el binario con motor visual.
-- Rollback (Gate 6.3): dejar que el launcher vuelva a 0.3.1 borrando o
-  renombrando `dist/releases/0.3.2/`; el código puede volver con
+  `build/release/` **no** entra). Tras 0.3.3 arranca el binario con reglas de eventos.
+- Rollback (Gate 6.3): dejar que el launcher vuelva a 0.3.2 borrando o
+  renombrando `dist/releases/0.3.3/`; el código puede volver con
   `git checkout -- <archivo>` y el sitio con `git revert` en `sitio/`.
   Backup previo al release:
-  `C:\Users\Nisoje\Desktop\PanelLiveBackups\Panel live 3.0-code-2026-09-20_09-51-13`.
+  `C:\Users\Nisoje\Desktop\PanelLiveBackups\Panel live 3.0-code-2026-09-22_...`  (ver manifest).
 - Para lanzar un release, ejecutar el script (Hard Rules de
   `docs/releases/RELEASE_PROTOCOL.md`), cargando ANTES el entorno MSVC:
 
@@ -196,5 +197,5 @@ Cada etapa debe terminar con:
 - El release sincroniza `tools/bridge_py/*.py` hacia el paquete.
 - **Nota sobre el launcher**: el glob `release-*` de `discover_versioned_panel_executables()`
   sí incluye `build/release/src/platform/NisojeStudio.exe` como fallback, por lo que
-  el launcher del escritorio detecta automáticamente 0.3.2 desde `dist/releases/`.
+  el launcher del escritorio detecta automáticamente 0.3.3 desde `dist/releases/`.
 

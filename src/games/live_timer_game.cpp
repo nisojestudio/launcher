@@ -1,9 +1,11 @@
 #include "games/live_timer_game.hpp"
 
 #include <algorithm>
+#include <cctype>
 #include <chrono>
 #include <cmath>
 #include <cstdint>
+#include <optional>
 #include <sstream>
 #include <iomanip>
 
@@ -19,6 +21,17 @@ constexpr std::string_view kTimePerShareS = "time_per_share_s";
 constexpr std::string_view kTimePerFollowS = "time_per_follow_s";
 constexpr std::string_view kTimePerGiftCoinS = "time_per_gift_coin_s";
 constexpr std::string_view kTimePerChatS = "time_per_chat_s";
+
+// Bloque A — reglas de tiempo
+constexpr std::string_view kLikeUseMagnitude = "like_use_magnitude";
+constexpr std::string_view kMultSubcriber = "mult_subscriber";
+constexpr std::string_view kMultFollower = "mult_follower";
+constexpr std::string_view kMultModerator = "mult_moderator";
+constexpr std::string_view kCapPerEventS = "cap_per_event_s";
+constexpr std::string_view kCapPerUserPerMinS = "cap_per_user_per_minute_s";
+constexpr std::string_view kCapTotalPerMinS = "cap_total_per_minute_s";
+constexpr std::string_view kFloorTimeS = "floor_time_s";
+constexpr std::string_view kGiftTiers = "gift_tiers";
 
 constexpr std::string_view kTitleText = "title_text";
 constexpr std::string_view kSubtitleText = "subtitle_text";
@@ -110,6 +123,16 @@ constexpr int kMaxThresholdSeconds = 3600;
 constexpr int kMinProgressThicknessPx = 1;
 constexpr int kMaxProgressThicknessPx = 40;
 
+// Bloque A — limites de las caps. 1 anno es el tope absoluto del reloj; aqui
+// se acotan los minutos de ventana para que no desborden en configuraciones
+// locas.
+constexpr double kMaxCapValueS = 86400.0;
+// Tokens "1500+" / "1500-" de los tramos de regalo. El "-" en un token numerico
+// al final de una serie significa "sin techo".
+constexpr std::string_view kTierNoCeilingMarker = "+";
+// Bloque A / M5: ventana deslizante de los topes (por minuto, con nombre).
+constexpr double kCapWindowS = 60.0;
+
 // Limites del motor visual. El servidor HTTP ya valida, pero el motor no puede
 // fiarse: un lienzo de 0 deja la escala en division por cero y una opacidad de
 // 500 pintaria un marco opaco tapando el directo.
@@ -157,6 +180,108 @@ constexpr std::string_view kIconShare = "\xf0\x9f\x94\x84"; // 🔄
 constexpr std::string_view kIconFollow = "\xe2\x9c\xa8";    // ✨
 constexpr std::string_view kIconGift = "\xf0\x9f\x8e\x81"; // 🎁
 constexpr std::string_view kIconChat = "\xf0\x9f\x92\xac"; // 💬
+
+// Bloque A — helpers de formato numérico de los tramos de regalo.
+std::string_view trim_view_soft(std::string_view s) noexcept {
+    while (!s.empty() && std::isspace(static_cast<unsigned char>(s.front())) != 0) s.remove_prefix(1);
+    while (!s.empty() && std::isspace(static_cast<unsigned char>(s.back())) != 0) s.remove_suffix(1);
+    return s;
+}
+
+std::optional<double> parse_seconds_token(std::string_view token) {
+    token = trim_view_soft(token);
+    if (token.empty()) return std::nullopt;
+    try {
+        std::size_t consumed = 0;
+        const double value = std::stod(std::string(token), &consumed);
+        if (consumed != token.size()) return std::nullopt;
+        return std::max(0.0, value);
+    } catch (...) {
+        return std::nullopt;
+    }
+}
+
+// '10', '10+', '10-99'. Devuelve true si el rango es valido; hi = -1 sin techo.
+bool parse_coins_range(std::string_view token, int& lo, int& hi) {
+    token = trim_view_soft(token);
+    if (token.empty()) return false;
+    lo = -1;
+    hi = -1;
+    const bool ends_with_plus = token.ends_with('+');
+    if (ends_with_plus) token.remove_suffix(1);
+    const auto dash = token.find('-');
+    std::string_view first = token;
+    std::string_view second;
+    if (dash != std::string_view::npos) {
+        first = trim_view_soft(token.substr(0, dash));
+        second = trim_view_soft(token.substr(dash + 1));
+    }
+    auto to_int = [](std::string_view v, int& out) {
+        if (v.empty()) return false;
+        try {
+            std::size_t consumed = 0;
+            const int value = std::stoi(std::string(v), &consumed);
+            if (consumed != v.size()) return false;
+            out = value;
+            return true;
+        } catch (...) {
+            return false;
+        }
+    };
+    int parsed_lo = 0;
+    int parsed_hi = 0;
+    if (!to_int(first, parsed_lo)) return false;
+    if (!second.empty()) {
+        if (!to_int(second, parsed_hi)) return false;
+        if (parsed_hi < parsed_lo) return false;
+        hi = parsed_hi;
+    } else if (ends_with_plus) {
+        hi = -1;
+    } else if (dash == std::string_view::npos) {
+        hi = parsed_lo;
+    } else {
+        hi = -1;
+    }
+    lo = parsed_lo;
+    return true;
+}
+
+// Parser de la regla de tramos: cada linea es 'rango: segundos' o 'nombre: segundos'.
+std::vector<LiveTimerGame::GiftTier> parse_gift_tiers_text(std::string_view text) {
+    std::vector<LiveTimerGame::GiftTier> out;
+    std::istringstream in{std::string(text)};
+    std::string line;
+    while (std::getline(in, line)) {
+        auto trimmed = trim_view_soft(std::string_view(line));
+        if (trimmed.empty() || trimmed.starts_with('#')) continue;
+        const auto colon = trimmed.find(':');
+        if (colon == std::string_view::npos) continue;
+        const auto lhs = trim_view_soft(trimmed.substr(0, colon));
+        const auto rhs = trim_view_soft(trimmed.substr(colon + 1));
+        const auto seconds = parse_seconds_token(rhs);
+        if (!seconds.has_value()) continue;
+
+        LiveTimerGame::GiftTier tier;
+        tier.seconds = *seconds;
+
+        int lo = -1, hi = -1;
+        const bool is_numeric = !lhs.empty()
+            && (std::isdigit(static_cast<unsigned char>(lhs.front())) != 0);
+        if (is_numeric && parse_coins_range(lhs, lo, hi)) {
+            tier.min_coins = lo;
+            tier.max_coins = hi;
+            out.push_back(std::move(tier));
+            continue;
+        }
+        std::string lower(lhs);
+        std::transform(lower.begin(), lower.end(), lower.begin(),
+                       [](char c) { return static_cast<char>(std::tolower(static_cast<unsigned char>(c))); });
+        tier.has_name = true;
+        tier.name = std::move(lower);
+        out.push_back(std::move(tier));
+    }
+    return out;
+}
 
 // T1.3: monotonic session id derived from the wall clock so save/restore and
 // arm() flows can reset the overlay's lastShownEventId deterministically.
@@ -276,6 +401,17 @@ gamesdk::GameConfig LiveTimerGame::default_config() const {
     config.set(std::string(kTimePerFollowS), 0.0);
     config.set(std::string(kTimePerGiftCoinS), 0.0);
     config.set(std::string(kTimePerChatS), 0.0);
+
+    // Bloque A — reglas: defaults neutros (sin cambio de comportamiento).
+    config.set(std::string(kLikeUseMagnitude), true);
+    config.set(std::string(kMultSubcriber), 1.0);
+    config.set(std::string(kMultFollower), 1.0);
+    config.set(std::string(kMultModerator), 1.0);
+    config.set(std::string(kCapPerEventS), 0.0);
+    config.set(std::string(kCapPerUserPerMinS), 0.0);
+    config.set(std::string(kCapTotalPerMinS), 0.0);
+    config.set(std::string(kFloorTimeS), 0.0);
+    config.set(std::string(kGiftTiers), std::string(""));
 
     config.set(std::string(kTitleText), std::string("🎯 Extiende el Live"));
     config.set(std::string(kSubtitleText), std::string("📌 Cada coin suma {time_per_gift_coin}s"));
@@ -420,6 +556,17 @@ void LiveTimerGame::apply_config(const gamesdk::GameConfig& config) {
     apply_double(kTimePerChatS);
     apply_double(kMaxTimeS);
 
+    // Bloque A — reglas de tiempo.
+    apply_bool(kLikeUseMagnitude);
+    apply_double(kMultSubcriber);
+    apply_double(kMultFollower);
+    apply_double(kMultModerator);
+    apply_double(kCapPerEventS);
+    apply_double(kCapPerUserPerMinS);
+    apply_double(kCapTotalPerMinS);
+    apply_double(kFloorTimeS);
+    apply_string(kGiftTiers);
+
     apply_string(kTitleText);
     apply_string(kSubtitleText);
 
@@ -504,6 +651,31 @@ void LiveTimerGame::apply_config(const gamesdk::GameConfig& config) {
     state_.time_per_gift_coin = config_.get_double(kTimePerGiftCoinS, 0.0);
     state_.time_per_chat = config_.get_double(kTimePerChatS, 0.0);
     state_.max_time_s = config_.get_double(kMaxTimeS, 0.0);
+
+    // Bloque A — reglas. Los mults y los topes se acotan: un multiplicador
+    // negativo convertiria un like en una resta oculta (bug dificil de mirar).
+    state_.like_use_magnitude = config_.get_bool(kLikeUseMagnitude, true);
+    auto clamp_nonneg = [&](std::string_view key, double fallback) {
+        double v = config_.get_double(key, fallback);
+        if (v < 0.0) {
+            v = 0.0;
+            config_.set(std::string(key), 0.0);
+        }
+        return v;
+    };
+    state_.mult_subscriber = clamp_nonneg(kMultSubcriber, 1.0);
+    state_.mult_follower = clamp_nonneg(kMultFollower, 1.0);
+    state_.mult_moderator = clamp_nonneg(kMultModerator, 1.0);
+    state_.cap_per_event_s = clamp_nonneg(kCapPerEventS, 0.0);
+    state_.cap_per_user_per_minute_s = clamp_nonneg(kCapPerUserPerMinS, 0.0);
+    state_.cap_total_per_minute_s = clamp_nonneg(kCapTotalPerMinS, 0.0);
+    state_.floor_time_s = clamp_nonneg(kFloorTimeS, 0.0);
+    // M4 — tramos de regalo. Se parsean aqui y se cachean; el texto queda como
+    // config para persistencia/serializacion.
+    state_.gift_tiers = config_.get_string(kGiftTiers, "");
+    gift_tiers_ = state_.gift_tiers.empty()
+        ? std::vector<GiftTier>{}
+        : parse_gift_tiers_text(state_.gift_tiers);
 
     double new_initial = config_.get_double(kInitialTimeS, 300.0);
     state_.initial_seconds = new_initial;
@@ -747,6 +919,10 @@ void LiveTimerGame::on_activated() {
     }
     state_.recent_events.clear();
     total_time_added_ = 0.0;
+    // Bloque A / M5: ventanas de aporte por usuario y global son de sesión;
+    // se resetean al armar/activar para que los topes no arrastren el directo anterior.
+    user_contributions_.clear();
+    total_contributions_.clear();
     // T1.3: session id is regenerated on each activation so the overlay resets
     // lastShownEventId. event_id_counter_ is intentionally NOT reset here so it
     // stays monotonic across activations, arm() and save/restore cycles.
@@ -768,6 +944,8 @@ void LiveTimerGame::arm() noexcept {
     state_.remaining_seconds = state_.initial_seconds;
     state_.recent_events.clear();
     total_time_added_ = 0.0;
+    user_contributions_.clear();
+    total_contributions_.clear();
     // T1.3: event_id_counter_ stays monotonic across arm(); only the session id
     // is regenerated so the overlay clears its lastShownEventId cursor.
     state_.session_id = now_wall_ms_int64();
@@ -868,11 +1046,20 @@ void LiveTimerGame::on_game_input_event(
     std::string_view label;
 
     switch (event.kind) {
-    case gamesdk::GameInputEventKind::like:
-        delta = state_.time_per_like;
+    case gamesdk::GameInputEventKind::like: {
+        // Bloque A / M2: likes por magnitud. Un lote de N likes suma N veces el
+        // valor configurado; con el flag apagado, comportamiento historico
+        // (1 unidad por evento, no importan cuantos likes traiga el lote).
+        if (state_.like_use_magnitude) {
+            const auto n = event.like_count > 0 ? event.like_count : 1u;
+            delta = static_cast<double>(n) * state_.time_per_like;
+        } else {
+            delta = state_.time_per_like;
+        }
         icon = kIconLike;
         label = "like";
         break;
+    }
     case gamesdk::GameInputEventKind::share:
         delta = state_.time_per_share;
         icon = kIconShare;
@@ -890,9 +1077,17 @@ void LiveTimerGame::on_game_input_event(
                 ? static_cast<double>(event.gift->diamond_count)
                 : static_cast<double>(event.gift->quantity);
         }
-        delta = coins * state_.time_per_gift_coin;
+        // Bloque A / M4: una regla de tramos que casa sustituye por completo al
+        // multiplicador plano; sin tramo, se usa el multiplicador historico.
+        const std::string_view gift_name = event.gift.has_value()
+            ? std::string_view(event.gift->gift_name)
+            : std::string_view{};
+        const double tiered = resolve_gift_seconds(gift_name, coins);
+        delta = tiered >= 0.0 ? tiered : coins * state_.time_per_gift_coin;
         icon = kIconGift;
-        label = "gift";
+        label = event.gift.has_value() && !event.gift->gift_name.empty()
+            ? std::string_view(event.gift->gift_name)
+            : std::string_view("gift");
         break;
     }
     case gamesdk::GameInputEventKind::chat_message:
@@ -904,6 +1099,23 @@ void LiveTimerGame::on_game_input_event(
         return;
     }
 
+    // Bloque A / M3: multiplicador por tipo de espectador aplicado al delta del
+    // evento (sub/follower/moderator). Solo a deltas POSITIVOS — multiplicar una
+    // resta agravia sin aportar valor de diseno.
+    if (delta > 0.0) {
+        delta *= actor_multiplier(event.actor);
+    }
+
+    // Bloque A / M5: topes (cap por evento, por usuario/min y global/min).
+    // Solo limitan aportes POSITIVOS; las restas no se tocan.
+    const auto actor_key = !event.actor.id.empty()
+        ? event.actor.id
+        : (!event.actor.username.empty()
+               ? event.actor.username
+               : (!event.actor.display_name.empty() ? event.actor.display_name
+                                                   : std::string("_anon")));
+    bool capped = false;
+    delta = apply_caps(delta, actor_key, &capped);
     if (delta == 0.0) return;
 
     state_.remaining_seconds += delta;
@@ -919,11 +1131,18 @@ void LiveTimerGame::on_game_input_event(
     if (state_.remaining_seconds > kMaxReasonableSeconds) {
         state_.remaining_seconds = kMaxReasonableSeconds;
     }
-    const bool completed_by_event = state_.remaining_seconds < 0.0;
+    // Bloque A / M5 (suelo): el reloj no baja por debajo de floor_time_s. Con
+    // exactamente 0 no corre, queda fijo en el suelo: el operador decide en un
+    // solo control cómo termina el live.
+    const bool completed_by_event = state_.remaining_seconds < std::max(0.0, state_.floor_time_s);
     if (completed_by_event) {
-        state_.remaining_seconds = 0.0;
-        state_.running = false;
-        state_.completed = true;
+        if (state_.floor_time_s > 0.0) {
+            state_.remaining_seconds = state_.floor_time_s;
+        } else {
+            state_.remaining_seconds = 0.0;
+            state_.running = false;
+            state_.completed = true;
+        }
     } else if (state_.max_time_s > 0.0 && state_.remaining_seconds > state_.max_time_s) {
         state_.remaining_seconds = state_.max_time_s;
     }
@@ -931,12 +1150,134 @@ void LiveTimerGame::on_game_input_event(
     // A8: skip the popup when this event is what exhausted the timer. The
     // overlay will fire confetti and the completed banner; a simultaneous
     // negative-time popup is confusing UX.
-    if (completed_by_event) return;
+    if (completed_by_event && state_.floor_time_s <= 0.0) return;
 
-    add_event_popup(icon, label, delta);
+    // Bloque A / M1: el popup lleva el nombre del actor (o el best-alias).
+    const auto& a = event.actor;
+    std::string actor_name = !a.display_name.empty()
+        ? a.display_name
+        : (!a.username.empty() ? a.username : std::string{});
+    add_event_popup(icon, label, delta, actor_name, capped);
 }
 
-void LiveTimerGame::add_event_popup(std::string_view icon, std::string_view label, double delta) {
+void LiveTimerGame::ContributionWindow::push(double seconds, double window_s,
+                                             const std::chrono::steady_clock::time_point& now) {
+    // Purga entradas viejas (respetando la ventana real) y entonces añade el
+    // aporte. Con un tope medido en minutos no vale retener mas de la ventana.
+    sum_recent(window_s, now);
+    entries.push_back({now, seconds});
+}
+
+double LiveTimerGame::ContributionWindow::sum_recent(double window_s, const std::chrono::steady_clock::time_point& now) {
+    const auto cutoff = now - std::chrono::duration<double>(window_s);
+    auto first_live = std::find_if(entries.begin(), entries.end(),
+        [&](const Entry& e) { return e.at >= cutoff; });
+    entries.erase(entries.begin(), first_live);
+    double total = 0.0;
+    for (const auto& e : entries) total += e.seconds;
+    return total;
+}
+
+void LiveTimerGame::ContributionWindow::clear() noexcept {
+    entries.clear();
+}
+
+double LiveTimerGame::actor_multiplier(const gamesdk::GameInputActor& actor) const noexcept {
+    // Bloque A / M3: un actor SIN roles devuelve el multiplicador neutro 1.0.
+    // Con roles, se toma el MAS ALTO de los roles que el actor tiene (`max`):
+    // un moderador que tambien es suscriptor se beneficia del suscriptor, y un
+    // moderador puro con mult 0.0 no aporta nada (configuracion de moderacion).
+    // NOTA: sin este diseno max, configurar "moderador = 0" nunca surtiria
+    // efecto (el 1.0 neutro 'ganaba' siempre).
+    double mult = 1.0;
+    bool has_role = false;
+    if (actor.is_subscriber) { mult = has_role ? std::max(mult, state_.mult_subscriber) : state_.mult_subscriber; has_role = true; }
+    if (actor.is_follower)   { mult = has_role ? std::max(mult, state_.mult_follower)   : state_.mult_follower;   has_role = true; }
+    if (actor.is_moderator)  { mult = has_role ? std::max(mult, state_.mult_moderator)  : state_.mult_moderator;  has_role = true; }
+    return mult;
+}
+
+double LiveTimerGame::resolve_gift_seconds(std::string_view gift_name, double coins) const noexcept {
+    // Bloque A / M4: tramos de regalo. Primero se mira excepción por NOMBRE
+    // (la regla más específica), luego el rango de coins. Si ninguna regla
+    // casa, se devuelve -1.0 y el llamador recurre al multiplicador historico.
+    if (gift_tiers_.empty()) return -1.0;
+
+    if (!gift_name.empty()) {
+        std::string lower(gift_name);
+        std::transform(lower.begin(), lower.end(), lower.begin(),
+                       [](char c) { return static_cast<char>(std::tolower(static_cast<unsigned char>(c))); });
+        for (const auto& tier : gift_tiers_) {
+            if (tier.has_name && !tier.name.empty() && lower.find(tier.name) != std::string::npos) {
+                return tier.seconds;
+            }
+        }
+    }
+
+    for (const auto& tier : gift_tiers_) {
+        if (tier.has_name) continue;
+        const int c = static_cast<int>(std::lround(coins));
+        if (c >= tier.min_coins && (tier.max_coins < 0 || c <= tier.max_coins)) {
+            return tier.seconds;
+        }
+    }
+    return -1.0;
+}
+
+double LiveTimerGame::apply_caps(double delta, const std::string& actor_key, bool* capped) {
+    if (capped != nullptr) *capped = false;
+    if (delta <= 0.0) return delta;  // sólo topa aportes positivos
+    bool was_capped = false;
+
+    // M5 — cap por evento.
+    if (state_.cap_per_event_s > 0.0 && delta > state_.cap_per_event_s) {
+        delta = state_.cap_per_event_s;
+        was_capped = true;
+    }
+
+    const auto now = std::chrono::steady_clock::now();
+
+    // M5 — cap por usuario durante la ventana deslizante.
+    if (state_.cap_per_user_per_minute_s > 0.0 && !actor_key.empty() && actor_key != "_anon") {
+        auto& win = user_contributions_[actor_key];
+        const double already = win.sum_recent(state_.cap_per_user_per_minute_s, now);
+        const double remaining = state_.cap_per_user_per_minute_s - already;
+        if (remaining <= 0.0) {
+            delta = 0.0;
+        } else if (delta > remaining) {
+            delta = remaining;
+            was_capped = true;
+        }
+    }
+
+    // M5 — cap global (todos los eventos) durante la ventana.
+    if (state_.cap_total_per_minute_s > 0.0) {
+        const double already = total_contributions_.sum_recent(state_.cap_total_per_minute_s, now);
+        const double remaining = state_.cap_total_per_minute_s - already;
+        if (remaining <= 0.0) {
+            delta = 0.0;
+        } else if (delta > remaining) {
+            delta = remaining;
+            was_capped = true;
+        }
+    }
+
+    if (capped != nullptr) *capped = was_capped;
+
+    // Registrar la contribución (sólo positivos): el tope es "por minuto".
+    if (delta > 0.0) {
+        if (state_.cap_per_user_per_minute_s > 0.0 && !actor_key.empty() && actor_key != "_anon") {
+            user_contributions_[actor_key].push(delta, kCapWindowS, now);
+        }
+        if (state_.cap_total_per_minute_s > 0.0) {
+            total_contributions_.push(delta, kCapWindowS, now);
+        }
+    }
+    return delta;
+}
+
+void LiveTimerGame::add_event_popup(std::string_view icon, std::string_view label, double delta,
+                                     std::string_view actor_name, bool capped) {
     prune_old_events();
     auto id = ++event_id_counter_;
     state_.recent_events.push_back({
@@ -946,6 +1287,8 @@ void LiveTimerGame::add_event_popup(std::string_view icon, std::string_view labe
         delta,
         delta >= 0,
         std::chrono::steady_clock::now(),
+        std::string(actor_name),
+        capped,
     });
     if (state_.recent_events.size() > kMaxRecentEvents) {
         state_.recent_events.erase(state_.recent_events.begin(),

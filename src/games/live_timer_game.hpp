@@ -2,9 +2,11 @@
 
 #include <chrono>
 #include <cstdint>
+#include <deque>
 #include <memory>
 #include <string>
 #include <string_view>
+#include <unordered_map>
 #include <vector>
 
 #include "gamesdk/game_factory.hpp"
@@ -36,6 +38,10 @@ struct LiveTimerRecentEvent {
     double delta_seconds = 0.0;
     bool is_addition = true;
     std::chrono::steady_clock::time_point occurred_at;
+    // Bloque A / M1: nombre del actor (vacío = anónimo / contador manual).
+    std::string actor_name;
+    // Bloque A / M5: etiqueta de motín cuando se recorta por tope.
+    bool capped = false;
 };
 
 struct LiveTimerGameState {
@@ -56,6 +62,32 @@ struct LiveTimerGameState {
     double time_per_follow = 0.0;
     double time_per_gift_coin = 0.0;
     double time_per_chat = 0.0;
+
+    // Bloque A / M2 — likes por magnitud. Cuando es true, un lote de N likes
+    // suma N * time_per_like (antes solo sumaba time_per_like una vez).
+    bool like_use_magnitude = true;
+    // Bloque A / M3 — multiplicadores por tipo de espectador aplicados al delta
+    // calculado por el evento (value = 0 anula el efecto para ese tipo). Cuando
+    // un actor es varios tipos a la vez (p.ej. moderador y suscriptor), se usa
+    // el multiplicador mas alto.
+    double mult_subscriber = 1.0;
+    double mult_follower = 1.0;
+    double mult_moderator = 1.0;
+    // Bloque A / M5 — topes. 0 = sin tope. Suelo del reloj: el contador nunca
+    // baja por debajo de floor_time_seconds (tampoco completa mientras el suelo
+    // no sea 0; eso convierte el timer en "no completable" si el operador lo
+    // elige asi). cap_*_per_minute_s miden la suma de DELTAS POSITIVAS.
+    double cap_per_event_s = 0.0;
+    double cap_per_user_per_minute_s = 0.0;
+    double cap_total_per_minute_s = 0.0;
+    double floor_time_s = 0.0;
+    // Bloque A / M4 — tramos de regalo por valor. Texto (una regla por linea):
+    //   "10-99: 15"   -> regalos de 10 a 99 coins suman 15 s
+    //   "100+: 300"   -> regalos de 100 coins o mas suman 300 s
+    //   "Rosa: 3"     -> excepcion por nombre de regalo (contains, case-ins)
+    // Si la linea no corresponde a ninguno, se ignora. Si una regla aplica,
+    // sustituye por completo a time_per_gift_coin (no se suman).
+    std::string gift_tiers;
 
     std::string title_text = "🎯 Extiende el Live";
     std::string subtitle_text = "📌 Cada coin suma {time_per_gift_coin}s";
@@ -209,12 +241,46 @@ public:
     std::int64_t session_id() const noexcept;
     double total_time_added() const noexcept;
 
+    // Bloque A / M4 — tramo parseado de la regla de regalos. Una excepcion por
+    // nombre tiene has_name=true y aplica si el nombre del regalo la contiene.
+    // Publico porque el parseador (namespace anonimo del .cpp) devuelve este tipo.
+    struct GiftTier {
+        int min_coins = 0;
+        int max_coins = -1;  // -1 = sin techo
+        double seconds = 0.0;
+        bool has_name = false;
+        std::string name;    // lowercase
+    };
+
+    // Bloque A / M5 — ventana deslizante de aportes (solo positivos) por actor
+    // y global. Se limpia en on_activated/stop (eventos = ventanas de la sesion
+    // en curso; topes entre directos no tienen sentido).
+    struct ContributionWindow {
+        struct Entry {
+            std::chrono::steady_clock::time_point at;
+            double seconds = 0.0;
+        };
+        std::deque<Entry> entries;
+
+        // window_s = longitud de la ventana deslizante (la purga la necesita
+        // para no borrar los aportes aun vigentes — bug: purgar con 0 vacia
+        // la ventana porque cada evento vive en su propio instante).
+        void push(double seconds, double window_s, const std::chrono::steady_clock::time_point& now);
+        double sum_recent(double window_s, const std::chrono::steady_clock::time_point& now);
+        void clear() noexcept;
+    };
+
 private:
-    void add_event_popup(std::string_view icon, std::string_view label, double delta);
+    void add_event_popup(std::string_view icon, std::string_view label, double delta,
+                         std::string_view actor_name = {}, bool capped = false);
     void prune_old_events();
     void play_completion_sound() const;
     void play_event_sound(const std::string& path, double volume) const;
     void stop_sound() const noexcept;
+    // Bloque A: calculo de deltas por tipo/tamaño.
+    double actor_multiplier(const gamesdk::GameInputActor& actor) const noexcept;
+    double resolve_gift_seconds(std::string_view gift_name, double coins) const noexcept;
+    double apply_caps(double delta, const std::string& actor_key, bool* capped);
 
     LiveTimerGameState state_;
     gamesdk::GameConfig config_;
@@ -224,6 +290,11 @@ private:
     int64_t event_id_counter_ = 0;
     bool completion_sound_triggered_ = false;
     int last_tick_second_ = -1;
+    // Bloque A / M4: tramos parseados (cacheados tras apply_config).
+    std::vector<GiftTier> gift_tiers_;
+    // Bloque A / M5: topes por actor y global.
+    std::unordered_map<std::string, ContributionWindow> user_contributions_;
+    ContributionWindow total_contributions_;
     // T2.6: hidden_ replaces enabled_. When true, event input and adjust_time
     // are blocked and the overlay renders "--:--:--". Runtime counters and
     // recent_events are preserved; user starts the timer explicitly after restore.
