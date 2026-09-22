@@ -32,6 +32,12 @@ constexpr std::string_view kCapPerUserPerMinS = "cap_per_user_per_minute_s";
 constexpr std::string_view kCapTotalPerMinS = "cap_total_per_minute_s";
 constexpr std::string_view kFloorTimeS = "floor_time_s";
 constexpr std::string_view kGiftTiers = "gift_tiers";
+// R2 — control de popups
+constexpr std::string_view kPopupsEnabled = "popups_enabled";
+constexpr std::string_view kPopupShowActor = "popup_show_actor";
+// R5 — posicion del bloque en el overlay
+constexpr std::string_view kAnchorPosition = "anchor_position";
+constexpr std::string_view kAnchorMarginPct = "anchor_margin_pct";
 
 constexpr std::string_view kTitleText = "title_text";
 constexpr std::string_view kSubtitleText = "subtitle_text";
@@ -412,6 +418,10 @@ gamesdk::GameConfig LiveTimerGame::default_config() const {
     config.set(std::string(kCapTotalPerMinS), 0.0);
     config.set(std::string(kFloorTimeS), 0.0);
     config.set(std::string(kGiftTiers), std::string(""));
+    config.set(std::string(kPopupsEnabled), true);
+    config.set(std::string(kPopupShowActor), true);
+    config.set(std::string(kAnchorPosition), std::string("center"));
+    config.set(std::string(kAnchorMarginPct), std::int64_t{2});
 
     config.set(std::string(kTitleText), std::string("🎯 Extiende el Live"));
     config.set(std::string(kSubtitleText), std::string("📌 Cada coin suma {time_per_gift_coin}s"));
@@ -566,6 +576,10 @@ void LiveTimerGame::apply_config(const gamesdk::GameConfig& config) {
     apply_double(kCapTotalPerMinS);
     apply_double(kFloorTimeS);
     apply_string(kGiftTiers);
+    apply_bool(kPopupsEnabled);
+    apply_bool(kPopupShowActor);
+    apply_string(kAnchorPosition);
+    apply_int(kAnchorMarginPct);
 
     apply_string(kTitleText);
     apply_string(kSubtitleText);
@@ -673,6 +687,23 @@ void LiveTimerGame::apply_config(const gamesdk::GameConfig& config) {
     // M4 — tramos de regalo. Se parsean aqui y se cachean; el texto queda como
     // config para persistencia/serializacion.
     state_.gift_tiers = config_.get_string(kGiftTiers, "");
+    state_.popups_enabled = config_.get_bool(kPopupsEnabled, true);
+    state_.popup_show_actor = config_.get_bool(kPopupShowActor, true);
+
+    // R5 — anclaje: la posicion se valida con lista blanca (es un valor del
+    // overlay repetido en 9 motifs distintos).
+    {
+        auto raw = config_.get_string(kAnchorPosition, "center");
+        if (raw != "center"
+            && raw != "top-left" && raw != "top-center" && raw != "top-right"
+            && raw != "middle-left" && raw != "middle-right"
+            && raw != "bottom-left" && raw != "bottom-center" && raw != "bottom-right") {
+            raw = "center";
+            config_.set(std::string(kAnchorPosition), raw);
+        }
+        state_.anchor_position = raw;
+    }
+    state_.anchor_margin_pct = clamp_int(read_config_int(config_, kAnchorMarginPct, 2), 0, 20);
     gift_tiers_ = state_.gift_tiers.empty()
         ? std::vector<GiftTier>{}
         : parse_gift_tiers_text(state_.gift_tiers);

@@ -263,9 +263,17 @@
           <details class="timer-config-details">
             <summary class="timer-config-summary">Configuraci&oacute;n</summary>
             <div class="timer-controls">
-              <!-- ===== Section 1: Tiempos ===== -->
-              <details class="tv-section" open>
-                <summary class="tv-summary">⏱ Tiempos</summary>
+              <!-- R1: vista Simple/Avanzada -->
+              <div class="tv-mode-bar">
+                <span class="tv-label">Modo:</span>
+                <button class="secondary-button tv-mode-btn" id="timer-mode-simple" type="button">Simple</button>
+                <button class="secondary-button tv-mode-btn" id="timer-mode-advanced" type="button">Avanzado</button>
+                <span class="summary-note" id="timer-mode-note">Simple: solo lo esencial</span>
+              </div>
+
+              <!-- ===== Section 1: Tiempos (siempre visible) ===== -->
+              <details class="tv-section tv-always" open>
+                <summary class="tv-summary">⏱ Tiempos y Sumas</summary>
                 <div class="tv-body">
                   <div class="tv-presets-row">
                     <button class="secondary-button preset-btn" type="button" data-preset="rapido">R&aacute;pido (60s)</button>
@@ -308,8 +316,96 @@
                 </div>
               </details>
 
-              <!-- ===== Section 1b: Reglas de eventos (Bloque A) ===== -->
-              <details class="tv-section">
+              <!-- ===== R4 — Simulador (siempre visible: para probar sin directo) ===== -->
+              <details class="tv-section tv-always">
+                <summary class="tv-summary">🧪 Probar sin directo</summary>
+                <div class="tv-body">
+                  <div class="tv-presets-row">
+                    <span class="tv-label">Simular:</span>
+                    <button class="secondary-button" type="button" id="timer-sim-like">❤️ 20 likes</button>
+                    <button class="secondary-button" type="button" id="timer-sim-share">🔄 1 share</button>
+                    <button class="secondary-button" type="button" id="timer-sim-follow">✨ 1 follow</button>
+                    <button class="secondary-button" type="button" id="timer-sim-chat">💬 Chat</button>
+                  </div>
+                  <div class="tv-row">
+                    <div class="tv-group">
+                      <span class="tv-label">Regalo de</span>
+                      <input class="timer-input tv-num" id="timer-sim-gift-coins" type="number" min="1" max="999999" step="1" value="10" style="width:70px">
+                      <span class="tv-label">coins</span>
+                    </div>
+                    <div class="tv-group tv-group-grow">
+                      <span class="tv-label">Nombre</span>
+                      <input class="timer-input" id="timer-sim-gift-name" type="text" value="Tienda" placeholder="Ej: Rosa / Galaxia">
+                    </div>
+                    <div class="tv-group" style="flex-shrink:0">
+                      <button class="secondary-button" type="button" id="timer-sim-gift">🎁 Saludar</button>
+                    </div>
+                  </div>
+                  <div class="tv-row">
+                    <span class="summary-note" id="timer-sim-status"></span>
+                  </div>
+                </div>
+              </details>
+
+              <!-- ===== Section 1b: Estilo rapido (siempre visible, R1 simple) ===== -->
+              <details class="tv-section tv-always" open>
+                <summary class="tv-summary">🎨 Estilo</summary>
+                <div class="tv-body">
+                  <div class="tv-presets-row">
+                    <span class="tv-label" style="align-self:center">Dise&ntilde;os:</span>
+                    <button class="secondary-button timer-design-preset" type="button" id="timer-design-hud">HUD &Oacute;rbita</button>
+                    <button class="secondary-button timer-design-preset" type="button" id="timer-design-glass">Cristal L&iacute;quido</button>
+                    <button class="secondary-button timer-design-preset" type="button" id="timer-design-sticker">Pegatina Brutal</button>
+                    <button class="secondary-button timer-design-preset" type="button" id="timer-design-classic">Cl&aacute;sico</button>
+                    <button class="secondary-button" type="button" id="timer-design-save" title="Guarda el estilo actual con tu nombre">⭐ Guardar</button>
+                    <span class="summary-note" id="timer-design-status"></span>
+                  </div>
+                  <div class="tv-row" id="timer-design-custom-row" style="display:none">
+                    <span class="tv-label" style="align-self:center">Tus dise&ntilde;os:</span>
+                    <span id="timer-design-custom-list"></span>
+                  </div>
+                  <div class="tv-row">
+                    <span class="summary-note">Para ajustes finos (tama&ntilde;o, fuente, colores, efectos) pulsa <b>Avanzado</b> arriba.</span>
+                  </div>
+                  <div class="tv-row">
+                    <label class="tv-chip" title="Muestra el nombre en cada popup (R2)">
+                      <input id="timer-popup-show-actor" type="checkbox" checked>
+                      <span>Nombre en popup</span>
+                    </label>
+                    <label class="tv-chip" title="Apagar los popups por completo (R2)">
+                      <input id="timer-popups-enabled" type="checkbox" checked>
+                      <span>Popups encendidos</span>
+                    </label>
+                  </div>
+                  <div class="tv-row">
+                    <div class="tv-group">
+                      <span class="tv-label">Posici&oacute;n en pantalla</span>
+                      <select class="timer-input tv-select" id="timer-anchor-position">
+                        <option value="top-left">↑ Arriba-izquierda</option>
+                        <option value="top-center">↑ Arriba-centro</option>
+                        <option value="top-right">↑ Arriba-derecha</option>
+                        <option value="center" selected>Centro (por defecto)</option>
+                        <option value="middle-left">Izquierda-centro</option>
+                        <option value="middle-right">Derecha-centro</option>
+                        <option value="bottom-left">↓ Abajo-izquierda</option>
+                        <option value="bottom-center">↓ Abajo-centro</option>
+                        <option value="bottom-right">↓ Abajo-derecha</option>
+                      </select>
+                    </div>
+                    <div class="tv-group">
+                      <span class="tv-label">Margen al borde (%)</span>
+                      <input class="timer-input tv-num" id="timer-anchor-margin" type="number" min="0" max="20" step="1" value="2">
+                    </div>
+                  </div>
+                </div>
+              </details>
+
+<!---
+A partir de aquí todo es AVANZADO
+El detalle: sólo se muestra cuando el usuario pulsa Avanzado.
+-->
+              <!-- ===== Section 1c: Reglas de eventos (Bloque A) — AVANZADO ===== -->
+              <details class="tv-section tv-advanced">
                 <summary class="tv-summary">⚖️ Reglas</summary>
                 <div class="tv-body">
                   <div class="tv-row" style="flex-wrap:wrap;gap:12px">
@@ -360,8 +456,8 @@
                 </div>
               </details>
 
-              <!-- ===== Section 2: Visual ===== -->
-              <details class="tv-section" open>
+              <!-- ===== Section 2: Visual (avanzado) ===== -->
+              <details class="tv-section tv-advanced">
                 <summary class="tv-summary">🎨 Visual</summary>
                 <div class="tv-body">
 
@@ -566,8 +662,8 @@
                 </div>
               </details>
 
-              <!-- ===== Section 3: Efectos ===== -->
-              <details class="tv-section">
+              <!-- ===== Section 3: Efectos (avanzado) ===== -->
+              <details class="tv-section tv-advanced">
                 <summary class="tv-summary">✨ Efectos</summary>
                 <div class="tv-body">
 
@@ -609,18 +705,14 @@
                 </div>
               </details>
 
-              <!-- ===== Section 4b: Diseno (motor visual) ===== -->
-              <details class="tv-section">
+              <!-- ===== Section 4b: Diseno (motor visual, avanzado) ===== -->
+              <details class="tv-section tv-advanced">
                 <summary class="tv-summary">🖥 Dise&ntilde;o (motor visual)</summary>
                 <div class="tv-body">
 
                   <div class="tv-presets-row">
                     <span class="tv-label" style="align-self:center">Dise&ntilde;os:</span>
-                    <button class="secondary-button" style="font-size:11px;padding:2px 8px" type="button" id="timer-design-hud">HUD &Oacute;rbita</button>
-                    <button class="secondary-button" style="font-size:11px;padding:2px 8px" type="button" id="timer-design-glass">Cristal L&iacute;quido</button>
-                    <button class="secondary-button" style="font-size:11px;padding:2px 8px" type="button" id="timer-design-sticker">Pegatina Brutal</button>
-                    <button class="secondary-button" style="font-size:11px;padding:2px 8px" type="button" id="timer-design-classic">Cl&aacute;sico</button>
-                    <span class="summary-note" id="timer-design-status"></span>
+                    <span class="summary-note">Usa los 4 botones de la sección "Estilo" (arriba) para aplicar un diseño completo.</span>
                   </div>
 
                   <div class="tv-row">
@@ -800,8 +892,8 @@
                 </div>
               </details>
 
-              <!-- ===== Section 4: Sonidos y Completado ===== -->
-              <details class="tv-section">
+              <!-- ===== Section 4: Sonidos y Completado (avanzado) ===== -->
+              <details class="tv-section tv-advanced">
                 <summary class="tv-summary">🔔 Sonidos y Completado</summary>
                 <div class="tv-body">
 
@@ -860,8 +952,8 @@
                 </div>
               </details>
 
-              <!-- ===== Section 5: Avisos ===== -->
-              <details class="tv-section">
+              <!-- ===== Section 5: Avisos (avanzado) ===== -->
+              <details class="tv-section tv-advanced">
                 <summary class="tv-summary">💬 Avisos</summary>
                 <div class="tv-body">
                   <div class="tv-row">
@@ -882,6 +974,9 @@
                 <div class="timer-events-list" id="timer-events-list">
                   <span class="timer-events-empty">Esperando eventos...</span>
                 </div>
+                <!-- R6: ritmo y aviso de "reloj se muere" -->
+                <div class="timer-rate-row" id="timer-rate">—</div>
+                <div class="timer-dying-alert" id="timer-dying-alert" style="display:none">⚠ El reloj se está apagando</div>
               </div>
 
               <div class="timer-action-row">

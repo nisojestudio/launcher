@@ -332,6 +332,29 @@
     timerCapTotalMin: $("#timer-cap-total-min"),
     timerFloorTime: $("#timer-floor-time"),
     timerGiftTiers: $("#timer-gift-tiers"),
+    // R2 — popups
+    timerPopupShowActor: $("#timer-popup-show-actor"),
+    timerPopupsEnabled: $("#timer-popups-enabled"),
+    // R5 — posición del bloque
+    timerAnchorPosition: $("#timer-anchor-position"),
+    timerAnchorMargin: $("#timer-anchor-margin"),
+    // R1 — modo simple / avanzado
+    timerModeSimple: $("#timer-mode-simple"),
+    timerModeAdvanced: $("#timer-mode-advanced"),
+    timerModeNote: $("#timer-mode-note"),
+    // R4 — simulador de eventos
+    timerSimLike: $("#timer-sim-like"),
+    timerSimShare: $("#timer-sim-share"),
+    timerSimFollow: $("#timer-sim-follow"),
+    timerSimChat: $("#timer-sim-chat"),
+    timerSimGift: $("#timer-sim-gift"),
+    timerSimGiftCoins: $("#timer-sim-gift-coins"),
+    timerSimGiftName: $("#timer-sim-gift-name"),
+    timerSimStatus: $("#timer-sim-status"),
+    // R3 — mis diseños guardados
+    timerDesignSave: $("#timer-design-save"),
+    timerDesignCustomList: $("#timer-design-custom-list"),
+    timerDesignCustomRow: $("#timer-design-custom-row"),
     timerPerShare: $("#timer-per-share"),
     timerPerFollow: $("#timer-per-follow"),
     timerPerGiftCoin: $("#timer-per-gift-coin"),
@@ -3674,7 +3697,11 @@
     });
 
     let lastEventId = 0;
+    let lastEventTs = 0;
+    let rateWindow = []; // R6: ventana de 60s con los aportes positivos
     const eventsListEl = document.getElementById('timer-events-list');
+    const timerRateEl = document.getElementById('timer-rate');
+    const timerDyingEl = document.getElementById('timer-dying-alert');
     // A10: chain-based polling so the timer can be stopped on teardown
     // (page reload / panel re-init) without leaking intervals.
     let pollTimerEventsTimerId = 0;
@@ -3692,6 +3719,11 @@
         let html = '';
         let maxId = lastEventId;
         data.recentEvents.forEach(ev => {
+          // R6: contamos los aportes NUEVOS antes de actualizar lastEventId. Cierto:
+          // como el polling repite la lista, solo los nuevos (id > lastEventId) entran.
+          if (lastEventId > 0 && ev.id > lastEventId && ev.isAddition && ev.delta > 0) {
+            rateWindow.push({ ts: Date.now(), s: ev.delta });
+          }
           if (ev.id > maxId) maxId = ev.id;
           const cls = ev.isAddition ? 'add' : 'sub';
           const sign = ev.isAddition ? '+' : '';
@@ -3710,6 +3742,38 @@
           eventsListEl.innerHTML = html;
         }
         lastEventId = maxId;
+
+        // R6 — ritmo (suma de deltas positivos en los ultimos 60 s) + aviso
+        // "reloj se muere" (poco tiempo y sin actividad). Solo son numeros — no
+        // modifican la caja del operador ni el estado del timer.
+        rateWindow = rateWindow.filter(t => Date.now() - t.ts < 60000);
+        if (data.recentEvents && data.recentEvents.length) {
+          // Solo marca actividad si el historial tiene algo. El overlay manda sus
+          // eventos del directo actual, asi que llegar algo YA es senal de vida.
+          lastEventTs = Date.now();
+        }
+        const rate = rateWindow.reduce((acc, t) => acc + t.s, 0);
+        const rem = data.remainingSeconds || 0;
+        let rateText = '';
+        if (rate > 0) rateText = `+${formatCompactNumber(rate)} s/min`;
+        else rateText = 'sin nuevos aportes';
+        let aliveFor = '';
+        if (rem > 0 && rate > 0.5) {
+          const mins = Math.round(rem / rate);
+          aliveFor = `· aguanta ~${mins} min a este ritmo`;
+        }
+        if (timerRateEl) timerRateEl.textContent = `${rateText} ${aliveFor}`.trim();
+
+        // Aviso "reloj se muere": si quedan menos de 60 s y hace mas de 2 min
+        // que no llega nada nuevo. El operador habla justo a tiempo.
+        const secsSinceLast = lastEventId > 0 && lastEventTs
+          ? Math.round((Date.now() - lastEventTs) / 1000)
+          : -1;
+        let dying = false;
+        if (rem > 0 && rem < 60 || (secsSinceLast > 120)) {
+          dying = true;
+        }
+        if (timerDyingEl) timerDyingEl.style.display = dying ? 'block' : 'none';
       } catch {
         // ignore
       } finally {
@@ -3824,6 +3888,12 @@
         cap_total_per_minute_s: parseTimerNum(els.timerCapTotalMin?.value, 0),
         floor_time_s: parseTimerNum(els.timerFloorTime?.value, 0),
         gift_tiers: els.timerGiftTiers?.value || "",
+        // R2 — popups
+        popups_enabled: !!els.timerPopupsEnabled?.checked,
+        popup_show_actor: !!els.timerPopupShowActor?.checked,
+        // R5 — posicion del bloque
+        anchor_position: els.timerAnchorPosition?.value || "center",
+        anchor_margin_pct: parseTimerNum(els.timerAnchorMargin?.value, 2),
         title_text: els.timerTitleText?.value ?? "🎯 Extiende el Live",
         subtitle_text: els.timerSubtitleText?.value ?? "📌 Cada coin suma {time_per_gift_coin}s",
         popup_add_color: els.timerPopupAddColor?.value || "#00AAFF",
@@ -4166,6 +4236,12 @@
         if (config.cap_total_per_minute_s !== undefined) els.timerCapTotalMin.value = config.cap_total_per_minute_s;
         if (config.floor_time_s !== undefined) els.timerFloorTime.value = config.floor_time_s;
         if (config.gift_tiers !== undefined && els.timerGiftTiers) els.timerGiftTiers.value = config.gift_tiers;
+        // R2 — popups
+        if (config.popups_enabled !== undefined && els.timerPopupsEnabled) els.timerPopupsEnabled.checked = !!config.popups_enabled;
+        if (config.popup_show_actor !== undefined && els.timerPopupShowActor) els.timerPopupShowActor.checked = !!config.popup_show_actor;
+        // R5 — posicion del bloque
+        if (config.anchor_position !== undefined && els.timerAnchorPosition) els.timerAnchorPosition.value = config.anchor_position;
+        if (config.anchor_margin_pct !== undefined && els.timerAnchorMargin) els.timerAnchorMargin.value = config.anchor_margin_pct;
         if (config.title_text !== undefined) els.timerTitleText.value = config.title_text;
         if (config.subtitle_text !== undefined) els.timerSubtitleText.value = config.subtitle_text;
         if (config.popup_add_color !== undefined) els.timerPopupAddColor.value = config.popup_add_color;
@@ -4320,6 +4396,27 @@
     els.timerStop?.addEventListener("click", () => timerAction("/api/timer/stop"));
     els.timerEnabled?.addEventListener("change", () => timerAction("/api/timer/toggle"));
 
+    // R4 — simulador de eventos (sin estar en directo)
+    async function simulateEvent(payload) {
+      if (els.timerSimStatus) els.timerSimStatus.textContent = "…simulando…";
+      try {
+        await apiPostJson("/api/timer/simulate", payload);
+        if (els.timerSimStatus) els.timerSimStatus.textContent = "Hecho ✓";
+      } catch (e) {
+        if (els.timerSimStatus) els.timerSimStatus.textContent = "Error";
+      }
+      setTimeout(() => { if (els.timerSimStatus) els.timerSimStatus.textContent = ""; }, 2000);
+    }
+    els.timerSimLike?.addEventListener("click", () => simulateEvent({ kind: "like", coins: 20, name: "20 likes" }));
+    els.timerSimShare?.addEventListener("click", () => simulateEvent({ kind: "share", name: "Compartió" }));
+    els.timerSimFollow?.addEventListener("click", () => simulateEvent({ kind: "follow", name: "Seguidor" }));
+    els.timerSimChat?.addEventListener("click", () => simulateEvent({ kind: "chat", name: "Bot en el chat" }));
+    els.timerSimGift?.addEventListener("click", () => {
+      const coins = parseFloat(els.timerSimGiftCoins?.value) || 10;
+      const name = (els.timerSimGiftName?.value || "Regalo").trim() || "Regalo";
+      simulateEvent({ kind: "gift", coins, name: name });
+    });
+
     // --- Timer manual adjust ---
     const applyAdjust = (delta) => {
       if (delta !== 0) {
@@ -4369,9 +4466,34 @@
 
     // --- Auto-send visual config on change (hot) with debounce ---
     let hotConfigTimer = null;
+
+    // R1 — Modo Simple / Avanzado. Simple muestra solo "Tiempos y Sumas" +
+    // "Estilo rapido"; Avanzado revela todas las secciones de detalle. El modo
+    // se guarda en localStorage para que el usuario avanzado no tenga que
+    // activarlo cada vez que abre el panel.
+    const TIMER_MODE_KEY = 'nisoje.timer.mode.v1';
+    function applyTimerMode(mode) {
+      const advanced = mode === 'advanced';
+      const controls = document.querySelector('.timer-controls');
+      if (controls) controls.classList.toggle('tv-simple', !advanced);
+      if (els.timerModeSimple) els.timerModeSimple.classList.toggle('tv-mode-active', !advanced);
+      if (els.timerModeAdvanced) els.timerModeAdvanced.classList.toggle('tv-mode-active', advanced);
+      if (els.timerModeNote) els.timerModeNote.textContent = advanced
+        ? 'Todos los controles visibles'
+        : 'Solo lo esencial: tiempo, cuanto suma cada evento, diseno';
+    }
+    els.timerModeSimple?.addEventListener('click', () => {
+      window.localStorage.setItem(TIMER_MODE_KEY, 'simple');
+      applyTimerMode('simple');
+    });
+    els.timerModeAdvanced?.addEventListener('click', () => {
+      window.localStorage.setItem(TIMER_MODE_KEY, 'advanced');
+      applyTimerMode('advanced');
+    });
+    const savedMode = window.localStorage.getItem(TIMER_MODE_KEY) || 'simple';
+    applyTimerMode(savedMode === 'advanced' ? 'advanced' : 'simple');
+
     // Fase 5 — coherencia de los controles visuales. Un sub-control que no aplica
-    // se desactiva en vez de quedarse ahi como si hiciera algo. Desactivar no
-    // pierde el valor: readVisualEngineFromForm lee .value aunque este disabled.
     function updateVisualCoherence() {
       const set = (key, enabled) => {
         const el = els[key];
@@ -4451,6 +4573,12 @@
             cap_total_per_minute_s: parseTimerNum(els.timerCapTotalMin?.value, 0),
             floor_time_s: parseTimerNum(els.timerFloorTime?.value, 0),
             gift_tiers: els.timerGiftTiers?.value || "",
+            // R2 — popups
+            popups_enabled: !!els.timerPopupsEnabled?.checked,
+            popup_show_actor: !!els.timerPopupShowActor?.checked,
+            // R5 — posicion del bloque
+            anchor_position: els.timerAnchorPosition?.value || "center",
+            anchor_margin_pct: parseTimerNum(els.timerAnchorMargin?.value, 2),
             // Fase 5 — motor visual (mismas 27 claves que el camino "Aplicar").
             ...readVisualEngineFromForm(),
           };
@@ -4501,7 +4629,11 @@
       'timerLikeUseMagnitude',
       'timerMultSubscriber', 'timerMultFollower', 'timerMultModerator',
       'timerCapEvent', 'timerCapUserMin', 'timerCapTotalMin',
-      'timerFloorTime', 'timerGiftTiers'
+      'timerFloorTime', 'timerGiftTiers',
+      // R2 — popups
+      'timerPopupsEnabled', 'timerPopupShowActor',
+      // R5 — posicion
+      'timerAnchorPosition', 'timerAnchorMargin'
     ];
     hotControls.forEach(id => {
       const el = els[id];
@@ -4699,6 +4831,102 @@
       const btn = document.getElementById('timer-design-' + name);
       if (btn) btn.addEventListener('click', () => { void applyDesignPreset(name); });
     });
+
+    // R3 — guardar diseños propios. La captura es TODO el visual del formulario
+    // (motor visual + colores + fuentes), asi despues se restaura de una tecla.
+    // Vive en localStorage del panel: el operador se lleva sus diseños a casa.
+    const TIMER_CUSTOM_DESIGNS_KEY = 'nisoje.timer.customDesigns.v1';
+    function readVisualSnapshot() {
+      const snap = {};
+      const putStr = (key, el) => { if (el) snap[key] = el.value; };
+      const putChk = (key, el) => { if (el) snap[key] = !!el.checked; };
+      const putNum = (key, el) => { if (el) snap[key] = el.value; };
+      putStr('title_text', els.timerTitleText); putStr('subtitle_text', els.timerSubtitleText);
+      putNum('title_font_size', els.timerTitleFontSize); putStr('title_font_color', els.timerTitleFontColor);
+      putStr('title_font_family', els.timerTitleFontFamily); putChk('title_bold', els.timerTitleBold);
+      putStr('title_effect', els.timerTitleEffect);
+      putNum('counter_font_size', els.timerCounterFontSize); putStr('counter_font_color', els.timerCounterFontColor);
+      putStr('counter_font_family', els.timerCounterFontFamily); putChk('counter_bold', els.timerCounterBold);
+      putStr('counter_effect', els.timerCounterEffect);
+      putNum('subtitle_font_size', els.timerSubtitleFontSize); putStr('subtitle_font_color', els.timerSubtitleFontColor);
+      putStr('subtitle_font_family', els.timerSubtitleFontFamily); putChk('subtitle_bold', els.timerSubtitleBold);
+      putStr('subtitle_effect', els.timerSubtitleEffect);
+      putChk('title_glow_enabled', els.timerTitleGlow); putChk('counter_glow_enabled', els.timerCounterGlow); putChk('subtitle_glow_enabled', els.timerSubtitleGlow);
+      putStr('glow_color', els.timerGlowColor); putNum('glow_intensity_px', els.timerGlowIntensity);
+      putStr('pulse_speed_s', els.timerPulseSpeed);
+      putStr('digit_effect', els.timerDigitEffect); putStr('color_preset', els.timerColorPreset);
+      putNum('frame_opacity', els.timerFrameOpacity); putStr('frame_style', els.timerFrameStyle); putStr('frame_color', els.timerFrameColor);
+      putStr('scale_mode', els.timerScaleMode); putNum('canvas_width', els.timerCanvasWidth); putNum('canvas_height', els.timerCanvasHeight);
+      putStr('particles_style', els.timerParticlesStyle); putChk('particles_enabled', els.timerParticlesEnabled);
+      putChk('title_effect', els.timerTitleEffect);
+      return snap;
+    }
+    function applyVisualSnapshot(snap) {
+      for (const key of Object.keys(snap)) {
+        // Buscar en els por el id canon (sin el prefijo timer-).
+        const id = 'timer-' + key.replace(/_/g, '-');
+        const el = document.getElementById(id);
+        if (el) {
+          if (el.type === 'checkbox') el.checked = !!snap[key];
+          else el.value = snap[key];
+        }
+      }
+      if (typeof updateGlowToggles === 'function') updateGlowToggles();
+      updateVisualCoherence();
+      void sendTimerConfigHot();
+    }
+    function saveCustomDesign() {
+      const name = prompt('Nombre del diseño (ej: "Rosado pastel", "Futurista LG"):');
+      if (!name || !name.trim()) return;
+      try {
+        const raw = window.localStorage.getItem(TIMER_CUSTOM_DESIGNS_KEY) || '{}';
+        const all = JSON.parse(raw);
+        all[name.trim()] = readVisualSnapshot();
+        window.localStorage.setItem(TIMER_CUSTOM_DESIGNS_KEY, JSON.stringify(all));
+        setDesignStatus('Guardado: ' + name.trim());
+        renderCustomDesigns();
+      } catch (e) {
+        setDesignStatus('Error al guardar');
+      }
+    }
+    function renderCustomDesigns() {
+      const list = document.getElementById('timer-design-custom-list');
+      const row = document.getElementById('timer-design-custom-row');
+      if (!list || !row) return;
+      try {
+        const raw = window.localStorage.getItem(TIMER_CUSTOM_DESIGNS_KEY) || '{}';
+        const all = JSON.parse(raw);
+        const names = Object.keys(all);
+        if (names.length === 0) { row.style.display = 'none'; return; }
+        row.style.display = 'flex';
+        list.innerHTML = '';
+        names.forEach(name => {
+          const btn = document.createElement('button');
+          btn.className = 'secondary-button';
+          btn.style.cssText = 'font-size:11px;padding:2px 8px;margin-right:4px';
+          btn.textContent = name;
+          btn.addEventListener('click', () => applyVisualSnapshot(all[name]));
+          list.appendChild(btn);
+          const del = document.createElement('button');
+          del.className = 'secondary-button';
+          del.style.cssText = 'font-size:11px;padding:2px 8px;margin-right:8px;background:#440000';
+          del.textContent = '✕';
+          del.title = 'Borrar ' + name;
+          del.addEventListener('click', () => {
+            if (confirm('Borrar "' + name + '"?')) {
+              delete all[name];
+              window.localStorage.setItem(TIMER_CUSTOM_DESIGNS_KEY, JSON.stringify(all));
+              renderCustomDesigns();
+            }
+          });
+          list.appendChild(del);
+        });
+      } catch (e) {
+        row.style.display = 'none';
+      }
+    }
+    if (els.timerDesignSave) els.timerDesignSave.addEventListener('click', saveCustomDesign);
+    window.addEventListener('load', renderCustomDesigns);
   }
 
   async function attemptAutoLogin() {

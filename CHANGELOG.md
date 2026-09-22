@@ -4,6 +4,31 @@ All notable Panel Live changes should be recorded here.
 
 Format follows a lightweight Keep a Changelog style. Versions use SemVer.
 
+## 0.3.4 - 2026-09-22
+
+### Added — R1, R2, R4, R5 (catálogo definitivo aplicado)
+
+Del catálogo definitivo (`specs/live-timer-definitivo.md` brief). El panel ya no es "página de 46 controles", es **Simple** primero y **Avanzado** cuando el operador quiere:
+
+- **R1 · Modo Simple / Avanzado**: botón arriba del panel que alterna entre vista simple (solo Tiempos y Sumas + Estilo) y avanzada (todo). Se memoriza en `localStorage` (`nisoje.timer.mode.v1`). Con solo poner 0.3.4 y no tocar nada, el panel se ve **simple por defecto**.
+- **R2 · Control de popups** (`popups_enabled`, `popup_show_actor`): apaga popups por completo o solo el nombre del actor. El overlay y el feed del panel lo respetan.
+- **R4 · Simulador de eventos**: botones "🤍 20 likes / 🔄 1 share / ✨ 1 follow / 💬 chat" + "🎁 saludar con N coins y nombre" — directo al motor del timer, sin bridge y sin regalar de verdad. Nuevo endpoint `POST /api/timer/simulate` (no requiere sesión ni bridge).
+- **R5 · Posición del overlay**: 9 posiciones (esquinas / centros) + margen. El reloj ya no está clavado al centro: se elige dónde vive en el browser de OBS.
+
+### Changed
+
+- Las 4 botones de diseño (HUD, Cristal, Pegatina, Clásico) viven ahora en la sección **Estilo** (visible siempre), no ocultos en "Diseño (motor visual)". El texto de marco de la sección "Diseño" avisa de dónde están.
+- "Tiempos" pasa a llamarse "⏱ Tiempos y Sumas" (separación del tiempo de las reglas).
+
+### Fixed
+
+- **Validación client-side de configuración** (es un guard adicional en app.js, antes el servidor ya lo hacía).
+
+### Verificación
+
+- 33/33 tests C++, 63/63 Python. Contrato UI↔backend OK.
+- Con el modo Simple encendido, el panel muestra 3 secciones y el resto está oculto.
+
 ## 0.3.3 - 2026-09-22
 
 ### Added — Live Timer Bloque A: reglas de eventos (M1, M2, M3, M4, M5)

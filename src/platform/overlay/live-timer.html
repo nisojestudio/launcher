@@ -1026,6 +1026,32 @@ function rgbaOf(color, alpha) {
 }
 
 // M16: el diseño se compone a un lienzo de referencia y se escala entero.
+// R5 — posicion del bloque (anclaje). Se pisa el body flex que centra todo y
+// se mueve segun la posicion elegida; margen en % se traduce a padding.
+function applyAnchor() {
+  var pos = (visualState.anchorPosition || 'center');
+  var margin = Math.max(0, Math.min(20, Number(visualState.anchorMarginPct) || 2));
+  var body = document.body;
+  if (!body) return;
+  if (pos === 'center') {
+    body.style.justifyContent = 'center';
+    body.style.alignItems = 'center';
+    body.style.padding = '';
+    return;
+  }
+  // "top-left", "middle-right", ... separar en eje vertical / horizontal.
+  var parts = pos.split('-');
+  var vertical = parts[0];   // top | middle | bottom
+  var horizontal = parts[1]; // left | center | right
+  if (vertical === 'middle') vertical = 'center';
+  var mapJ = { 'left': 'flex-start', 'center': 'center', 'right': 'flex-end' };
+  var mapA = { 'top': 'flex-start', 'center': 'center', 'bottom': 'flex-end' };
+  body.style.justifyContent = mapJ[horizontal] || 'center';
+  body.style.alignItems = mapA[vertical] || 'center';
+  // Margen como padding global en % del lienzo, respetando el lado opuesto.
+  body.style.padding = margin + '%';
+}
+
 function applyScale() {
   var stage = document.getElementById('stage');
   if (!stage) return;
@@ -1080,6 +1106,9 @@ function applyVisualEngine(data) {
     progressStyle: data.progress_style || 'none',
     progressThicknessPx: isFinite(Number(data.progress_thickness_px)) ? Number(data.progress_thickness_px) : 6,
     progressColor: data.progress_color || '',
+    // R5 — posicion
+    anchorPosition: data.anchor_position || 'center',
+    anchorMarginPct: isFinite(Number(data.anchor_margin_pct)) ? Number(data.anchor_margin_pct) : 2,
     // El color del contador entra en la firma: si no, con progress_color vacio el
     // medidor se quedaba con el color de reserva para siempre, porque el motor
     // solo refresca cuando la firma cambia (lo cazo la verificacion visual).
@@ -1097,6 +1126,7 @@ function applyVisualEngine(data) {
   var frame = document.getElementById('frame');
   if (stage) {
     applyScale();
+    applyAnchor();
   }
   if (frame) {
     var style = FRAME_CLASSES.indexOf('f-' + next.frameStyle) >= 0 ? next.frameStyle : 'none';

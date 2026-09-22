@@ -28,6 +28,8 @@
 #endif
 
 #include "events/host_event.hpp"
+#include "gamesdk/game_input_event.hpp"
+#include "host/session_state.hpp"
 #include "platform/panel_app.hpp"
 #include "platform/panel_console.hpp"
 #include "platform/panel_http_json.hpp"
@@ -1010,6 +1012,12 @@ std::string build_live_timer_config_json(const nlp3::games::LiveTimerGame* game)
     add("cap_total_per_minute_s"); out << ",";
     add("floor_time_s"); out << ",";
     add("gift_tiers"); out << ",";
+    // R2 — control de popups.
+    add("popups_enabled"); out << ",";
+    add("popup_show_actor"); out << ",";
+    // R5 — posicion del bloque.
+    add("anchor_position"); out << ",";
+    add("anchor_margin_pct"); out << ",";
     add("title_text"); out << ",";
     add("subtitle_text"); out << ",";
     add("on_complete_sound_path"); out << ",";
@@ -1159,6 +1167,22 @@ std::string handle_timer_configure(PanelApp* app, std::string_view body) {
     // Bloque A / M4: tramos de regalo (texto multilinea).
     maybe_str = parse_json_string(body, "gift_tiers");
     if (maybe_str.has_value()) config.set("gift_tiers", maybe_str->substr(0, 4096));
+
+    // R2 — control de popups.
+    {
+        auto b = parse_json_bool(body, "popups_enabled");
+        if (b.has_value()) config.set("popups_enabled", *b);
+        b = parse_json_bool(body, "popup_show_actor");
+        if (b.has_value()) config.set("popup_show_actor", *b);
+    }
+
+    // R5 — posicion del bloque en el overlay.
+    maybe_str = parse_json_string(body, "anchor_position");
+    if (maybe_str.has_value()) config.set("anchor_position", *maybe_str);
+    {
+        auto pct_opt = parse_json_uint64(body, "anchor_margin_pct");
+        if (pct_opt.has_value()) config.set("anchor_margin_pct", static_cast<std::int64_t>(std::clamp<uint64_t>(*pct_opt, 0, 20)));
+    }
     maybe_str = parse_json_string(body, "on_complete_sound_path");
     if (maybe_str.has_value()) config.set("on_complete_sound_path", *maybe_str);
     maybe_str = parse_json_string(body, "title_font_color");
@@ -2043,6 +2067,45 @@ std::string build_route_response(
         auto* timer = app->live_timer();
         if (timer != nullptr) { timer->set_enabled(!timer->is_enabled()); app->save_timer_state(); }
         return make_http_response("200 OK", "application/json; charset=utf-8", make_simple_result(timer != nullptr, timer ? (timer->is_enabled() ? "enabled" : "disabled") : "unavailable"));
+    }
+    // R4 — simulador: dispara un evento en el motor igual que un regalo real,
+    // sin tocar el bridge ni la sesión en vivo. Solo para probar.
+    if (request.method == "POST" && request.path == "/api/timer/simulate") {
+        auto* timer = app->live_timer();
+        if (timer == nullptr) {
+            return make_http_response("200 OK", "application/json; charset=utf-8", make_simple_result(false, "unavailable"));
+        }
+        if (!timer->is_enabled()) {
+            return make_http_response("200 OK", "application/json; charset=utf-8", make_simple_result(false, "timer_hidden"));
+        }
+        const auto kind = parse_json_string(request.body, "kind").value_or("gift");
+        const auto coins = parse_json_double(request.body, "coins").value_or(1.0);
+        const auto name = parse_json_string(request.body, "name").value_or("Simulacion");
+        nlp3::gamesdk::GameInputEvent ev;
+        ev.actor.username = name;
+        ev.actor.display_name = name;
+        ev.actor.id = "simulator";
+        if (kind == "gift") {
+            ev.kind = nlp3::gamesdk::GameInputEventKind::gift;
+            ev.gift = nlp3::gamesdk::GameInputGift{"sim", name, static_cast<uint32_t>(coins), static_cast<uint32_t>(coins)};
+        } else if (kind == "like") {
+            ev.kind = nlp3::gamesdk::GameInputEventKind::like;
+            ev.like_count = static_cast<uint32_t>(std::max(0.0, coins));
+        } else if (kind == "share") {
+            ev.kind = nlp3::gamesdk::GameInputEventKind::share;
+        } else if (kind == "follow") {
+            ev.kind = nlp3::gamesdk::GameInputEventKind::follow;
+        } else if (kind == "chat") {
+            ev.kind = nlp3::gamesdk::GameInputEventKind::chat_message;
+            ev.text = name;
+        } else {
+            return make_http_response("400 Bad Request", "application/json; charset=utf-8", make_simple_result(false, "unknown_kind"));
+        }
+        // Snapshot no esencial aqui; pasamos uno vacio.
+        nlp3::host::HostSessionSnapshot snapshot{};
+        timer->on_game_input_event(ev, snapshot);
+        app->save_timer_state();
+        return make_http_response("200 OK", "application/json; charset=utf-8", make_simple_result(true, "simulated"));
     }
     if (request.method == "POST" && request.path == "/api/host/tts") {
         return make_http_response("200 OK", "application/json; charset=utf-8", handle_host_tts(app, request.body));

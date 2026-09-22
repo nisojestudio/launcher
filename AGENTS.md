@@ -169,7 +169,9 @@ Cada etapa debe terminar con:
 
 ## 11. Estado del release (baseline actual)
 
-- Versión en `master`: **0.3.3** (2026-09-22). Tag público más reciente: `v0.3.2`
+- Versión en `master`: **0.3.4** (2026-09-22). Tag público más reciente: `v0.3.3`
+  (0.3.4 añade el catálogo definitivo del timer: vista Simple/Avanzado, controles
+  de popup/nombre, simulador R4 y posicionamiento del overlay).
   (0.3.3 añade Bloque A de reglas del timer: likes por magnitud, multiplicadores
   por tipo de espectador, tramos de regalo, topes y suelo).
 - Artefactos 0.3.3: `dist/releases/0.3.3/installer/panel-live-0.3.3-win-x64.exe`,

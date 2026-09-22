@@ -88,6 +88,17 @@ struct LiveTimerGameState {
     // Si la linea no corresponde a ninguno, se ignora. Si una regla aplica,
     // sustituye por completo a time_per_gift_coin (no se suman).
     std::string gift_tiers;
+    // R2 — control de popups. popups_enabled=false apaga los popups por completo
+    // (el overlay no pinta nada). popup_show_actor=false oculta solo el nombre.
+    bool popups_enabled = true;
+    bool popup_show_actor = true;
+    // R5 — anclaje del overlay: dónde va el bloque dentro del lienzo.
+    // "center" → el default de siempre. Las otras 8 posiciones son esquinas/
+    // bordes combinando fila (top/center/bottom) y columna (left/center/right).
+    std::string anchor_position = "center";
+    // Margen al borde elegido en % del lienzo. 0..20 (un solo valor simétrico
+    // cubre el caso real — no hace falta separado por lado).
+    int anchor_margin_pct = 2;
 
     std::string title_text = "🎯 Extiende el Live";
     std::string subtitle_text = "📌 Cada coin suma {time_per_gift_coin}s";

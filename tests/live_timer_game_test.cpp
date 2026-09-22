@@ -1229,6 +1229,67 @@ void test_bloque_a_serializacion_en_json() {
     std::cout << "PASS: bloque_a_serializacion_en_json\n";
 }
 
+void test_r2_popups_ocultables() {
+    LiveTimerGame game;
+    auto cfg = game.default_config();
+    cfg.set("initial_time_s", 300.0);
+    cfg.set("time_per_follow_s", 10.0);
+    cfg.set("popups_enabled", false);
+    game.apply_config(cfg);
+    game.on_activated();
+
+    game.on_game_input_event(make_test_event(GameInputEventKind::follow), kEmptySnapshot);
+    const std::string json = nlp3::platform::build_live_timer_state_json(&game);
+    // Con popups_enabled=false el overlay recibe la lista vacia.
+    assert(json.find("\"recentEvents\":[]") != std::string::npos);
+
+    std::cout << "PASS: r2_popups_ocultables\n";
+}
+
+void test_r5_posicion_camba_json() {
+    LiveTimerGame game;
+    auto cfg = game.default_config();
+    cfg.set("anchor_position", std::string("bottom-right"));
+    cfg.set("anchor_margin_pct", std::int64_t{4});
+    game.apply_config(cfg);
+
+    const std::string json = nlp3::platform::build_live_timer_state_json(&game);
+    assert(json.find("\"anchor_position\":\"bottom-right\"") != std::string::npos);
+    assert(json.find("\"anchor_margin_pct\":4") != std::string::npos);
+
+    std::cout << "PASS: r5_posicion_camba_json\n";
+}
+
+void test_r5_posicion_invalida_cae_a_center() {
+    LiveTimerGame game;
+    auto cfg = game.default_config();
+    cfg.set("anchor_position", std::string("devoid"));
+    game.apply_config(cfg);
+    assert(game.state().anchor_position == "center");
+
+    std::cout << "PASS: r5_posicion_invalida_cae_a_center\n";
+}
+
+void test_r2_nombre_oculto_en_popup() {
+    LiveTimerGame game;
+    auto cfg = game.default_config();
+    cfg.set("initial_time_s", 300.0);
+    cfg.set("time_per_follow_s", 10.0);
+    cfg.set("popup_show_actor", false);
+    game.apply_config(cfg);
+    game.on_activated();
+
+    auto ev = make_test_event(GameInputEventKind::follow);
+    ev.actor.display_name = "musitogamer";
+    game.on_game_input_event(ev, kEmptySnapshot);
+    const std::string json = nlp3::platform::build_live_timer_state_json(&game);
+    // El nombre NO debe aparecer (ni en popup, ni en ningun sitio del JSON).
+    assert(json.find("musitogamer") == std::string::npos);
+    assert(json.find("\"actorName\":\"\"") != std::string::npos);
+
+    std::cout << "PASS: r2_nombre_oculto_en_popup\n";
+}
+
 } // namespace
 
 int main() {
@@ -1288,6 +1349,10 @@ int main() {
     test_m5_tope_total_global();
     test_m5_suelo_no_completa();
     test_bloque_a_serializacion_en_json();
+    test_r2_popups_ocultables();
+    test_r2_nombre_oculto_en_popup();
+    test_r5_posicion_camba_json();
+    test_r5_posicion_invalida_cae_a_center();
 
     std::cout << "\nAll tests passed!\n";
     return 0;

@@ -130,8 +130,10 @@ std::string build_live_timer_state_json(const games::LiveTimerGame* game) {
     std::ostringstream events_json;
     events_json << "[";
     bool first = true;
-    for (const auto& ev : s.recent_events) {
-        if (!first) events_json << ",";
+    // R2: con popups_enabled=false el overlay no pinta nada — la lista va vacia.
+    static const std::vector<nlp3::games::LiveTimerRecentEvent> kEmptyEvents{};
+    for (const auto& ev : (s.popups_enabled ? s.recent_events : kEmptyEvents)) {
+          if (!first) events_json << ",";
         first = false;
         events_json << "{"
             << "\"id\":" << ev.id << ","
@@ -139,8 +141,8 @@ std::string build_live_timer_state_json(const games::LiveTimerGame* game) {
             << "\"label\":" << json_quote(ev.label) << ","
             << "\"delta\":" << ev.delta_seconds << ","
             << "\"isAddition\":" << (ev.is_addition ? "true" : "false") << ","
-            // Bloque A / M1: nombre del actor (vacio = anonimo o no aplica).
-            << "\"actorName\":" << json_quote(ev.actor_name) << ","
+            // Bloque A / M1 + R2: nombre del actor; se omite si el operador no lo quiere.
+            << "\"actorName\":" << json_quote(s.popup_show_actor ? ev.actor_name : "") << ","
             // Bloque A / M5: el delta fue recortado por un tope.
             << "\"capped\":" << (ev.capped ? "true" : "false")
             << "}";
@@ -209,6 +211,12 @@ std::string build_live_timer_state_json(const games::LiveTimerGame* game) {
         << "\"particles_budget\":" << s.particles_budget << ","
         << "\"particles_density\":" << s.particles_density << ","
         << "\"particles_force\":" << (s.particles_force ? "true" : "false") << ","
+        // R5 — posicion del bloque en el overlay.
+        << "\"anchor_position\":" << json_quote(s.anchor_position) << ","
+        << "\"anchor_margin_pct\":" << s.anchor_margin_pct << ","
+        // R6 — aviso/resumen para el panel (el overlay no usa esto, pero lo lee la UI).
+        << "\"popup_show_actor\":" << (s.popup_show_actor ? "true" : "false") << ","
+        << "\"popups_enabled\":" << (s.popups_enabled ? "true" : "false") << ","
         // T1.4: overlay HTML5 audio reads these fields and plays via new Audio().
         // Empty path = total silence. Backend never plays sounds itself.
         << "\"tick_sound_path\":" << json_quote(s.tick_sound_path) << ","

@@ -3168,6 +3168,23 @@ select.timer-input,
   text-transform: uppercase;
   letter-spacing: 0.5px;
 }
+
+/* R6 — ritmo y aviso */
+.timer-rate-row {
+  font-size: 11px;
+  color: var(--text-dim);
+  margin-top: 6px;
+}
+.timer-dying-alert {
+  background: rgba(255, 70, 70, 0.15);
+  border: 1px solid #ff4444;
+  color: #ff6666;
+  padding: 6px 10px;
+  margin-top: 6px;
+  border-radius: 4px;
+  font-size: 12px;
+  font-weight: 600;
+}
 .timer-events-list {
   max-height: 120px;
   overflow-y: auto;
@@ -3315,6 +3332,30 @@ select.timer-input,
   display: flex;
   flex-direction: column;
   gap: 6px;
+}
+
+/* ===== R1: Modo simple / avanzado ===== */
+/* En modo simple, las secciones con .tv-advanced no se muestran. El modo se
+   memoriza en localStorage para que UN usuario avanzado no tenga que activarlo
+   cada vez, y el principiante ve solo lo esencial por defecto. */
+.timer-controls.tv-simple .tv-section.tv-advanced {
+  display: none;
+}
+.tv-mode-bar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 4px 2px 8px;
+  flex-wrap: wrap;
+}
+.tv-mode-bar .tv-mode-btn {
+  padding: 2px 12px;
+  font-size: 12px;
+}
+.tv-mode-bar .tv-mode-btn.tv-mode-active {
+  background: var(--accent);
+  color: #fff;
+  border-color: var(--accent);
 }
 
 /* Card for each visual element */
