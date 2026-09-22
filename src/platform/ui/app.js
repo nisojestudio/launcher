@@ -4107,8 +4107,12 @@
 
     function updatePreviewUrl() {
       if (previewIframe) {
-        const url = _timerOverlayUrl || `${window.location.origin}/overlay/live-timer`;
-        previewIframe.src = url + (url.includes('?') ? '&' : '?') + 'preview=1&t=' + Date.now();
+        // Siempre vamos al panel local — la URL pública de nisoje.com sólo la
+        // ve el usuario si configura el túnel. Para la previa dentro del panel
+        // no tiene sentido: es un pedazo de UI "local" y si la cambiamos por la
+        // URL pública (con el panel en standby, sin sesión publicada) veremos
+        // "esperando al panel" pese a que el tiempo está bien.
+        previewIframe.src = `${window.location.origin}/overlay/live-timer?preview=1&t=` + Date.now();
       }
     }
 
