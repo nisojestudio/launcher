@@ -4,7 +4,14 @@ All notable Panel Live changes should be recorded here.
 
 Format follows a lightweight Keep a Changelog style. Versions use SemVer.
 
-## Unreleased
+## 0.3.5 - 2026-09-23
+
+### Fixed — Overlay timer: conexion perdida al reiniciar el panel
+
+- **Causa raiz**: la publicacion de la sesion del overlay en el Worker de Cloudflare exige `license_key` (Bearer). En modo `auth.required=false` el login se descartaba por completo (`reset_for_current_mode`) y la key quedaba vacia para siempre -> publish imposible y el timer remoto se perdia al cerrar y reabrir el panel.
+- **`ServerLicenseService::authenticate`**: en modo local ahora conserva `email` + `license_key` del formulario (sin validacion remota, igual que antes), para que `publish_overlay_session` pueda republicar.
+- **Auto-login (`ui/app.js`)**: `attemptAutoLogin` ya no aborta cuando el panel NO esta bloqueado; sincroniza las credenciales persistentes con el backend en cada arranque, de modo que `authenticate_access` re-publica la sesion del overlay inmediatamente (sin esperar al heartbeat de 5 min).
+
 
 ### Fixed — Auditoría voz post-P3 (lote 1)
 
