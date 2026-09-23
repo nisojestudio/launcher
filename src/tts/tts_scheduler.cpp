@@ -230,6 +230,20 @@ bool is_allowed_tts_text_codepoint(std::uint32_t codepoint) {
     return false;
 }
 
+std::string truncate_utf8(const std::string& input, std::size_t max_bytes) {
+    if (max_bytes == 0 || input.size() <= max_bytes) {
+        return input;
+    }
+
+    // Cortar en max_bytes; retroceder sobre bytes de continuacion (10xxxxxx)
+    // para no partir una secuencia UTF-8 a la mitad (M1/P1.2).
+    std::size_t end = max_bytes;
+    while (end > 0 && (static_cast<unsigned char>(input[end]) & 0xC0) == 0x80) {
+        --end;
+    }
+    return input.substr(0, end);
+}
+
 std::string sanitize_tts_text(const std::string& input) {
     std::string output{};
     output.reserve(input.size());
@@ -264,7 +278,7 @@ std::string sanitize_tts_text(const std::string& input) {
 
 } // namespace
 
-TtsScheduler::TtsScheduler(TtsConfig config, TtsPolicy policy, ITtsBackend& backend) noexcept
+TtsScheduler::TtsScheduler(TtsConfig config, TtsPolicy policy, ITtsBackend& backend)
     : config_(config),
       policy_(policy),
       backend_(&backend) {
@@ -284,6 +298,12 @@ bool TtsScheduler::submit(TtsMessage message) {
         return false;
     }
 
+    if (message.enqueued_at_ms == 0) {
+        using namespace std::chrono;
+        message.enqueued_at_ms = static_cast<std::int64_t>(
+            duration_cast<milliseconds>(system_clock::now().time_since_epoch()).count());
+    }
+
     return queue_.push(std::move(message), config_.max_queue_size, config_.drop_oldest_on_overflow);
 }
 
@@ -301,8 +321,22 @@ std::size_t TtsScheduler::dispatch_pending(std::size_t max_messages) {
             break;
         }
 
+        // TTL: descartar mensajes caducos en lugar de hablarlos tarde (auditoria A2).
+        const auto now_ms = static_cast<std::int64_t>(
+            std::chrono::duration_cast<std::chrono::milliseconds>(
+                std::chrono::system_clock::now().time_since_epoch())
+                .count());
+        if (tts_message_expired(config_.max_message_age_ms, next->enqueued_at_ms, now_ms)) {
+            continue;
+        }
+
         if (backend_->speak(*next)) {
             ++dispatched;
+        } else {
+            // A1: no perder el mensaje si el backend falla; re-encolar al frente
+            // y dejar de intentar este tick (el backend sigue caido).
+            queue_.push_front(std::move(*next));
+            break;
         }
     }
 
@@ -348,8 +382,10 @@ bool TtsScheduler::sanitize_message(TtsMessage& message) const {
         return false;
     }
 
-    if (config_.max_text_length > 0 && message.text.size() > config_.max_text_length) {
-        message.text.resize(config_.max_text_length);
+    if (config_.max_text_length > 0) {
+        // P1.2/M1: truncar UTF-8 de forma segura (no partir secuencias).
+        message.text = truncate_utf8(message.text, config_.max_text_length);
+        message.content_text = truncate_utf8(message.content_text, config_.max_text_length);
     }
 
     if (message.created_at_ms == 0) {

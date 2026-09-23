@@ -80,6 +80,11 @@ public:
     bool apply_live_config();
     bool reload_config(const std::string& config_path = "panel_config.json");
 
+    // M8: slot del rate-limit de POST /api/tts/test (estado por instancia,
+    // no static del proceso). Devuelve false si still dentro de la ventana.
+    // Se resetea en apply_live_config.
+    bool try_acquire_tts_test_slot(std::int64_t now_ms);
+
     PanelSnapshot snapshot() const;
     PanelDiagnosticsReport diagnostics() const;
     PanelCommandResult execute_command(const PanelCommand& command);
@@ -161,6 +166,8 @@ public:
     host::HostPeriodicTtsConfig host_periodic_tts_config() const;
     tts::TtsConfig host_tts_runtime_config() const;
     std::vector<tts::TtsVoiceDescriptor> tts_voice_catalog() const;
+    // P2.3/M7: re-escanear voces del backend (SAPI) bajo demanda.
+    void refresh_tts_voice_catalog();
     std::string tts_backend_name() const;
     bool tts_backend_available() const noexcept;
     std::uint64_t uptime_ms() const noexcept;
@@ -288,6 +295,8 @@ private:
     std::size_t external_bridge_moderation_events_ = 0;
     std::size_t external_bridge_custom_raw_events_ = 0;
     std::int64_t started_at_ms_ = 0;
+    // M8: ultimo POST exitoso de /api/tts/test (0 = sin uso).
+    std::int64_t tts_test_last_ms_ = 0;
     bool initialized_ = false;
 };
 

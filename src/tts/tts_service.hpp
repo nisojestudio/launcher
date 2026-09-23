@@ -13,6 +13,8 @@
 
 namespace nlp3::tts {
 
+// B10: ITtsService/HostTtsService comparten el invariant single-thread de
+// TtsScheduler — un unico hilo orquesta submit/dispatch/set_*.
 class ITtsService {
 public:
     virtual ~ITtsService() = default;
@@ -31,7 +33,8 @@ public:
 
 class HostTtsService final : public ITtsService {
 public:
-    HostTtsService(TtsConfig config, TtsPolicy policy, ITtsBackend& backend) noexcept;
+    // B8: no noexcept — el ctor de TtsScheduler ya no es noexcept (apply_config).
+    HostTtsService(TtsConfig config, TtsPolicy policy, ITtsBackend& backend);
 
     std::string_view service_name() const noexcept override;
     bool available() const noexcept override;

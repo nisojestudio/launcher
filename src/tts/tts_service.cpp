@@ -8,15 +8,7 @@
 
 namespace nlp3::tts {
 
-namespace {
-
-bool chat_template_mentions_user(std::string_view template_text) {
-    return template_text.find("{user}") != std::string_view::npos;
-}
-
-} // namespace
-
-HostTtsService::HostTtsService(TtsConfig config, TtsPolicy policy, ITtsBackend& backend) noexcept
+HostTtsService::HostTtsService(TtsConfig config, TtsPolicy policy, ITtsBackend& backend)
     : config_(std::move(config)),
       policy_(std::move(policy)),
       scheduler_(config_, policy_, backend) {
@@ -42,17 +34,22 @@ bool HostTtsService::enqueue_chat_read(const events::HostEvent& event) {
         return false;
     }
 
-    const auto event_time = event.metadata.source_timestamp_ms;
-    if (policy_.chat_cooldown_ms > 0 && last_chat_enqueued_at_ms_ > 0 && event_time > 0) {
-        if (event_time >= last_chat_enqueued_at_ms_
-            && static_cast<std::uint64_t>(event_time - last_chat_enqueued_at_ms_) < policy_.chat_cooldown_ms) {
+    // P1.3/M2: cooldown con reloj de RECEPCION (wall clock al encolar),
+    // no con source_timestamp_ms — eventos con timestamp=0 o atrasados
+    // no deben saltarse el cooldown.
+    const auto now_ms = static_cast<std::int64_t>(
+        std::chrono::duration_cast<std::chrono::milliseconds>(
+            std::chrono::system_clock::now().time_since_epoch()).count());
+    if (policy_.chat_cooldown_ms > 0 && last_chat_enqueued_at_ms_ > 0) {
+        if (now_ms >= last_chat_enqueued_at_ms_
+            && static_cast<std::uint64_t>(now_ms - last_chat_enqueued_at_ms_) < policy_.chat_cooldown_ms) {
             return false;
         }
     }
 
     const auto accepted = submit(build_chat_message(event));
     if (accepted) {
-        last_chat_enqueued_at_ms_ = event_time;
+        last_chat_enqueued_at_ms_ = now_ms;
     }
     return accepted;
 }
@@ -106,9 +103,14 @@ TtsMessage HostTtsService::build_chat_message(const events::HostEvent& event) co
     context.message = event.message;
     context.viewers = event.viewer_count;
 
+    // P2.2/M5: aplicar plantilla SIEMPRE. Si include_actor_name_for_chat esta off,
+    // {user} se rellena con cadena vacia; el formatter+sanitize colapsa espacios
+    // sobrantes ("Dice : hola" -> "Dice: hola").
     std::string formatted{};
-    if (!policy_.chat_message_template.empty()
-        && (policy_.include_actor_name_for_chat || !chat_template_mentions_user(policy_.chat_message_template))) {
+    if (!policy_.chat_message_template.empty()) {
+        if (!policy_.include_actor_name_for_chat) {
+            context.user.clear();
+        }
         formatted = format_tts_template(policy_.chat_message_template, context);
     }
     if (formatted.empty()) {

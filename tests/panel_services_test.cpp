@@ -43,12 +43,15 @@ int main() {
     persisted_config.tts_runtime.enabled = true;
     persisted_config.tts_runtime.max_queue_size = 9;
     persisted_config.tts_runtime.backend_queue_size = 17;
+    persisted_config.tts_runtime.max_message_age_ms = 12345;
     persisted_config.tts_runtime.max_dispatch_per_tick = 3;
     persisted_config.tts_runtime.max_text_length = 144;
     persisted_config.tts_runtime.drop_oldest_on_overflow = true;
     persisted_config.tts_runtime.selected_voice_id = "english-female";
     persisted_config.tts_runtime.selected_language = "en";
     persisted_config.tts_runtime.frequency = "high";
+    persisted_config.tts_runtime.volume = 88;
+    persisted_config.tts_runtime.test_rate_limit_ms = 2500;
     persisted_config.tts.allow_chat_messages = false;
     persisted_config.tts.allow_manual_messages = false;
     persisted_config.tts.include_actor_name_for_chat = false;
@@ -95,12 +98,15 @@ int main() {
     assert(loaded_config.tts_runtime.enabled);
     assert(loaded_config.tts_runtime.max_queue_size == 9);
     assert(loaded_config.tts_runtime.backend_queue_size == 17);
+    assert(loaded_config.tts_runtime.max_message_age_ms == 12345);
     assert(loaded_config.tts_runtime.max_dispatch_per_tick == 3);
     assert(loaded_config.tts_runtime.max_text_length == 144);
     assert(loaded_config.tts_runtime.drop_oldest_on_overflow);
     assert(loaded_config.tts_runtime.selected_voice_id == "english-female");
     assert(loaded_config.tts_runtime.selected_language == "en");
     assert(loaded_config.tts_runtime.frequency == "high");
+    assert(loaded_config.tts_runtime.volume == 88);
+    assert(loaded_config.tts_runtime.test_rate_limit_ms == 2500);
     assert(!loaded_config.tts.allow_chat_messages);
     assert(!loaded_config.tts.allow_manual_messages);
     assert(!loaded_config.tts.include_actor_name_for_chat);
@@ -176,7 +182,9 @@ int main() {
     first_periodic.interval_ms = 1000;
     first_periodic.messages = {"Mensaje viejo"};
     host_runtime.apply_periodic_tts_config(first_periodic);
-    assert(host_runtime.tick_periodic_tts(1000));
+    // P2.1: primer tick arma; emitir solo tras el intervalo.
+    assert(!host_runtime.tick_periodic_tts(500));
+    assert(host_runtime.tick_periodic_tts(1500));
     assert(host_runtime.queued_tts_messages() == 1);
 
     host_runtime.clear_pending_tts();
@@ -185,10 +193,22 @@ int main() {
     second_periodic.messages = {"Mensaje nuevo"};
     host_runtime.apply_periodic_tts_config(second_periodic);
     assert(host_runtime.queued_tts_messages() == 0);
-    assert(host_runtime.tick_periodic_tts(1000));
+    // clear_pending hace reset; el proximo tick vuelve a armar.
+    assert(!host_runtime.tick_periodic_tts(500));
+    assert(host_runtime.tick_periodic_tts(1500));
     assert(host_runtime.flush_tts(8) == 1);
     assert(mock_tts_backend.spoken_messages().size() == 1);
     assert(mock_tts_backend.spoken_messages().back().text == "Mensaje nuevo");
+
+    // P2.1: cambiar solo los mensajes (mismo intervalo, ya habilitado) NO
+    // reinicia el timer — el proximo emit sigue siendo por elapsed desde el
+    // ultimo emit/armado, no un emit inmediato.
+    nlp3::host::HostPeriodicTtsConfig third_periodic = second_periodic;
+    third_periodic.messages = {"Mensaje tercero"};
+    host_runtime.apply_periodic_tts_config(third_periodic);
+    assert(host_runtime.queued_tts_messages() == 0);
+    assert(!host_runtime.tick_periodic_tts(1600)); // 100ms desde el emit en 1500
+    assert(host_runtime.queued_tts_messages() == 0);
 
     std::filesystem::remove(config_path);
     return 0;

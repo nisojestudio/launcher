@@ -18,9 +18,13 @@ public:
 
     const std::vector<TtsMessage>& spoken_messages() const noexcept;
 
+    // Test hook: hace fallar las siguientes N llamadas a speak().
+    void set_fail_speak_count(std::size_t count) noexcept;
+
 private:
     TtsConfig config_{};
     std::vector<TtsMessage> spoken_messages_{};
+    std::size_t fail_speak_count_ = 0;
 };
 
 } // namespace nlp3::tts

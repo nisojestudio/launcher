@@ -43,14 +43,17 @@
   },
   "tts_runtime": {
     "enabled": true,
-    "max_queue_size": 0,
-    "backend_queue_size": 0,
+    "max_queue_size": 50,
+    "backend_queue_size": 20,
+    "max_message_age_ms": 30000,
     "max_dispatch_per_tick": 1,
     "max_text_length": 160,
     "drop_oldest_on_overflow": false,
     "selected_voice_id": "spanish-female",
     "selected_language": "es",
-    "frequency": "normal"
+    "frequency": "normal",
+    "volume": 100,
+    "test_rate_limit_ms": 1000
   },
   "tts": {
     "allow_chat_messages": false,

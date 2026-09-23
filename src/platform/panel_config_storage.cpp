@@ -233,12 +233,15 @@ ordered_json tts_runtime_to_json(const tts::TtsConfig& config) {
     runtime["enabled"] = config.enabled;
     runtime["max_queue_size"] = config.max_queue_size;
     runtime["backend_queue_size"] = config.backend_queue_size;
+    runtime["max_message_age_ms"] = config.max_message_age_ms;
     runtime["max_dispatch_per_tick"] = config.max_dispatch_per_tick;
     runtime["max_text_length"] = config.max_text_length;
     runtime["drop_oldest_on_overflow"] = config.drop_oldest_on_overflow;
     runtime["selected_voice_id"] = config.selected_voice_id;
     runtime["selected_language"] = config.selected_language;
     runtime["frequency"] = config.frequency;
+    runtime["volume"] = config.volume;
+    runtime["test_rate_limit_ms"] = config.test_rate_limit_ms;
     return runtime;
 }
 
@@ -322,12 +325,18 @@ bool load_tts_runtime_object(
     return try_read_bool(object, "enabled", config.enabled)
         && try_read_unsigned(object, "max_queue_size", config.max_queue_size)
         && try_read_unsigned(object, "backend_queue_size", config.backend_queue_size)
+        && try_read_unsigned(object, "max_message_age_ms", config.max_message_age_ms)
         && try_read_unsigned(object, "max_dispatch_per_tick", config.max_dispatch_per_tick)
         && try_read_unsigned(object, "max_text_length", config.max_text_length)
         && try_read_bool(object, "drop_oldest_on_overflow", config.drop_oldest_on_overflow)
         && try_read_string(object, "selected_voice_id", config.selected_voice_id)
         && try_read_string(object, "selected_language", config.selected_language)
-        && try_read_string(object, "frequency", config.frequency);
+        && try_read_string(object, "frequency", config.frequency)
+        // B7: volumen opcional; default 100 si no esta presente en configs viejas.
+        && (!object.contains("volume") || try_read_unsigned(object, "volume", config.volume))
+        // M8: ventana del rate-limit de /api/tts/test; default 1000 si falta.
+        && (!object.contains("test_rate_limit_ms")
+            || try_read_unsigned(object, "test_rate_limit_ms", config.test_rate_limit_ms));
 }
 
 bool load_tts_policy_object(

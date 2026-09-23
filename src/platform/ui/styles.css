@@ -585,6 +585,19 @@ textarea::placeholder {
   align-items: stretch;
 }
 
+.voice-chat-row #voice-volume-row {
+  grid-column: 1 / -1;
+}
+
+.voice-chat-row #voice-volume-row input[type="range"] {
+  width: 100%;
+}
+
+.voice-chat-row #voice-volume-row output {
+  font-variant-numeric: tabular-nums;
+  font-weight: 700;
+}
+
 .chat-scope-field {
   height: 100%;
 }
@@ -1798,37 +1811,6 @@ body::-webkit-scrollbar-corner,
   min-height: 84px;
 }
 
-.notice-audio-shell {
-  display: grid;
-  gap: 10px;
-  padding: 12px;
-  border-radius: var(--radius-sm);
-  border: 1px solid rgba(148, 163, 184, 0.12);
-  background: rgba(15, 23, 42, 0.56);
-}
-
-.notice-audio-row {
-  display: flex;
-  gap: 10px;
-  align-items: center;
-}
-
-.notice-audio-name {
-  flex: 1;
-}
-
-.notice-file-button {
-  position: relative;
-  overflow: hidden;
-}
-
-.notice-file-button input {
-  position: absolute;
-  inset: 0;
-  opacity: 0;
-  cursor: pointer;
-}
-
 .notice-pill-row {
   display: flex;
   flex-wrap: wrap;
@@ -1847,11 +1829,6 @@ body::-webkit-scrollbar-corner,
   font-weight: 700;
   letter-spacing: 0.06em;
   text-transform: uppercase;
-}
-
-.notice-pill.notice-pill-audio {
-  background: rgba(22, 69, 87, 0.96);
-  color: #d5f3ff;
 }
 
 .voice-panel .button-row {

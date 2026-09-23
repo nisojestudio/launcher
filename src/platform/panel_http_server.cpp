@@ -97,6 +97,8 @@ using nlp3::platform::now_wall_clock_ms;
 struct ParsedRequest {
     std::string method{};
     std::string path{};
+    // Path completo con query (antes de strip) — necesario para flags como ?refresh=1.
+    std::string raw_target{};
     std::string body{};
     std::vector<std::pair<std::string, std::string>> headers{};
     bool ready = false;
@@ -121,6 +123,7 @@ ParsedRequest parse_request_buffer(std::string_view request_buffer) {
     if (parsed.method.empty() || parsed.path.empty()) {
         return parsed;
     }
+    parsed.raw_target = parsed.path;
     // Strip query string from path so route exact-matches work
     const auto qmark = parsed.path.find('?');
     if (qmark != std::string::npos) {
@@ -704,14 +707,6 @@ std::string make_support_export_result(const nlp3::platform::SupportBundleExport
         "\"exportedAtMs\":" + std::to_string(result.exported_at_ms) + ","
         "\"includedLogs\":" + std::to_string(result.included_logs)
         + "}";
-}
-
-std::string normalize_energy_level(std::string_view raw) {
-    const auto lowered = to_lower_copy(trim_copy(raw));
-    if (lowered == "calm" || lowered == "balanced" || lowered == "hype") {
-        return lowered;
-    }
-    return "balanced";
 }
 
 std::string normalize_tone_style(std::string_view raw) {
@@ -1402,13 +1397,17 @@ std::string handle_host_tts(PanelApp* app, std::string_view body) {
     const auto voice_id = parse_json_string(body, "voiceId");
     const auto voice_language = parse_json_string(body, "voiceLanguage");
     const auto voice_frequency = parse_json_string(body, "voiceFrequency");
-    const auto energy = parse_json_string(body, "energyLevel");
+    // P1.6 + endurecimiento: energyLevel NO se acepta del body libre.
+    // El bug era un "balanced" hardcodeado que pisaba la config; la UI ya no
+    // lo manda y el servidor lo ignora. Cambios de energia solo via action
+    // (boost_hype / calm_mode), no por campo suelto.
     const auto tone = parse_json_string(body, "toneStyle");
     const auto action = to_lower_copy(parse_json_string(body, "action").value_or(""));
     const auto message = parse_json_string(body, "message").value_or("");
     const auto replace_periodic_messages = parse_json_bool(body, "replacePeriodicMessages").value_or(false);
     const auto allow_chat_messages = parse_json_bool(body, "allowChatMessages");
     const auto chat_filter_mode = parse_json_string(body, "chatFilterMode");
+    const auto chat_cooldown_ms = parse_json_uint64(body, "chatCooldownMs");
     const auto chat_template = parse_json_string(body, "chatMessageTemplate");
     const auto gift_template = parse_json_string(body, "giftThanksTemplate");
     const auto follow_template = parse_json_string(body, "followThanksTemplate");
@@ -1429,8 +1428,14 @@ std::string handle_host_tts(PanelApp* app, std::string_view body) {
     if (voice_frequency.has_value()) {
         config.tts_runtime.frequency = *voice_frequency;
     }
-    if (energy.has_value()) {
-        config.host_energy_level = normalize_energy_level(*energy);
+    if (const auto volume = parse_json_uint64(body, "voiceVolume"); volume.has_value()) {
+        // B7: clamp al rango SAPI 0..100.
+        config.tts_runtime.volume = static_cast<std::uint32_t>(
+            volume.value() > 100 ? 100 : volume.value());
+    }
+    if (const auto rate_limit = parse_json_uint64(body, "testRateLimitMs"); rate_limit.has_value()) {
+        // M8: 0 = sin limite de /api/tts/test.
+        config.tts_runtime.test_rate_limit_ms = *rate_limit;
     }
     if (tone.has_value()) {
         config.host_tone_style = normalize_tone_style(*tone);
@@ -1441,8 +1446,15 @@ std::string handle_host_tts(PanelApp* app, std::string_view body) {
     if (chat_filter_mode.has_value()) {
         config.tts.chat_filter_mode = nlp3::tts::parse_tts_chat_filter_mode(*chat_filter_mode);
     }
+    if (chat_cooldown_ms.has_value()) {
+        config.tts.chat_cooldown_ms = *chat_cooldown_ms;
+    }
     if (chat_template.has_value()) {
         config.tts.chat_message_template = *chat_template;
+    }
+    if (const auto include_actor = parse_json_bool(body, "includeActorName"); include_actor.has_value()) {
+        // B3: flag vivo (P2.2) — expuesto para que el UI pueda alternarlo.
+        config.tts.include_actor_name_for_chat = *include_actor;
     }
 
     if (const auto value = parse_json_bool(body, "giftThanksEnabled"); value.has_value()) {
@@ -1486,7 +1498,14 @@ std::string handle_host_tts(PanelApp* app, std::string_view body) {
         config.tts.allow_chat_messages = false;
     }
 
-    sync_host_persona(app, replace_periodic_messages || !action.empty(), !action.empty());
+    // B9: aplicar plantillas del body ANTES de sync_host_persona, o — si el body
+    // trae alguna — pasar replace_*=false para no pisarlas con los defaults de
+    // persona. Hoy body gana porque se aplica despues; hacerlo explicito evita
+    // que un action (boost_hype etc.) sobrescriba plantillas del body.
+    const bool body_brings_templates =
+        gift_template.has_value() || follow_template.has_value() || like_template.has_value()
+        || subscriber_template.has_value() || share_template.has_value();
+    const bool body_brings_periodic = periodic_messages.has_value();
 
     if (gift_template.has_value()) {
         config.automation.gift_thanks_template = *gift_template;
@@ -1506,6 +1525,11 @@ std::string handle_host_tts(PanelApp* app, std::string_view body) {
     if (periodic_messages.has_value()) {
         config.periodic_tts.messages = *periodic_messages;
     }
+
+    sync_host_persona(
+        app,
+        (replace_periodic_messages || !action.empty()) && !body_brings_periodic,
+        (!action.empty()) && !body_brings_templates);
 
     const auto applied = app->apply_live_config();
     const auto saved = applied && app->save_config();
@@ -1937,6 +1961,10 @@ std::string build_route_response(
             nlp3::platform::build_panel_http_realtime_json(*app));
     }
     if (request.method == "GET" && request.path == "/api/tts/config") {
+        // P2.3/M7: ?refresh=1 re-escanea el catalogo de voces del sistema.
+        if (request.raw_target.find("refresh=1") != std::string::npos) {
+            app->refresh_tts_voice_catalog();
+        }
         return make_http_response(
             "200 OK",
             "application/json; charset=utf-8",
@@ -2114,6 +2142,21 @@ std::string build_route_response(
         return make_http_response("200 OK", "application/json; charset=utf-8", handle_host_tts(app, request.body));
     }
     if (request.method == "POST" && request.path == "/api/tts/test") {
+        // M8: rate-limit de ventana fija configurable via tts_runtime.
+        // test_rate_limit_ms (default 1000; 0 = sin limite). Estado en
+        // PanelApp (no static de proceso); se resetea en apply_live_config.
+        if (app != nullptr) {
+            const auto now_ms = static_cast<std::int64_t>(
+                std::chrono::duration_cast<std::chrono::milliseconds>(
+                    std::chrono::system_clock::now().time_since_epoch())
+                    .count());
+            if (!app->try_acquire_tts_test_slot(now_ms)) {
+                return make_http_response(
+                    "429 Too Many Requests",
+                    "application/json; charset=utf-8",
+                    nlp3::platform::build_panel_http_error_json("tts_test_rate_limited"));
+            }
+        }
         return make_http_response("200 OK", "application/json; charset=utf-8", handle_tts_test(app, request.body));
     }
     if (request.method == "POST" && request.path == "/api/system/reconnect") {

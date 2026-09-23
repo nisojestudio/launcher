@@ -263,6 +263,8 @@ int main() {
     if (!require(html.find("activity-gift-menu") != std::string::npos, "html gift picker")) return 1;
     if (!require(html.find("voice-notices-list") != std::string::npos, "html voice notices list")) return 1;
     if (!require(html.find("voice-save-button") != std::string::npos, "html voice save button")) return 1;
+    if (!require(html.find("voice-volume") != std::string::npos, "html voice volume control")) return 1;
+    if (!require(html.find("voice-include-actor") != std::string::npos, "html voice include actor control")) return 1;
     if (!require(html.find("voice-read-likes") != std::string::npos, "html voice likes bridge")) return 1;
     if (!require(html.find("auth-form-body") != std::string::npos, "html auth form body")) return 1;
     if (!require(html.find("auth-field-wide") != std::string::npos, "html auth wide field")) return 1;
@@ -470,11 +472,23 @@ int main() {
         kPort,
         make_post_request(
             "/api/host/tts",
-            "{\"energyLevel\":\"hype\",\"toneStyle\":\"electric\",\"giftThanksEnabled\":true,"
+            // Endurecimiento P1.6+: energyLevel en el body se ignora;
+            // la energia solo cambia via action (boost_hype -> hype).
+            "{\"energyLevel\":\"hype\",\"action\":\"boost_hype\",\"toneStyle\":\"electric\","
+            "\"giftThanksEnabled\":true,"
             "\"followThanksEnabled\":true,\"periodicEnabled\":true,\"periodicIntervalMs\":1500,"
             "\"message\":\"Hola desde la UI\"}"));
     if (!require(host_tts.find("\"ok\":true") != std::string::npos, "host tts ok")) return 1;
     if (!require(host_tts.find("\"spoke\":true") != std::string::npos, "host tts spoke")) return 1;
+
+    // energyLevel suelto en el body NO debe pisar la energia ya puesta por action.
+    const auto energy_ignored = issue_request(
+        panel_app,
+        kPort,
+        make_post_request(
+            "/api/host/tts",
+            "{\"energyLevel\":\"calm\"}"));
+    if (!require(energy_ignored.find("\"ok\":true") != std::string::npos, "host tts energy ignore ok")) return 1;
 
     const auto tts_config_update = issue_request(
         panel_app,
@@ -487,6 +501,10 @@ int main() {
             "\"voiceFrequency\":\"high\","
             "\"allowChatMessages\":true,"
             "\"chatFilterMode\":\"subscribers_only\","
+            "\"chatCooldownMs\":1200,"
+            "\"voiceVolume\":55,"
+            "\"includeActorName\":false,"
+            "\"testRateLimitMs\":5000,"
             "\"chatMessageTemplate\":\"Hello {user}: {message}\","
             "\"giftThanksEnabled\":true,"
             "\"followThanksEnabled\":true,"
@@ -505,6 +523,10 @@ int main() {
     if (!require(tts_after.find("\"voiceLanguage\":\"en\"") != std::string::npos, "tts language updated")) return 1;
     if (!require(tts_after.find("\"voiceFrequency\":\"high\"") != std::string::npos, "tts frequency updated")) return 1;
     if (!require(tts_after.find("\"chatFilterMode\":\"subscribers_only\"") != std::string::npos, "tts chat filter updated")) return 1;
+    if (!require(tts_after.find("\"chatCooldownMs\":1200") != std::string::npos, "tts chat cooldown updated")) return 1;
+    if (!require(tts_after.find("\"voiceVolume\":55") != std::string::npos, "tts volume updated")) return 1;
+    if (!require(tts_after.find("\"includeActorName\":false") != std::string::npos, "tts include actor updated")) return 1;
+    if (!require(tts_after.find("\"testRateLimitMs\":5000") != std::string::npos, "tts rate limit updated")) return 1;
     if (!require(tts_after.find("\"chatMessageTemplate\":\"Hello {user}: {message}\"") != std::string::npos, "tts chat template updated")) return 1;
     if (!require(tts_after.find("\"likeThanksEnabled\":true") != std::string::npos, "tts like enabled updated")) return 1;
     if (!require(tts_after.find("\"likeThanksTemplate\":\"Thanks {user} for {count} likes\"") != std::string::npos, "tts like template updated")) return 1;
@@ -518,8 +540,53 @@ int main() {
     if (!require(tts_test.find("\"ok\":true") != std::string::npos, "tts test ok")) return 1;
     if (!require(tts_test.find("tts_announcement_enqueued") != std::string::npos, "tts test enqueued")) return 1;
 
+    // M8: segundo POST inmediato dentro de la ventana (5 s) -> 429.
+    // (50/500 ms eran demasiado ajustados: el round-trip real del test client
+    // con tick/sleep llega a ~580 ms entre acquires y se salía de la ventana.)
+    const auto tts_test_limited = issue_request(
+        panel_app,
+        kPort,
+        make_post_request("/api/tts/test", "{\"message\":\"Spam\"}"));
+    if (!require(
+            tts_test_limited.find("HTTP/1.1 429 Too Many Requests") != std::string::npos,
+            "tts test rate limited")) {
+        return 1;
+    }
+    if (!require(
+            tts_test_limited.find("tts_test_rate_limited") != std::string::npos,
+            "tts test rate limited code")) {
+        return 1;
+    }
+
+    // M8: ventana configurable — 0 desactiva el limite; el siguiente POST pasa.
+    const auto rate_off = issue_request(
+        panel_app,
+        kPort,
+        make_post_request("/api/tts/config", "{\"testRateLimitMs\":0}"));
+    if (!require(rate_off.find("\"ok\":true") != std::string::npos, "rate limit disable ok")) return 1;
+    const auto tts_test_unlimited = issue_request(
+        panel_app,
+        kPort,
+        make_post_request("/api/tts/test", "{\"message\":\"After disable\"}"));
+    if (!require(
+            tts_test_unlimited.find("\"ok\":true") != std::string::npos,
+            "tts test after rate disable")) {
+        return 1;
+    }
+
+    // P2.3/M7: GET con ?refresh=1 re-escanea el catalogo y sigue respondiendo 200.
+    const auto tts_refresh = issue_request(
+        panel_app,
+        kPort,
+        make_get_request("/api/tts/config?refresh=1"));
+    if (!require(tts_refresh.find("HTTP/1.1 200 OK") != std::string::npos, "tts refresh status")) return 1;
+    if (!require(tts_refresh.find("\"voiceCatalog\"") != std::string::npos, "tts refresh catalog")) return 1;
+    if (!require(tts_refresh.find("\"voiceVolume\":55") != std::string::npos, "tts refresh keeps volume")) return 1;
+    if (!require(tts_refresh.find("\"includeActorName\":false") != std::string::npos, "tts refresh keeps actor flag")) return 1;
+    if (!require(tts_refresh.find("\"testRateLimitMs\":0") != std::string::npos, "tts refresh keeps rate limit")) return 1;
+
     const auto state_after_host = issue_request(panel_app, kPort, make_get_request("/api/state"));
-    if (!require(state_after_host.find("\"energyLevel\":\"hype\"") != std::string::npos, "host energy updated")) return 1;
+    if (!require(state_after_host.find("\"energyLevel\":\"hype\"") != std::string::npos, "host energy via action")) return 1;
     if (!require(state_after_host.find("\"toneStyle\":\"electric\"") != std::string::npos, "host tone updated")) return 1;
     if (!require(state_after_host.find("\"queuedMessages\":") != std::string::npos, "tts queue visible")) return 1;
 

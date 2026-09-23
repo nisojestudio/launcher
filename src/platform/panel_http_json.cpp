@@ -506,11 +506,18 @@ std::string host_controls_json(const nlp3::platform::PanelApp& app) {
            << "\"voiceId\":" << quote(tts_runtime.selected_voice_id) << ","
            << "\"voiceLanguage\":" << quote(tts_runtime.selected_language) << ","
            << "\"voiceFrequency\":" << quote(tts_runtime.frequency) << ","
+           // B7: volumen SAPI 0..100 para el slider del panel de voz.
+           << "\"voiceVolume\":" << tts_runtime.volume << ","
+           // M8: ventana configurable del rate-limit de POST /api/tts/test.
+           << "\"testRateLimitMs\":" << tts_runtime.test_rate_limit_ms << ","
            << "\"energyLevel\":" << quote(config.host_energy_level) << ","
            << "\"toneStyle\":" << quote(config.host_tone_style) << ","
            << "\"allowChatMessages\":" << bool_json(config.tts.allow_chat_messages) << ","
            << "\"chatFilterMode\":" << quote(std::string(nlp3::tts::to_string(config.tts.chat_filter_mode))) << ","
+           << "\"chatCooldownMs\":" << config.tts.chat_cooldown_ms << ","
            << "\"chatMessageTemplate\":" << quote(config.tts.chat_message_template) << ","
+           // B3: flag vivo — con P2.2 controla si {user} se rellena en la plantilla.
+           << "\"includeActorName\":" << bool_json(config.tts.include_actor_name_for_chat) << ","
            << "\"giftThanksEnabled\":" << bool_json(automation.enable_gift_thanks_tts) << ","
            << "\"followThanksEnabled\":" << bool_json(automation.enable_follow_thanks_tts) << ","
            << "\"likeThanksEnabled\":" << bool_json(automation.enable_like_thanks_tts) << ","

@@ -1080,6 +1080,21 @@ El detalle: sólo se muestra cuando el usuario pulsa Avanzado.
                   <option value="moderators_only">Solo moderadores</option>
                 </select>
               </label>
+
+              <label class="field compact-field" id="chat-cooldown-row-visible">
+                <span>Enfriamiento chat (ms)</span>
+                <input id="voice-chat-cooldown" type="number" min="0" step="100" value="0">
+              </label>
+
+              <label class="field compact-field" id="voice-volume-row">
+                <span>Volumen <output id="voice-volume-value">100</output>%</span>
+                <input id="voice-volume" type="range" min="0" max="100" step="1" value="100">
+              </label>
+
+              <label class="option-chip option-chip-wide" id="include-actor-row">
+                <input id="voice-include-actor" type="checkbox" checked>
+                <span>Incluir nombre de quien habla</span>
+              </label>
             </div>
 
             <section class="notice-builder" aria-labelledby="voice-notices-title">

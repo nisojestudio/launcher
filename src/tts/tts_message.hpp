@@ -40,6 +40,10 @@ struct TtsMessage {
     std::string actor_name;
     std::string source;
     std::int64_t created_at_ms = 0;
+    // Marca de cuando entro en la cola del scheduler; base del TTL (no confundir
+    // con created_at_ms, que es el tiempo del evento origen y puede ser antiguo
+    // en replay). Se rellena en TtsScheduler::submit si viene a 0.
+    std::int64_t enqueued_at_ms = 0;
 };
 
 constexpr std::string_view to_string(TtsTrigger trigger) noexcept {

@@ -14,6 +14,8 @@
 
 #include <algorithm>
 #include <cctype>
+#include <chrono>
+#include <limits>
 #include <string_view>
 #include <utility>
 
@@ -395,6 +397,10 @@ RealTtsBackend::~RealTtsBackend() {
     if (worker_.joinable()) {
         worker_.join();
     }
+    // B7/drenaje honesto: al morir, vaciar la cola pendiente sin hablarla
+    // (el worker ya termino; no hay voz activa que "cortar" a medias).
+    std::scoped_lock lock{mutex_};
+    queue_.clear();
 }
 
 std::string_view RealTtsBackend::backend_name() const noexcept {
@@ -410,9 +416,21 @@ void RealTtsBackend::apply_config(const TtsConfig& config) {
     config_ = config;
 }
 
+
 std::vector<TtsVoiceDescriptor> RealTtsBackend::voice_catalog() const {
     std::scoped_lock lock{mutex_};
     return voice_catalog_;
+}
+
+void RealTtsBackend::refresh_voice_catalog() {
+    auto fresh = build_runtime_voice_catalog();
+    const auto has_available = std::any_of(
+        fresh.begin(),
+        fresh.end(),
+        [](const TtsVoiceDescriptor& voice) { return voice.available; });
+    std::scoped_lock lock{mutex_};
+    voice_catalog_ = std::move(fresh);
+    available_.store(has_available);
 }
 
 bool RealTtsBackend::speak(const TtsMessage& message) {
@@ -426,11 +444,44 @@ bool RealTtsBackend::speak(const TtsMessage& message) {
     }
 
     if (config_.backend_queue_size > 0 && queue_.size() >= config_.backend_queue_size) {
-        if (!config_.drop_oldest_on_overflow
-            && static_cast<int>(message.priority) <= static_cast<int>(queue_.back().priority)) {
+        int lowest_priority = std::numeric_limits<int>::max();
+        for (const auto& existing : queue_) {
+            lowest_priority = std::min(
+                lowest_priority,
+                static_cast<int>(existing.priority));
+        }
+        const auto incoming_priority = static_cast<int>(message.priority);
+
+        if (!config_.drop_oldest_on_overflow && incoming_priority <= lowest_priority) {
             return false;
         }
-        queue_.pop_back();
+
+        // D3: evacuar el más antiguo (drop_oldest) o el más antiguo de la mínima
+        // prioridad (preempa), no simplemente queue_.back().
+        std::size_t best = 0;
+        bool found = false;
+        for (std::size_t index = 0; index < queue_.size(); ++index) {
+            if (!config_.drop_oldest_on_overflow
+                && static_cast<int>(queue_[index].priority) != lowest_priority) {
+                continue;
+            }
+            if (!found) {
+                best = index;
+                found = true;
+                continue;
+            }
+            const auto age = queue_[index].enqueued_at_ms > 0
+                ? queue_[index].enqueued_at_ms
+                : queue_[index].created_at_ms;
+            const auto best_age = queue_[best].enqueued_at_ms > 0
+                ? queue_[best].enqueued_at_ms
+                : queue_[best].created_at_ms;
+            if (age > 0 && best_age > 0 && age < best_age) {
+                best = index;
+            }
+        }
+        queue_.erase(
+            queue_.begin() + static_cast<std::ptrdiff_t>(best));
     }
 
     const auto insert_at = std::find_if(
@@ -485,7 +536,22 @@ void RealTtsBackend::worker_main() {
             backend_voice_id = resolve_backend_voice_id(local_config, voice_catalog_);
         }
 
+        // TTL tambien en el worker: un mensaje que espero mucho en la cola del
+        // backend no debe sonar tarde (auditoria A2).
+        const auto now_ms = static_cast<std::int64_t>(
+            std::chrono::duration_cast<std::chrono::milliseconds>(
+                std::chrono::system_clock::now().time_since_epoch())
+                .count());
+        if (tts_message_expired(local_config.max_message_age_ms, next.enqueued_at_ms, now_ms)) {
+            continue;
+        }
+
         voice->SetRate(sapi_rate_for_frequency(local_config.frequency));
+        // B7: volumen configurable 0..100 (SAPI USHORT).
+        {
+            const auto vol = local_config.volume > 100 ? 100u : local_config.volume;
+            voice->SetVolume(static_cast<USHORT>(vol));
+        }
 
         if (!backend_voice_id.empty()) {
             const auto token = create_token_from_id(backend_voice_id);
@@ -513,6 +579,7 @@ std::string_view RealTtsBackend::backend_name() const noexcept { return "real-tt
 bool RealTtsBackend::available() const noexcept { return false; }
 void RealTtsBackend::apply_config(const TtsConfig&) {}
 std::vector<TtsVoiceDescriptor> RealTtsBackend::voice_catalog() const { return build_curated_voice_catalog(); }
+void RealTtsBackend::refresh_voice_catalog() {}
 bool RealTtsBackend::speak(const TtsMessage&) { return false; }
 std::size_t RealTtsBackend::queued_message_count() const noexcept { return 0; }
 void RealTtsBackend::clear_pending() noexcept {}

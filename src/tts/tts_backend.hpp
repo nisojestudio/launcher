@@ -18,6 +18,9 @@ public:
     virtual bool available() const noexcept = 0;
     virtual void apply_config(const TtsConfig& config) = 0;
     virtual std::vector<TtsVoiceDescriptor> voice_catalog() const = 0;
+    // P2.3/M7: re-escanear voces del sistema bajo demanda (POST/GET con
+    // refresh). Default no-op para mocks y NullTtsBackend.
+    virtual void refresh_voice_catalog() {}
     virtual bool speak(const TtsMessage& message) = 0;
     virtual std::size_t queued_message_count() const noexcept = 0;
     virtual void clear_pending() noexcept = 0;

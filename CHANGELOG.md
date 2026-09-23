@@ -4,6 +4,58 @@ All notable Panel Live changes should be recorded here.
 
 Format follows a lightweight Keep a Changelog style. Versions use SemVer.
 
+## Unreleased
+
+### Fixed — Auditoría voz post-P3 (lote 1)
+
+- **Volumen 0 en UI**: `composeVoicePayload` y `renderVoice` usaban `|| 100`, que convertía un volumen real de `0` (mute) en `100`. Nuevo `normalizeVoiceVolume` preserva `0..100` y solo cae a `100` si el valor no es numérico.
+- **Cooldown de automation con wall clock (M2-clase)**: `HostAutomationEngine::allow_with_cooldown` ya no usa `source_timestamp_ms`. Con `ts=0` el cooldown no acumulaba y los agradecimientos de regalo/follow/like/share/sub se disparaban sin límite. Ahora usa el reloj de recepción, igual que `enqueue_chat_read`.
+- **Rate-limit de `POST /api/tts/test` por instancia**: el `static last_tts_test_ms` del proceso pasó a `PanelApp::try_acquire_tts_test_slot` + `tts_test_last_ms_`; se resetea en `apply_live_config` al cambiar la ventana.
+- Tests: cooldowns de automation con `timestamp=0` + sleep fuera de ventana; migraciones TTS en `panel_app_smoke` (`min_text_length 3→1`, `chat_cooldown_ms 2500→0`, colas `16/32→50/20`, overrides explícitos intactos).
+
+### Fixed — Auditoría voz post-P3 (lote 3)
+
+- **`apply_live_config` ya no purga la cola TTS ni resetea el periódico (#3)**: antes llamaba `clear_pending_tts()` en cada guardado de config de voz, lo que vaciaba mensajes pendientes y anulaba la lógica de `apply_periodic_tts_config` (reset solo al re-habilitar o cambiar el intervalo). El purge explícito sigue disponible vía `clear_pending_live_backlog` (desconexiones/reconnects). Test de regresión en `panel_app_smoke`: cola manual + periódico armado sobreviven a un guardado inocuo (solo volumen).
+
+### Fixed — Auditoría TTS fase P0 (A1, A2 / D2, D4)
+
+- **A1 · Fallo de `speak()` no pierde mensajes**: `TtsScheduler::dispatch_pending` ya no vacía la cola si el backend falla; re-encola la mensaje al frente (`TtsQueue::push_front`) y detiene el intento del tick.
+- **A2 · TTL de mensajes encolados**: nuevo `tts_runtime.max_message_age_ms` (default `30000`, `0` = off). El scheduler descarta mensajes caducos antes de hablarlos y `RealTtsBackend` también lo comprueba en su worker. La edad se mide con `enqueued_at_ms` (rellenado en `submit`), no con `created_at_ms`, para no romper replay/fixtures.
+- **D4 · Topes de cola**: defaults `max_queue_size = 50` y `backend_queue_size = 20` (`0` sigue = ilimitado). `panel_config.json` actualizado. Migración de producto: stock antiguo `16/32` → `50/20` (antes → `0`).
+- Tests: fallo de speak (no-loss + fallo permanente), TTL on/off, top de cola, roundtrip de `max_message_age_ms` en storage.
+
+### Changed — Auditoría TTS fase P1 (D1, D3, cooldown)
+
+- **D1 · UI de audio de avisos retirada**: el tipo "Audio" y el upload de archivos no se reproducían en el backend (solo vivían en localStorage). Los avisos legacy `contentType=audio` se migran a texto al sanitizar. Se elimina la subida, el CSS asociado y el resumen de "audios".
+- **D3 · Semántica de overflow corregida**: `drop_oldest_on_overflow=true` ahora evacúa el mensaje **más antiguo** (`enqueued_at_ms`/`created_at_ms`), no `back()` (que era la prioridad más baja/última). Con `false`, la preempa por prioridad sigue rechazando iguales o menores y evacúa al más antiguo de la mínima prioridad. Igual en la cola interna de `RealTtsBackend`.
+- **Cooldown de chat expuesto**: `chatCooldownMs` en `GET/POST /api/tts/config` y `/api/host/tts`, con control visible en el panel (ms) junto al scope de lectura de chat.
+- Tests: overflow drop-oldest, preempa por prioridad, rechazo de prioridad no mayor, roundtrip HTTP de `chatCooldownMs`.
+
+### Fixed — Auditoría TTS fase P1 restante (M1, M2, M3 / P2.1–P2.2)
+
+- **M1 · Truncado UTF-8 seguro**: `sanitize_message` corta `text` y `content_text` con retroceso sobre bytes de continuación (no `resize()` crudo). Evita secuencias UTF-8 partidas en el límite de `max_text_length`.
+- **M2 · Cooldown de chat con reloj de recepción**: `enqueue_chat_read` usa el wall clock al encolar, no `source_timestamp_ms`. Eventos con `timestamp=0` o atrasados ya no se saltan el cooldown.
+- **M3 · `energyLevel` fijo retirado del payload de UI**: `composeVoicePayload` ya no envía `energyLevel: "balanced"`; el servidor **ignora** `energyLevel` en el body libre — la energía solo cambia via `action` (`boost_hype` / `calm_mode`), para que un valor hardcodeado no pueda pisar el modo.
+- **P2.1 · Periódico epoch-safe**: `HostPeriodicTtsEngine` arma `started_at_ms_` en el primer tick y no emite hasta que `elapsed >= interval_ms` (antes `now_ms >= interval` emitía al instante con reloj epoch). `apply_periodic_tts_config` solo hace `reset()` al re-habilitar o cambiar el intervalo (no en cada apply).
+- **P2.2 · Plantilla `{user}` siempre**: la plantilla de chat se aplica siempre; con `include_actor_name_for_chat=false`, `{user}` se rellena vacío y el sanitize colapsa espacios (`"Dice {user}: {message}"` → `"Dice: hola"`).
+- Tests: M1 (UTF-8 en límite), M2 (cooldown wall clock + `timestamp=0`), anuncio vacío/emoji, cooldowns gift/follow/share, periódico epoch-like (arm → emit → no doble).
+
+### Added — Auditoría TTS fase P2–P3 (M7, B4, B7–B10, M8)
+
+- **M7 · `refresh_voice_catalog`**: `GET /api/tts/config?refresh=1` re-escanea las voces SAPI bajo demanda (`ITtsBackend::refresh_voice_catalog`, implementado en `RealTtsBackend`).
+- **B4 · Test real backend no audible por defecto**: `tts_real_backend_test` encola y limpia sin `Speak` audible; opt-in con `NLP3_TTS_AUDIBLE_TESTS=1`.
+- **B7 · Volumen SAPI**: `tts_runtime.volume` (0–100, default 100) aplicado con `ISpVoice::SetVolume`; persistido en storage; drenaje honesto de la cola al destruir el backend; slider `Volumen` en el panel de voz (`voice-volume` + `voiceVolume` en el payload).
+- **B8 · `noexcept` removido** de ctors `TtsScheduler`/`HostTtsService` (podían lanzar desde `apply_config`).
+- **B10 · Invariant single-thread documentado** en `tts_scheduler.hpp` y `tts_service.hpp`.
+- **M8 · Rate-limit de `POST /api/tts/test`**: ventana configurable vía `tts_runtime.test_rate_limit_ms` (default 1000 ms; `0` = sin límite); 429 si se spamea; test HTTP que verifica el 429, el apagado con `0` y `?refresh=1`.
+- **B9 · Orden de plantillas del body**: se aplican antes de `sync_host_persona` y se pasa `replace_*=false` cuando el body trae plantillas/mensajes periódicos, para no pisarlos con defaults de persona.
+
+### Changed — Docs / limpieza (B1, B3, B6)
+
+- **B1 · `NullTtsBackend` documentado como huérfano**: sin uso en runtime; se mantiene en el build solo para no forzar re-configure de CMake (AGENTS §5.5). No exponer en el UI.
+- **B3 · `include_actor_name_for_chat` es un flag vivo**: con P2.2 controla si `{user}` se rellena; documentado en `README_tts.md` (ya no es "legacy ignored"); expuesto en GET/POST y con checkbox en el UI (`voice-include-actor`).
+- **B6 · `source_event_type` documentado** en `README_tts.md` como parte del contrato de eventos external/bridge.
+
 ## 0.3.4 - 2026-09-22
 
 ### Added — R1, R2, R4, R5 (catálogo definitivo aplicado)

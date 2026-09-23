@@ -15,7 +15,6 @@
   const VOICE_NOTICES_STORAGE_KEY = "nlp3-custom-voice-notices-v1";
   const FIREBASE_API_KEY = "AIzaSyBWRMoHbPNkOw0zvflcPb_dv9G1Bgg1uLc";
   let _timerOverlayUrl = "";
-  const AUDIO_NOTICE_MAX_BYTES = 1572864;
 
   function formatCompactNumber(n) {
     const s = Math.abs(n).toString();
@@ -59,9 +58,9 @@
     { value: "subscription", label: "Suscripci\u00f3n" },
     { value: "timer", label: "Temporizado" },
   ];
+  // D1: la UI de audio de avisos se retiro; el backend no reproducia contentType=audio.
   const NOTICE_CONTENT_TYPES = [
     { value: "text", label: "Mensaje" },
-    { value: "audio", label: "Audio" },
   ];
   const COMMUNITY_ACTIVITY_LABELS = new Set([
     "chat_message",
@@ -256,6 +255,10 @@
     voiceReadChatVisible: $("#voice-read-chat-visible"),
     chatReadingRowVisible: $("#chat-reading-row-visible"),
     chatReadingScopeVisible: $("#chat-reading-scope-visible"),
+    voiceChatCooldown: $("#voice-chat-cooldown"),
+    voiceVolume: $("#voice-volume"),
+    voiceVolumeValue: $("#voice-volume-value"),
+    voiceIncludeActor: $("#voice-include-actor"),
     voiceReadGifts: $("#voice-read-gifts"),
     voiceReadFollows: $("#voice-read-follows"),
     voiceReadLikes: $("#voice-read-likes"),
@@ -637,9 +640,10 @@
 
   function sanitizeVoiceNotice(raw, index = 0) {
     const allowedTriggers = new Set(NOTICE_TRIGGERS.map((item) => item.value));
-    const allowedContentTypes = new Set(NOTICE_CONTENT_TYPES.map((item) => item.value));
     const trigger = allowedTriggers.has(raw?.trigger) ? raw.trigger : "gift";
-    const contentType = allowedContentTypes.has(raw?.contentType) ? raw.contentType : "text";
+    // D1: contentType=audio ya no existe en la UI; se migra a texto (el backend
+    // nunca reproducia el audio adjunto).
+    const contentType = "text";
     const seconds = Math.max(5, Number.parseInt(raw?.seconds, 10) || 30);
 
     return {
@@ -649,9 +653,6 @@
       message: normalizeLegacyNoticeMessage(trigger, raw?.message || ""),
       seconds,
       enabled: raw?.enabled !== false,
-      audioName: String(raw?.audioName || ""),
-      audioMimeType: String(raw?.audioMimeType || ""),
-      audioDataUrl: typeof raw?.audioDataUrl === "string" ? raw.audioDataUrl : "",
     };
   }
 
@@ -1341,7 +1342,8 @@
   }
 
   function noticeTypeLabel(notice) {
-    return notice?.contentType === "audio" ? "Audio" : "Mensaje";
+    void notice;
+    return "Mensaje";
   }
 
   function noticeSubtitle(notice) {
@@ -1351,9 +1353,7 @@
     if (notice.trigger === "timer") {
       return `Se reproduce cada ${notice.seconds}s`;
     }
-    return notice.contentType === "audio"
-      ? "Audio personalizado"
-      : "Mensaje personalizado";
+    return "Mensaje personalizado";
   }
 
   function textNoticeCount() {
@@ -1367,7 +1367,6 @@
   function updateTemplateSummary() {
     const count = state.voiceNotices.length;
     const enabledCount = state.voiceNotices.filter((n) => n.enabled !== false).length;
-    const audioCount = state.voiceNotices.filter((notice) => notice.contentType === "audio").length;
     const periodicCount = timerNoticeCount();
     if (!els.templateSummaryText) {
       return;
@@ -1379,9 +1378,6 @@
     const fragments = [`${count} ${count === 1 ? "mensaje" : "mensajes"}`];
     if (enabledCount !== count) {
       fragments.push(`${enabledCount} activos`);
-    }
-    if (audioCount) {
-      fragments.push(`${audioCount} ${audioCount === 1 ? "audio" : "audios"}`);
     }
     if (periodicCount) {
       fragments.push(`${periodicCount} temporizados`);
@@ -1591,14 +1587,9 @@
 
     els.voiceNoticesList.innerHTML = state.voiceNotices.map((notice, index) => {
       const isTimer = notice.trigger === "timer";
-      const isAudio = notice.contentType === "audio";
-      const audioLabel = notice.audioName || "Sin archivo seleccionado";
       const isOpen = state.noticeAccordionOpenIds.has(notice.id);
       const triggerOptions = NOTICE_TRIGGERS.map((item) => (
         `<option value="${escapeHtml(item.value)}"${item.value === notice.trigger ? " selected" : ""}>${escapeHtml(item.label)}</option>`
-      )).join("");
-      const contentOptions = NOTICE_CONTENT_TYPES.map((item) => (
-        `<option value="${escapeHtml(item.value)}"${item.value === notice.contentType ? " selected" : ""}>${escapeHtml(item.label)}</option>`
       )).join("");
 
       const isEnabled = notice.enabled !== false;
@@ -1630,10 +1621,6 @@
                 `<span>Disparador</span>` +
                 `<select data-notice-field="trigger">${triggerOptions}</select>` +
               `</label>` +
-              `<label class="field">` +
-                `<span>Tipo</span>` +
-                `<select data-notice-field="contentType">${contentOptions}</select>` +
-              `</label>` +
               `${isTimer ? (
                 `<label class="field">` +
                   `<span>Tiempo (seg)</span>` +
@@ -1641,23 +1628,10 @@
                 `</label>`
               ) : ""}` +
             `</div>` +
-            `${isAudio ? (
-              `<div class="notice-audio-shell">` +
-                `<div class="notice-audio-row">` +
-                  `<input class="notice-audio-name" type="text" value="${escapeHtml(audioLabel)}" readonly>` +
-                  `<label class="secondary-button notice-file-button" type="button">` +
-                    `Subir audio` +
-                    `<input data-notice-audio="${index}" type="file" accept=".mp3,.m4a,.ogg,.aac,.wav,audio/mpeg,audio/mp4,audio/ogg,audio/aac,audio/wav">` +
-                  `</label>` +
-                `</div>` +
-                `<span class="status-label">MP3, M4A, OGG, AAC o WAV ligero.</span>` +
-              `</div>`
-            ) : (
-              `<label class="field">` +
-                `<span>Mensaje</span>` +
-                `<textarea class="notice-textarea" data-notice-field="message" rows="3" placeholder="Escribe el mensaje de este aviso.">${escapeHtml(notice.message)}</textarea>` +
-              `</label>`
-            )}` +
+            `<label class="field">` +
+              `<span>Mensaje</span>` +
+              `<textarea class="notice-textarea" data-notice-field="message" rows="3" placeholder="Escribe el mensaje de este aviso.">${escapeHtml(notice.message)}</textarea>` +
+            `</label>` +
           `</div>` +
         `</details>`
       );
@@ -1894,7 +1868,8 @@
     } else if (field === "trigger") {
       notice.trigger = NOTICE_TRIGGERS.some((item) => item.value === value) ? value : "gift";
     } else if (field === "contentType") {
-      notice.contentType = NOTICE_CONTENT_TYPES.some((item) => item.value === value) ? value : "text";
+      // D1: solo existe texto; cualquier valor legacy se normaliza.
+      notice.contentType = "text";
     } else if (field === "message") {
       notice.message = String(value || "");
     } else if (field === "enabled") {
@@ -1903,32 +1878,11 @@
     touchVoiceNoticeState(options);
   }
 
-  async function attachVoiceNoticeAudio(index, file) {
-    if (!file) {
-      return;
-    }
-    if (file.size > AUDIO_NOTICE_MAX_BYTES) {
-      appendLog("El audio del aviso supera el l\u00edmite ligero de 1.5 MB. Usa un MP3 u OGG m\u00e1s liviano.");
-      return;
-    }
-
-    const notice = state.voiceNotices[index];
-    if (!notice) {
-      return;
-    }
-
-    const dataUrl = await new Promise((resolve, reject) => {
-      const reader = new FileReader();
-      reader.onload = () => resolve(typeof reader.result === "string" ? reader.result : "");
-      reader.onerror = () => reject(new Error("No se pudo leer el archivo de audio."));
-      reader.readAsDataURL(file);
-    });
-
-    notice.contentType = "audio";
-    notice.audioName = file.name;
-    notice.audioMimeType = file.type || "";
-    notice.audioDataUrl = dataUrl;
-    touchVoiceNoticeState();
+  // B7/#1: 0 es un volumen valido (mute). No usar `|| 100` — coeria 0 a 100.
+  function normalizeVoiceVolume(value) {
+    const parsed = Number.parseInt(value, 10);
+    if (!Number.isFinite(parsed)) return 100;
+    return Math.min(100, Math.max(0, parsed));
   }
 
   function composeVoicePayload(extra = {}) {
@@ -1942,10 +1896,18 @@
       voiceId: els.voiceProfile.value,
       voiceLanguage: els.voiceLanguage.value,
       voiceFrequency: els.voiceFrequency.value,
-      energyLevel: "balanced",
+      // P1.6/M3 + endurecimiento: energyLevel NO se envia — el servidor
+      // ignora energyLevel en el body; la energia solo cambia via action
+      // (boost_hype / calm_mode), asi un "balanced" hardcodeado no puede
+      // pisar la config.
       toneStyle: toneForVoiceProfile(els.voiceProfile.value),
       allowChatMessages: els.voiceEnabled.checked && els.voiceReadChat.checked,
       chatFilterMode: els.chatReadingScope.value,
+      chatCooldownMs: Math.max(0, Number.parseInt(els.voiceChatCooldown?.value, 10) || 0),
+      // B7: volumen SAPI 0..100 (0 = mute real).
+      voiceVolume: normalizeVoiceVolume(els.voiceVolume?.value),
+      // B3: si {user} se rellena o se deja vacío en la plantilla.
+      includeActorName: !!els.voiceIncludeActor?.checked,
       chatMessageTemplate: els.messageChatTemplate.value.trim(),
       giftThanksEnabled: els.voiceEnabled.checked && els.voiceReadGifts.checked,
       followThanksEnabled: els.voiceEnabled.checked && els.voiceReadFollows.checked,
@@ -2313,6 +2275,19 @@
       els.voiceReadChat.checked = !!host.allowChatMessages;
       els.chatReadingScope.value = host.chatFilterMode || state.uiPrefs.chatReadingScope;
       els.chatReadingScopeVisible.value = host.chatFilterMode || state.uiPrefs.chatReadingScope;
+      if (els.voiceChatCooldown) {
+        els.voiceChatCooldown.value = String(host.chatCooldownMs ?? 0);
+      }
+      if (els.voiceVolume) {
+        els.voiceVolume.value = String(normalizeVoiceVolume(host.voiceVolume));
+        if (els.voiceVolumeValue) {
+          els.voiceVolumeValue.value = els.voiceVolume.value;
+          els.voiceVolumeValue.textContent = els.voiceVolume.value;
+        }
+      }
+      if (els.voiceIncludeActor) {
+        els.voiceIncludeActor.checked = host.includeActorName !== false;
+      }
       els.voicePeriodicInterval.value = normalizedPeriodicIntervalValue(host.periodicIntervalMs || 60000);
       els.messageGiftTemplate.value = host.giftThanksTemplate || "";
       els.messageChatTemplate.value = host.chatMessageTemplate || "{message}";
@@ -3276,7 +3251,7 @@
       updateVoiceNoticeField(index, field, target.value, { rerender: false });
     });
 
-    els.voiceNoticesList?.addEventListener("change", async (event) => {
+    els.voiceNoticesList?.addEventListener("change", (event) => {
       const target = event.target;
       const row = target.closest("[data-notice-index]");
       if (!row) {
@@ -3287,14 +3262,6 @@
         return;
       }
       holdUiInteraction(6000);
-      if (target.dataset.noticeAudio !== undefined) {
-        try {
-          await attachVoiceNoticeAudio(index, target.files?.[0] || null);
-        } catch (error) {
-          appendLog(`No se pudo adjuntar el audio del aviso: ${error}`);
-        }
-        return;
-      }
       if (target.dataset.noticeEnabled !== undefined) {
         updateVoiceNoticeField(index, "enabled", target.checked, { rerender: true });
         return;
@@ -3358,6 +3325,9 @@
       els.voiceLanguage,
       els.voiceFrequency,
       els.chatReadingScope,
+      els.voiceChatCooldown,
+      els.voiceVolume,
+      els.voiceIncludeActor,
       els.voicePeriodicInterval,
       els.messageGiftTemplate,
       els.messageChatTemplate,
@@ -3379,6 +3349,13 @@
         updateTemplateSummary();
         renderVoiceSaveState();
       });
+    });
+
+    els.voiceVolume?.addEventListener("input", () => {
+      if (els.voiceVolumeValue) {
+        els.voiceVolumeValue.value = els.voiceVolume.value;
+        els.voiceVolumeValue.textContent = els.voiceVolume.value;
+      }
     });
 
     els.voiceProfile?.addEventListener("change", () => {
@@ -4940,10 +4917,11 @@
     }
     state.autoLoginAttempted = true;
 
-    // Check if the panel is actually locked.
-    if (!authIsLocked(state.payload)) {
-      return;
-    }
+    // Check if the panel is actually locked. When it is NOT locked (local
+    // mode, auth.required=false) we still want to deliver the saved
+    // license_key to the backend: without it the overlay session cannot be
+    // republished and the timer connection is lost after a restart.
+    const panelLocked = authIsLocked(state.payload);
 
     // Check if we have the minimum saved data to attempt login.
     const savedEmail = String(els.authEmail?.value || "").trim();
@@ -4959,11 +4937,15 @@
     // this session had a prior successful login before restart.
     const persistent = loadPersistentCredentials();
     if (!persistent.email || !persistent.licenseKey) {
-      appendLog("Se requieren credenciales para reingresar autom\u00e1ticamente.");
+      if (panelLocked) {
+        appendLog("Se requieren credenciales para reingresar autom\u00e1ticamente.");
+      }
       return;
     }
 
-    appendLog("Reingresando autom\u00e1ticamente...");
+    appendLog(panelLocked
+      ? "Reingresando autom\u00e1ticamente..."
+      : "Sincronizando credenciales guardadas con el panel...");
     await submitAuthLogin();
   }
 

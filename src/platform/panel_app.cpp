@@ -345,11 +345,13 @@ void apply_product_migrations(nlp3::platform::PanelConfig& config) {
     if (config.tts.chat_cooldown_ms == 2500) {
         config.tts.chat_cooldown_ms = 0;
     }
+    // Old stock limits (16/32) -> new safe defaults from auditoria D4 (50/20).
+    // Explicit 0 (unlimited) remains unlimited for users who chose it.
     if (config.tts_runtime.max_queue_size == 16) {
-        config.tts_runtime.max_queue_size = 0;
+        config.tts_runtime.max_queue_size = 50;
     }
     if (config.tts_runtime.backend_queue_size == 32) {
-        config.tts_runtime.backend_queue_size = 0;
+        config.tts_runtime.backend_queue_size = 20;
     }
 }
 
@@ -1218,7 +1220,11 @@ bool PanelApp::apply_live_config() {
         return false;
     }
 
-    host_runtime_->clear_pending_tts();
+    // #3: NO purgar la cola TTS ni resetear el periódico aquí. Antes se
+    // llamaba clear_pending_tts() en cada guardado, lo que vaciaba mensajes
+    // pendientes y anulaba la lógica de apply_periodic_tts_config (reset
+    // solo al re-habilitar o cambiar el intervalo). clear_pending_live_backlog
+    // sigue disponible para desconexiones/reconnects explícitos.
     host_runtime_->apply_automation_config(config_.automation);
     host_runtime_->apply_periodic_tts_config(config_.periodic_tts);
     host_runtime_->apply_bridge_mapper_config(config_.bridge);
@@ -1226,9 +1232,23 @@ bool PanelApp::apply_live_config() {
         tts_service_->set_config(config_.tts_runtime);
         tts_service_->set_policy(config_.tts);
     }
+    // M8: al re-aplicar config, el rate-limit de /api/tts/test arranca limpio
+    // (antes era un static de proceso que sobrevivia a cambios de ventana).
+    tts_test_last_ms_ = 0;
     if (remote_game_distribution_service_ != nullptr) {
         remote_game_distribution_service_->update_config(config_.auth);
     }
+    return true;
+}
+
+bool PanelApp::try_acquire_tts_test_slot(std::int64_t now_ms) {
+    const auto window_ms = config_.tts_runtime.test_rate_limit_ms;
+    if (window_ms > 0
+        && tts_test_last_ms_ > 0
+        && (now_ms - tts_test_last_ms_) < static_cast<std::int64_t>(window_ms)) {
+        return false;
+    }
+    tts_test_last_ms_ = now_ms;
     return true;
 }
 
@@ -2267,6 +2287,12 @@ tts::TtsConfig PanelApp::host_tts_runtime_config() const {
 
 std::vector<tts::TtsVoiceDescriptor> PanelApp::tts_voice_catalog() const {
     return tts_backend_ != nullptr ? tts_backend_->voice_catalog() : std::vector<tts::TtsVoiceDescriptor>{};
+}
+
+void PanelApp::refresh_tts_voice_catalog() {
+    if (tts_backend_ != nullptr) {
+        tts_backend_->refresh_voice_catalog();
+    }
 }
 
 std::string PanelApp::tts_backend_name() const {

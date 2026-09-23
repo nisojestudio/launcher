@@ -438,17 +438,20 @@ int main() {
     assert(tts_backend.spoken_messages()[1].trigger == nlp3::tts::TtsTrigger::chat_event);
     assert(tts_backend.spoken_messages()[1].text == "Hello host");
 
+    // P2.1: el primer tick solo arma; emite tras `interval` desde el armado.
     assert(!runtime.tick_periodic_tts(500));
     assert(runtime.queued_tts_messages() == 0);
-    assert(runtime.tick_periodic_tts(1000));
+    assert(!runtime.tick_periodic_tts(1000)); // 500ms < intervalo 1000
+    assert(runtime.queued_tts_messages() == 0);
+    assert(runtime.tick_periodic_tts(1500)); // 1000ms desde el armado en 500
     assert(runtime.queued_tts_messages() == 1);
     assert(runtime.flush_tts() == 1);
     assert(runtime.queued_tts_messages() == 0);
     assert(tts_backend.spoken_messages().size() == 3);
     assert(tts_backend.spoken_messages()[2].text == "Mensaje A");
-    assert(!runtime.tick_periodic_tts(1500));
+    assert(!runtime.tick_periodic_tts(2000));
     assert(runtime.queued_tts_messages() == 0);
-    assert(runtime.tick_periodic_tts(2000));
+    assert(runtime.tick_periodic_tts(2500));
     assert(runtime.queued_tts_messages() == 1);
     assert(runtime.flush_tts() == 1);
     assert(runtime.queued_tts_messages() == 0);

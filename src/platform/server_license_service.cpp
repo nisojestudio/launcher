@@ -227,6 +227,16 @@ PanelAuthLoginResult ServerLicenseService::authenticate(const PanelAuthLoginRequ
 
     if (!config_.required) {
         reset_for_current_mode();
+        // Modo local (auth no requerido): el acceso ya esta concedido, pero el
+        // overlay publico necesita una license_key para publicarse en el
+        // Worker (Bearer). Antes el login se descartaba por completo y la key
+        // quedaba vacia para siempre -> "sin license_key" en cada publish y el
+        // temporizador se perdia al reiniciar. Conservamos email/key del
+        // formulario (sin validacion remota en este modo).
+        if (!license_key.empty()) {
+            auth_snapshot_.license_key = license_key;
+            auth_snapshot_.email = email;
+        }
         return make_login_result(true, "auth_not_required", {}, license_snapshot_, auth_snapshot_);
     }
 

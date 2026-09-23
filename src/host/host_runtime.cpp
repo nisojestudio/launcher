@@ -349,8 +349,17 @@ void HostRuntime::apply_automation_config(const HostAutomationConfig& config) {
 }
 
 void HostRuntime::apply_periodic_tts_config(const HostPeriodicTtsConfig& config) {
+    // P2.1: reset solo al re-habilitar o al cambiar el intervalo — no en
+    // cada apply (p.ej. cambiar solo los mensajes no debe reiniciar el timer).
+    const auto was_enabled = periodic_tts_.config().enabled;
+    const auto old_interval = periodic_tts_.config().interval_ms;
     periodic_tts_.set_config(config);
-    periodic_tts_.reset();
+
+    const bool re_enabled = config.enabled && !was_enabled;
+    const bool interval_changed = config.enabled && was_enabled && old_interval != config.interval_ms;
+    if (re_enabled || interval_changed) {
+        periodic_tts_.reset();
+    }
 }
 
 void HostRuntime::apply_bridge_mapper_config(const bridge::TikTokBridgeConfig& config) {

@@ -80,6 +80,92 @@ int main() {
     std::puts("panel_app_smoke cp2");
     std::fflush(stdout);
 
+    // --- Migraciones de producto TTS (auditoria pendiente #7) ---
+    {
+        const auto legacy_path = nlp3::testsupport::write_temp_panel_config(
+            "nlp3_panel_app_tts_migration_config.json",
+            []() {
+                nlp3::platform::PanelConfig config{};
+                config.panel_name = "Panel live 3.0";
+                config.bridge_mode = "stub";
+                config.bridge.stub_mode = true;
+                // Defaults stock antiguos que apply_product_migrations debe upgrade.
+                config.tts.min_text_length = 3;
+                config.tts.chat_cooldown_ms = 2500;
+                config.tts_runtime.max_queue_size = 16;
+                config.tts_runtime.backend_queue_size = 32;
+                return config;
+            }());
+        nlp3::platform::PanelApp legacy_app;
+        NLP3_TEST_REQUIRE(legacy_app.initialize(legacy_path.string()));
+        NLP3_TEST_REQUIRE(legacy_app.config().panel_name == "Nisoje Studio");
+        NLP3_TEST_REQUIRE(legacy_app.config().tts.min_text_length == 1);
+        NLP3_TEST_REQUIRE(legacy_app.config().tts.chat_cooldown_ms == 0);
+        NLP3_TEST_REQUIRE(legacy_app.config().tts_runtime.max_queue_size == 50);
+        NLP3_TEST_REQUIRE(legacy_app.config().tts_runtime.backend_queue_size == 20);
+
+        // Overrides explicitos del usuario NO se pisan (solo los stock exactos).
+        const auto custom_path = nlp3::testsupport::write_temp_panel_config(
+            "nlp3_panel_app_tts_custom_config.json",
+            []() {
+                nlp3::platform::PanelConfig config{};
+                config.bridge_mode = "stub";
+                config.bridge.stub_mode = true;
+                config.tts.min_text_length = 5;
+                config.tts.chat_cooldown_ms = 4000;
+                config.tts_runtime.max_queue_size = 0; // unlimited explicito
+                config.tts_runtime.backend_queue_size = 7;
+                return config;
+            }());
+        nlp3::platform::PanelApp custom_app;
+        NLP3_TEST_REQUIRE(custom_app.initialize(custom_path.string()));
+        NLP3_TEST_REQUIRE(custom_app.config().tts.min_text_length == 5);
+        NLP3_TEST_REQUIRE(custom_app.config().tts.chat_cooldown_ms == 4000);
+        NLP3_TEST_REQUIRE(custom_app.config().tts_runtime.max_queue_size == 0);
+        NLP3_TEST_REQUIRE(custom_app.config().tts_runtime.backend_queue_size == 7);
+
+        std::filesystem::remove(legacy_path);
+        std::filesystem::remove(custom_path);
+    }
+    std::puts("panel_app_smoke cp2b tts migrations");
+    std::fflush(stdout);
+
+    // --- #3: apply_live_config no purga la cola TTS ni resetea el periódico ---
+    {
+        const auto enq = panel_app.execute_command({
+            nlp3::platform::PanelCommandKind::tts_enqueue_announcement,
+            "Mensaje pendiente antes de guardar",
+        });
+        NLP3_TEST_REQUIRE(enq.ok);
+
+        panel_app.config().periodic_tts.enabled = true;
+        panel_app.config().periodic_tts.interval_ms = 1000;
+        panel_app.config().periodic_tts.messages = {"Recordatorio periodico"};
+        NLP3_TEST_REQUIRE(panel_app.apply_live_config());
+
+        // Armar en t=1000; emitir tras el intervalo en t=2000.
+        NLP3_TEST_REQUIRE(!panel_app.tick_periodic_tts(1000));
+        NLP3_TEST_REQUIRE(panel_app.tick_periodic_tts(2000));
+        const auto queued_before_save = panel_app.snapshot().tts.queued_messages;
+        NLP3_TEST_REQUIRE(queued_before_save >= 2); // manual + periodico
+
+        // Guardado inocuo (solo volumen) — no debe vaciar la cola...
+        panel_app.config().tts_runtime.volume = 50;
+        NLP3_TEST_REQUIRE(panel_app.apply_live_config());
+        NLP3_TEST_REQUIRE(panel_app.snapshot().tts.queued_messages == queued_before_save);
+
+        // ...ni resetear el periodico: last_emit sigue en 2000, intervalo 1000,
+        // asi que t=3000 debe emitir (si se hubiera reseteado, solo armaria).
+        NLP3_TEST_REQUIRE(panel_app.tick_periodic_tts(3000));
+
+        // Limpieza: deshabilitar el periodico para no afectar el resto del test.
+        panel_app.config().periodic_tts.enabled = false;
+        panel_app.config().periodic_tts.messages.clear();
+        NLP3_TEST_REQUIRE(panel_app.apply_live_config());
+    }
+    std::puts("panel_app_smoke cp2c apply_live_config keeps queue");
+    std::fflush(stdout);
+
     const auto snapshot = panel_app.snapshot();
     NLP3_TEST_REQUIRE(snapshot.panel_name == "Nisoje Studio");
     NLP3_TEST_REQUIRE(snapshot.bridge_mode == "stub");

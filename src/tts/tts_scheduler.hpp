@@ -9,9 +9,14 @@
 
 namespace nlp3::tts {
 
+// B10: TtsScheduler no es thread-safe. Todas las llamadas publicas deben
+// provenir del hilo que posee el servicio TTS (hilo principal del panel o
+// el worker unico de RealTtsBackend). No proteger con mutex: el diseño es
+// single-thread por ownership, no por bloqueo.
 class TtsScheduler {
 public:
-    TtsScheduler(TtsConfig config, TtsPolicy policy, ITtsBackend& backend) noexcept;
+    // B8: no noexcept — backend_->apply_config() puede lanzar (alloc/lock).
+    TtsScheduler(TtsConfig config, TtsPolicy policy, ITtsBackend& backend);
 
     bool submit(TtsMessage message);
     std::size_t dispatch_pending(std::size_t max_messages = 0);

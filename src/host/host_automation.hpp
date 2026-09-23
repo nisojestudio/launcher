@@ -41,7 +41,9 @@ public:
         const HostSessionSnapshot& session);
 
 private:
-    bool allow_with_cooldown(std::int64_t now_ms, std::uint64_t cooldown_ms, std::int64_t& last_at_ms) const noexcept;
+    // M2-clase: cooldown SIEMPRE con wall clock de recepcion (no
+    // source_timestamp_ms — eventos con ts=0 o atrasados no deben saltarlo).
+    bool allow_with_cooldown(std::uint64_t cooldown_ms, std::int64_t& last_at_ms) const noexcept;
     bool is_subscriber_event(const events::HostEvent& event) const;
 
     HostAutomationConfig config_{};

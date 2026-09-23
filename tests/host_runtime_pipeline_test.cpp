@@ -1,9 +1,11 @@
 #include <algorithm>
 #include <cassert>
+#include <chrono>
 #include <cstdint>
 #include <memory>
 #include <optional>
 #include <string>
+#include <thread>
 #include <vector>
 
 #include "bridge/tiktok_bridge_controller.hpp"
@@ -180,8 +182,10 @@ int main() {
     assert(tts_backend.spoken_messages()[1].trigger == nlp3::tts::TtsTrigger::chat_event);
     assert(tts_backend.spoken_messages()[1].text == "Hello runtime");
 
+    // P2.1: primer tick arma; emite tras el intervalo (1000) desde el armado.
     assert(!runtime.tick_periodic_tts(500));
-    assert(runtime.tick_periodic_tts(1000));
+    assert(!runtime.tick_periodic_tts(1000));
+    assert(runtime.tick_periodic_tts(1500));
     assert(runtime.queued_tts_messages() == 1);
     assert(runtime.flush_tts() == 1);
     assert(tts_backend.spoken_messages().size() == 3);
@@ -251,6 +255,11 @@ int main() {
     };
     auto like_automation_config = config.automation;
     like_automation_config.enable_like_thanks_tts = true;
+    // Este bloque prueba el BATCHING de likes, no el cooldown. El cooldown de
+    // automation ahora es wall clock (M2-clase); con el default de 3000ms el
+    // segundo agradecimiento del mismo test se perderia. Cobertura de cooldown
+    // va en el bloque de gift/follow/share con sleeps.
+    like_automation_config.like_thanks_cooldown_ms = 0;
 
     nlp3::platform::PanelActivityLog like_activity_log{};
     nlp3::host::HostRuntime like_runtime{
@@ -355,6 +364,71 @@ int main() {
     assert(cleared_runtime.queued_tts_messages() == 0);
     assert(!cleared_runtime.tick_like_batches(7000));
     assert(cleared_runtime.flush_tts() == 0);
+
+    // --- P1.5 + auditoria voz: cooldowns de automation con wall clock ---
+    {
+        nlp3::host::HostAutomationConfig auto_cfg{};
+        auto_cfg.enable_gift_thanks_tts = true;
+        auto_cfg.enable_follow_thanks_tts = true;
+        auto_cfg.enable_share_thanks_tts = true;
+        // Ventana corta: el cooldown ya NO usa source_timestamp_ms (M2-clase).
+        auto_cfg.gift_thanks_cooldown_ms = 80;
+        auto_cfg.follow_thanks_cooldown_ms = 80;
+        auto_cfg.share_thanks_cooldown_ms = 80;
+        nlp3::host::HostAutomationEngine engine{auto_cfg};
+        nlp3::host::HostSessionSnapshot session{};
+
+        auto make_gift = [](std::int64_t ts) {
+            nlp3::events::HostEvent event{};
+            event.kind = nlp3::events::HostEventKind::gift;
+            event.actor.id = "g1";
+            event.actor.display_name = "Gifter";
+            event.gift = nlp3::events::GiftEventData{"Rose", 1, 10};
+            event.metadata.source = "test";
+            event.metadata.source_event_type = "gift";
+            event.metadata.source_timestamp_ms = ts;
+            return event;
+        };
+
+        // Primer gift (incluso con ts=0) -> mensaje.
+        assert(engine.build_tts_message(make_gift(0), session).has_value());
+        // Segundo inmediato, cooldown 80ms de wall clock -> rechazado
+        // (antes con ts=0 el cooldown no acumulaba y siempre pasaba).
+        assert(!engine.build_tts_message(make_gift(0), session).has_value());
+        // Fuera de la ventana -> aceptado de nuevo.
+        std::this_thread::sleep_for(std::chrono::milliseconds(120));
+        assert(engine.build_tts_message(make_gift(0), session).has_value());
+
+        auto make_follow = [](std::int64_t ts) {
+            nlp3::events::HostEvent event{};
+            event.kind = nlp3::events::HostEventKind::follow;
+            event.actor.id = "f1";
+            event.actor.display_name = "Follower";
+            event.metadata.source = "test";
+            event.metadata.source_event_type = "follow";
+            event.metadata.source_timestamp_ms = ts;
+            return event;
+        };
+        assert(engine.build_tts_message(make_follow(0), session).has_value());
+        assert(!engine.build_tts_message(make_follow(0), session).has_value());
+        std::this_thread::sleep_for(std::chrono::milliseconds(120));
+        assert(engine.build_tts_message(make_follow(0), session).has_value());
+
+        auto make_share = [](std::int64_t ts) {
+            nlp3::events::HostEvent event{};
+            event.kind = nlp3::events::HostEventKind::share;
+            event.actor.id = "s1";
+            event.actor.display_name = "Sharer";
+            event.metadata.source = "test";
+            event.metadata.source_event_type = "share";
+            event.metadata.source_timestamp_ms = ts;
+            return event;
+        };
+        assert(engine.build_tts_message(make_share(0), session).has_value());
+        assert(!engine.build_tts_message(make_share(0), session).has_value());
+        std::this_thread::sleep_for(std::chrono::milliseconds(120));
+        assert(engine.build_tts_message(make_share(0), session).has_value());
+    }
     assert(cleared_tts_backend.spoken_messages().empty());
 
     return 0;

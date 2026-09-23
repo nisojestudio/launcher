@@ -25,15 +25,25 @@ bool HostPeriodicTtsEngine::should_emit(std::uint64_t now_ms) const noexcept {
         return true;
     }
 
-    if (last_emit_at_ms_ == 0) {
-        return now_ms >= config_.interval_ms;
+    if (last_emit_at_ms_ != 0) {
+        if (now_ms < last_emit_at_ms_) {
+            return false;
+        }
+        return (now_ms - last_emit_at_ms_) >= config_.interval_ms;
     }
 
-    if (now_ms < last_emit_at_ms_) {
+    // Nunca emitido: el primer tick solo arma el reloj; no emitir (evita
+    // epoch-like now_ms >= interval en el primer tick).
+    if (!armed_) {
+        armed_ = true;
+        started_at_ms_ = now_ms;
         return false;
     }
 
-    return (now_ms - last_emit_at_ms_) >= config_.interval_ms;
+    if (now_ms < started_at_ms_) {
+        return false;
+    }
+    return (now_ms - started_at_ms_) >= config_.interval_ms;
 }
 
 std::string HostPeriodicTtsEngine::take_next_message(std::uint64_t now_ms) {
@@ -48,6 +58,8 @@ std::string HostPeriodicTtsEngine::take_next_message(std::uint64_t now_ms) {
 }
 
 void HostPeriodicTtsEngine::reset() noexcept {
+    armed_ = false;
+    started_at_ms_ = 0;
     last_emit_at_ms_ = 0;
     next_message_index_ = 0;
 }

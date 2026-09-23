@@ -163,7 +163,9 @@ int main() {
     nlp3::platform::PanelConfigStorage live_config_storage;
     NLP3_TEST_REQUIRE(live_config_storage.save_to_file(reloaded_live_config, config_path.string()));
     NLP3_TEST_REQUIRE(panel_app.reload_config(config_path.string()));
-    NLP3_TEST_REQUIRE(panel_app.tick_periodic_tts(10));
+    // P2.1: el primer tick tras re-habilitar solo arma; el emit es tras interval=10.
+    NLP3_TEST_REQUIRE(!panel_app.tick_periodic_tts(10));
+    NLP3_TEST_REQUIRE(panel_app.tick_periodic_tts(20));
     NLP3_TEST_REQUIRE(panel_app.snapshot().tts.queued_messages >= 1);
 
     NLP3_TEST_REQUIRE(panel_console.execute_line("tts say Hola panel"));

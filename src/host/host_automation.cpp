@@ -2,6 +2,7 @@
 
 #include <algorithm>
 #include <cctype>
+#include <chrono>
 #include <utility>
 
 #include "tts/tts_template_formatter.hpp"
@@ -21,9 +22,15 @@ void HostAutomationEngine::set_config(HostAutomationConfig config) noexcept {
 }
 
 bool HostAutomationEngine::allow_with_cooldown(
-    std::int64_t now_ms,
     std::uint64_t cooldown_ms,
     std::int64_t& last_at_ms) const noexcept {
+    // M2-clase (auditoria voz): wall clock al evaluar, igual que enqueue_chat_read.
+    // Antes se pasaba source_timestamp_ms; con ts=0 el cooldown nunca acumulaba
+    // (last_at_ms se quedaba en 0 y siempre se aceptaba).
+    const auto now_ms = static_cast<std::int64_t>(
+        std::chrono::duration_cast<std::chrono::milliseconds>(
+            std::chrono::system_clock::now().time_since_epoch())
+            .count());
     if (cooldown_ms == 0 || last_at_ms <= 0 || now_ms <= 0) {
         last_at_ms = now_ms;
         return true;
@@ -83,37 +90,25 @@ std::optional<tts::TtsMessage> HostAutomationEngine::build_tts_message(
     switch (event.kind) {
     case events::HostEventKind::gift:
         if (config_.enable_gift_thanks_tts
-            && allow_with_cooldown(
-                event.metadata.source_timestamp_ms,
-                config_.gift_thanks_cooldown_ms,
-                last_gift_tts_at_ms_)) {
+            && allow_with_cooldown(config_.gift_thanks_cooldown_ms, last_gift_tts_at_ms_)) {
             return build_message(config_.gift_thanks_template, tts::TtsPriority::high, tts::TtsMessageCategory::gift);
         }
         break;
     case events::HostEventKind::follow:
         if (config_.enable_follow_thanks_tts
-            && allow_with_cooldown(
-                event.metadata.source_timestamp_ms,
-                config_.follow_thanks_cooldown_ms,
-                last_follow_tts_at_ms_)) {
+            && allow_with_cooldown(config_.follow_thanks_cooldown_ms, last_follow_tts_at_ms_)) {
             return build_message(config_.follow_thanks_template, tts::TtsPriority::normal, tts::TtsMessageCategory::follow);
         }
         break;
     case events::HostEventKind::like:
         if (config_.enable_like_thanks_tts
-            && allow_with_cooldown(
-                event.metadata.source_timestamp_ms,
-                config_.like_thanks_cooldown_ms,
-                last_like_tts_at_ms_)) {
+            && allow_with_cooldown(config_.like_thanks_cooldown_ms, last_like_tts_at_ms_)) {
             return build_message(config_.like_thanks_template, tts::TtsPriority::normal, tts::TtsMessageCategory::like);
         }
         break;
     case events::HostEventKind::share:
         if (config_.enable_share_thanks_tts
-            && allow_with_cooldown(
-                event.metadata.source_timestamp_ms,
-                config_.share_thanks_cooldown_ms,
-                last_share_tts_at_ms_)) {
+            && allow_with_cooldown(config_.share_thanks_cooldown_ms, last_share_tts_at_ms_)) {
             return build_message(config_.share_thanks_template, tts::TtsPriority::normal, tts::TtsMessageCategory::share);
         }
         break;
@@ -121,7 +116,6 @@ std::optional<tts::TtsMessage> HostAutomationEngine::build_tts_message(
         if (config_.enable_subscriber_thanks_tts
             && is_subscriber_event(event)
             && allow_with_cooldown(
-                event.metadata.source_timestamp_ms,
                 config_.subscriber_thanks_cooldown_ms,
                 last_subscriber_tts_at_ms_)) {
             return build_message(

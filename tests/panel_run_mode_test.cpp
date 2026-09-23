@@ -63,14 +63,18 @@ int main() {
     NLP3_TEST_REQUIRE(periodic_panel_app.initialize(periodic_config_path.string()));
 
     const auto periodic_before = periodic_panel_app.snapshot();
+    // P2.1: primer tick arma; emitir cuando elapsed >= interval (1000).
     const auto tick_before = periodic_panel_app.tick(500);
     NLP3_TEST_REQUIRE(tick_before.now_ms == 500);
     NLP3_TEST_REQUIRE(tick_before.bridge_events_processed == 0);
     NLP3_TEST_REQUIRE(!tick_before.periodic_tts_enqueued);
     NLP3_TEST_REQUIRE(periodic_panel_app.snapshot().tts.queued_messages == periodic_before.tts.queued_messages);
 
-    const auto tick_after = periodic_panel_app.tick(1000);
-    NLP3_TEST_REQUIRE(tick_after.now_ms == 1000);
+    const auto tick_arm = periodic_panel_app.tick(1000);
+    NLP3_TEST_REQUIRE(!tick_arm.periodic_tts_enqueued);
+
+    const auto tick_after = periodic_panel_app.tick(1500);
+    NLP3_TEST_REQUIRE(tick_after.now_ms == 1500);
     NLP3_TEST_REQUIRE(tick_after.bridge_events_processed == 0);
     NLP3_TEST_REQUIRE(tick_after.periodic_tts_enqueued);
     const auto periodic_after_tick = periodic_panel_app.snapshot();
@@ -93,6 +97,7 @@ int main() {
     nlp3::platform::PanelApp periodic_run_panel_app;
     NLP3_TEST_REQUIRE(periodic_run_panel_app.initialize(periodic_run_config_path.string()));
     const auto periodic_run_before = periodic_run_panel_app.snapshot();
+    // run_ticks start=0 step=1000: tick(0) arma, tick(1000) emite (elapsed 1000).
     const auto periodic_run_result = periodic_run_panel_app.run_ticks(2, 0, 1000);
     NLP3_TEST_REQUIRE(periodic_run_result.ticks_executed == 2);
     NLP3_TEST_REQUIRE(periodic_run_result.total_bridge_events_processed == 0);
@@ -124,7 +129,11 @@ int main() {
         1000,
     }));
 
-    const auto external_periodic_after = external_periodic_panel_app.tick(1000);
+    // Tras conectar, el primer tick al engine solo arma (P2.1); el emit es
+    // cuando elapsed >= interval (1000).
+    const auto external_periodic_arm = external_periodic_panel_app.tick(1000);
+    NLP3_TEST_REQUIRE(!external_periodic_arm.periodic_tts_enqueued);
+    const auto external_periodic_after = external_periodic_panel_app.tick(2000);
     NLP3_TEST_REQUIRE(external_periodic_after.periodic_tts_enqueued);
 
     std::filesystem::remove(external_config_path);

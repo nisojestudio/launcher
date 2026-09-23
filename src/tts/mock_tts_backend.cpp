@@ -26,6 +26,10 @@ std::vector<TtsVoiceDescriptor> MockTtsBackend::voice_catalog() const {
 }
 
 bool MockTtsBackend::speak(const TtsMessage& message) {
+    if (fail_speak_count_ > 0) {
+        --fail_speak_count_;
+        return false;
+    }
     if (!config_.enabled) {
         return false;
     }
@@ -42,6 +46,10 @@ void MockTtsBackend::clear_pending() noexcept {
 
 const std::vector<TtsMessage>& MockTtsBackend::spoken_messages() const noexcept {
     return spoken_messages_;
+}
+
+void MockTtsBackend::set_fail_speak_count(std::size_t count) noexcept {
+    fail_speak_count_ = count;
 }
 
 } // namespace nlp3::tts

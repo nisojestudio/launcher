@@ -26,6 +26,11 @@ public:
 
 private:
     HostPeriodicTtsConfig config_{};
+    // Arming en el primer tick (mutable: should_emit es const pero necesita
+    // registrar el instante de arranque). Sin esto, comparar last_emit==0
+    // contra now_ms con reloj epoch emitia al instante (M4/P2.1).
+    mutable bool armed_ = false;
+    mutable std::uint64_t started_at_ms_ = 0;
     std::uint64_t last_emit_at_ms_ = 0;
     std::size_t next_message_index_ = 0;
 };
