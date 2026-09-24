@@ -24,7 +24,7 @@ constexpr std::string_view kTimePerChatS = "time_per_chat_s";
 
 // Bloque A — reglas de tiempo
 constexpr std::string_view kLikeUseMagnitude = "like_use_magnitude";
-constexpr std::string_view kMultSubcriber = "mult_subscriber";
+constexpr std::string_view kMultSubscriber = "mult_subscriber";
 constexpr std::string_view kMultFollower = "mult_follower";
 constexpr std::string_view kMultModerator = "mult_moderator";
 constexpr std::string_view kCapPerEventS = "cap_per_event_s";
@@ -413,7 +413,7 @@ gamesdk::GameConfig LiveTimerGame::default_config() const {
 
     // Bloque A — reglas: defaults neutros (sin cambio de comportamiento).
     config.set(std::string(kLikeUseMagnitude), true);
-    config.set(std::string(kMultSubcriber), 1.0);
+    config.set(std::string(kMultSubscriber), 1.0);
     config.set(std::string(kMultFollower), 1.0);
     config.set(std::string(kMultModerator), 1.0);
     config.set(std::string(kCapPerEventS), 0.0);
@@ -571,7 +571,7 @@ void LiveTimerGame::apply_config(const gamesdk::GameConfig& config) {
 
     // Bloque A — reglas de tiempo.
     apply_bool(kLikeUseMagnitude);
-    apply_double(kMultSubcriber);
+    apply_double(kMultSubscriber);
     apply_double(kMultFollower);
     apply_double(kMultModerator);
     apply_double(kCapPerEventS);
@@ -680,7 +680,7 @@ void LiveTimerGame::apply_config(const gamesdk::GameConfig& config) {
         }
         return v;
     };
-    state_.mult_subscriber = clamp_nonneg(kMultSubcriber, 1.0);
+    state_.mult_subscriber = clamp_nonneg(kMultSubscriber, 1.0);
     state_.mult_follower = clamp_nonneg(kMultFollower, 1.0);
     state_.mult_moderator = clamp_nonneg(kMultModerator, 1.0);
     state_.cap_per_event_s = clamp_nonneg(kCapPerEventS, 0.0);
@@ -1114,6 +1114,10 @@ void LiveTimerGame::on_game_input_event(
     case gamesdk::GameInputEventKind::gift: {
         double coins = 1.0;
         if (event.gift.has_value()) {
+            // B8 (contrato): diamond_count se interpreta como TOTAL de monedas
+            // del evento; quantity es el tamano de la pila. Si una fuente expone
+            // precio UNITARIO debe multiplicar por quantity aguas arriba (en el
+            // mapper), no aqui. Verificar con un payload real del bridge en uso.
             coins = event.gift->diamond_count > 0
                 ? static_cast<double>(event.gift->diamond_count)
                 : static_cast<double>(event.gift->quantity);

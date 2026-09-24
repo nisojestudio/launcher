@@ -693,6 +693,12 @@ bool request_origin_allowed(const ParsedRequest& request, const PanelHttpServerS
 }
 
 bool request_requires_access(const ParsedRequest& request) {
+    // B7: GET /api/timer/config expone config del operador (textos, paths de
+    // sonido) — se protege igual que los POST. El overlay
+    // (/api/overlay/live-timer/state) sigue siendo publico por diseno.
+    if (request.method == "GET" && request.path == "/api/timer/config") {
+        return true;
+    }
     return request.method == "POST"
         && request.path != "/api/auth/login"
         && request.path != "/api/auth/logout"

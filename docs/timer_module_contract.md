@@ -104,7 +104,7 @@ shows the warning count and logs to `console.warn` for inspection.
 
 | Method | Path | Purpose |
 |--------|------|---------|
-| GET | `/api/timer/config` | Returns the current `live_timer` config (used by export). |
+| GET | `/api/timer/config` | Returns the current `live_timer` config (used by export). Requires access when auth is enabled (same gate as POST). |
 | POST | `/api/timer/configure` | Partial config update. JSON body. Returns `{ok, message, warnings}`. |
 | POST | `/api/timer/start` | `on_activated()`. |
 | POST | `/api/timer/pause` | `pause()`. |
@@ -197,6 +197,10 @@ the operator presses Start to continue (contract test `cp6`).
 - Caps (`cap_per_user_per_minute_s` / `cap_total_per_minute_s`) use a **fixed
   60 s sliding window** (`kCapWindowS`); the cap *value* is the budget of
   seconds allowed per minute, never the window length.
+- Gift time consumes `diamond_count` as the **total** coins of the event
+  (fallback to `quantity` when 0). Sources that expose a *unit* price must
+  multiply by `quantity` upstream in the mapper — verify against a real
+  payload from the bridge in use before changing this.
 
 ## 10. V3 Visual Enhancements (digit effects, palettes, fonts)
 
