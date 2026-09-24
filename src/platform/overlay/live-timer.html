@@ -2,6 +2,7 @@
 <html lang="es">
 <head>
 <meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
 <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; connect-src 'self'; media-src 'self' blob: http: https:;">
 <title>Live Timer</title>
 <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;700&family=Space+Mono:wght@400;700&family=Share+Tech+Mono&family=Chakra+Petch:wght@600;700&family=Rajdhani:wght@600;700&display=swap" rel="stylesheet">
@@ -563,6 +564,17 @@ body.preview-mode #perf-notice.visible { display: block; }
 #frame-content.has-ring #progress-ring {
   display: block;
 }
+/* F3: en pantallas angostas (móvil, con viewport meta) el popup envuelve a 2
+   líneas en vez de cortarse con ellipsis a ~120px de ancho real. */
+@media (max-width: 600px) {
+  .event-popup {
+    white-space: normal;
+    max-width: 100%;
+    line-height: 1.3;
+    text-overflow: clip;
+  }
+  #event-container { gap: 4px; }
+}
 </style>
 </head>
 <body>
@@ -815,9 +827,19 @@ function showPopup(icon, label, delta, actorName, capped) {
   el.setAttribute('aria-label', (label || 'evento') + ' ' + deltaText);
   // V2: la lane lateral apila los popups por flex. Ya no se calcula `top` ni
   // offsets por indice, y el tamano se acota para que la cola no desborde.
+  // F3: techo ampliado (48→72 de lienzo) y, fuera de preview, piso físico de
+  // ~14px reales (dividiendo por el scale activo) — nunca por encima del contador.
   const counterSize = (styles.counter && styles.counter.font_size_px) || 120;
   const popupScale = previewMode ? 0.26 : 0.4;
-  el.style.fontSize = Math.max(16, Math.min(48, Math.round(counterSize * popupScale))) + 'px';
+  let size = Math.max(16, Math.min(72, Math.round(counterSize * popupScale)));
+  if (!previewMode) {
+    const k = currentScaleK > 0 ? currentScaleK : 1;
+    const physMin = Math.ceil(14 / k);
+    size = Math.max(size, Math.min(physMin, counterSize));
+  }
+  el.style.fontSize = size + 'px';
+  // F2: recolocar la lane midiendo el contador antes de insertar el popup.
+  layoutEventLane();
   container.appendChild(el);
   requestAnimationFrame(() => { el.classList.add('fade'); });
   setTimeout(() => { if (el.parentNode) el.parentNode.removeChild(el); }, 3000);
@@ -1013,6 +1035,9 @@ var pollGeneration = 0;
    antes. El sistema de escala se recalcula solo al redimensionar. */
 var FRAME_CLASSES = ['f-none', 'f-card', 'f-glass', 'f-neon', 'f-ribbon', 'f-badge'];
 var visualSignature = '';
+// F3: factor de escala activo (auto → k, escala fija → 1). showPopup lo usa para
+// garantizar un piso físico de legibilidad del popup en móvil.
+var currentScaleK = 1;
 var visualState = {
   scaleMode: 'auto', canvasWidth: 1920, canvasHeight: 1080,
   warnSeconds: 60, dangerSeconds: 10, dangerEffect: 'pulse',
@@ -1050,6 +1075,7 @@ function applyAnchor() {
     body.style.justifyContent = 'center';
     body.style.alignItems = 'center';
     body.style.padding = '';
+    layoutEventLane();
     return;
   }
   // "top-left", "middle-right", ... separar en eje vertical / horizontal.
@@ -1063,6 +1089,7 @@ function applyAnchor() {
   body.style.alignItems = mapA[vertical] || 'center';
   // Margen como padding global en % del lienzo, respetando el lado opuesto.
   body.style.padding = margin + '%';
+  layoutEventLane();
 }
 
 function applyScale() {
@@ -1075,6 +1102,7 @@ function applyScale() {
     stage.style.removeProperty('--canvas-w');
     stage.style.removeProperty('--canvas-h');
     stage.style.transform = '';
+    currentScaleK = 1;
     return;
   }
   stage.classList.add('scaled');
@@ -1083,12 +1111,65 @@ function applyScale() {
   var k = Math.min(window.innerWidth / refW, window.innerHeight / refH);
   if (!isFinite(k) || k <= 0) k = 1;
   stage.style.transform = 'scale(' + k + ')';
+  currentScaleK = k;
   // El canvas de particulas se redimensiona al vuelo: si no, al cambiar el
   // tamaño de la ventana las particulas saldrian con coordenadas viejas.
   particleCanvas = null;
   particleCtx = null;
   particleList = [];
   stopParticleLoop();
+}
+
+// F2: la lane de popups no vive en una posición fija. Mide el contador (en
+// unidades de lienzo, descontando el scale del stage) y se sienta A SU DERECHA
+// con un hueco; si no cabe, a su izquierda; si el contador ocupa casi todo el
+// ancho, debajo del bloque. Así nunca pisa los dígitos, sea cual sea el tamaño
+// de fuente o el anclaje del bloque. (En preview iframe manda el CSS propio.)
+function layoutEventLane() {
+  var lane = document.getElementById('event-container');
+  var wrap = document.getElementById('counter-wrap');
+  var stage = document.getElementById('stage');
+  if (!lane || !wrap || !stage || previewMode) return;
+  var rect = stage.getBoundingClientRect();
+  var counterRect = wrap.getBoundingClientRect();
+  if (rect.width <= 0 || counterRect.width <= 0) return;
+  // px de pantalla → unidades de lienzo (en modo auto el stage va con transform).
+  var k = currentScaleK > 0 ? currentScaleK : 1;
+  var stageW = rect.width / k;
+  var counterLeft = (counterRect.left - rect.left) / k;
+  var counterRight = (counterRect.right - rect.left) / k;
+  var counterBottom = (counterRect.bottom - rect.top) / k;
+  var edge = Math.round(stageW * 0.03);
+  var gap = 48;    // aire mínimo: el anillo de progreso sobresale 28px del contador
+  var minLane = 260; // ancho mínimo de lane para que quepa texto legible
+  var spaceRight = stageW - edge - counterRight - gap;
+  var spaceLeft = counterLeft - edge - gap;
+  lane.style.bottom = '';
+  if (spaceRight >= minLane) {
+    lane.style.left = Math.ceil(counterRight + gap) + 'px';
+    lane.style.right = edge + 'px';
+    lane.style.top = '50%';
+    lane.style.transform = 'translateY(-50%)';
+    lane.style.maxWidth = Math.round(stageW * 0.45) + 'px';
+    lane.style.maxHeight = '72%';
+  } else if (spaceLeft >= minLane) {
+    lane.style.left = edge + 'px';
+    lane.style.right = Math.ceil(stageW - (counterLeft - gap)) + 'px';
+    lane.style.top = '50%';
+    lane.style.transform = 'translateY(-50%)';
+    lane.style.maxWidth = Math.round(stageW * 0.45) + 'px';
+    lane.style.maxHeight = '72%';
+  } else {
+    // Contador casi a todo el ancho: la lane queda por debajo del bloque, en la
+    // esquina inferior derecha — fuera de la banda vertical del reloj.
+    lane.style.left = '';
+    lane.style.right = edge + 'px';
+    lane.style.top = Math.ceil(counterBottom + gap) + 'px';
+    lane.style.transform = 'none';
+    lane.style.bottom = '6%';
+    lane.style.maxWidth = Math.round(stageW * 0.42) + 'px';
+    lane.style.maxHeight = 'none';
+  }
 }
 
 function applyVisualEngine(data) {
@@ -1201,7 +1282,7 @@ function applyVisualEngine(data) {
   }
 }
 
-window.addEventListener('resize', applyScale);
+window.addEventListener('resize', function() { applyScale(); layoutEventLane(); });
 
 /* === V11: particulas ========================================================
    Un solo canvas, dibujado con rectangulos y lineas (sin imagenes), y un bucle

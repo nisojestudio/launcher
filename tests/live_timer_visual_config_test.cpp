@@ -376,5 +376,25 @@ int main() {
         NLP3_TEST_REQUIRE(other.state().particles_density >= 0.25);
     }
 
+    // --- 19. Popup móvil: viewport, lane medida y piso físico de font --------
+    // Reproduce el reporte (patrón Prove-It): sin viewport el browser hace doble
+    // zoom en móvil; la lane fija en right:3% invade el reloj con contadores
+    // anclados a la derecha o grandes; y el font del popup (techo 48px de lienzo)
+    // cae a ~10px físicos con k≈0.2.
+    {
+        const std::string html(nlp3::platform::panel_overlay_live_timer_html());
+        // F1: sin este meta, el overlay se escalaba dos veces en pantallas táctiles.
+        NLP3_TEST_REQUIRE(html.find("<meta name=\"viewport\"") != std::string::npos);
+        // F2: la lane se recoloca midiendo el contador (derecha → izquierda →
+        // esquina inferior), en vez de una posición fija que puede pisar los dígitos.
+        NLP3_TEST_REQUIRE(html.find("function layoutEventLane()") != std::string::npos);
+        NLP3_TEST_REQUIRE(html.find("layoutEventLane();") != std::string::npos);
+        // F3: piso físico (~14px reales) y techo ampliado a 72px de lienzo.
+        NLP3_TEST_REQUIRE(html.find("physMin") != std::string::npos);
+        NLP3_TEST_REQUIRE(html.find("Math.min(72") != std::string::npos);
+        // F3: en pantallas angostas el texto del popup envuelve en 2 líneas.
+        NLP3_TEST_REQUIRE(html.find("@media (max-width: 600px)") != std::string::npos);
+    }
+
     return 0;
 }
