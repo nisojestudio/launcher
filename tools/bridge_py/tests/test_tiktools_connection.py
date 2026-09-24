@@ -5,7 +5,12 @@ import logging
 import unittest
 from unittest import mock
 
-from tiktools_connection import TikToolsConnection, TikToolsConnectionError, classify_tiktools_error
+from tiktools_connection import (
+    TikToolsConnection,
+    TikToolsConnectionError,
+    _ws_event_to_canonical,
+    classify_tiktools_error,
+)
 
 
 async def noop_callback(_value: object) -> None:
@@ -143,6 +148,95 @@ class TikToolsConnectionTests(unittest.IsolatedAsyncioTestCase):
         self.assertFalse(connection.handshake_complete)
         self.assertNotIn("connected", states)
         self.assertIn("connecting", states)
+
+
+class GiftDiamondTotalTests(unittest.TestCase):
+    """B8 — tik.tools documenta diamondCount como precio UNITARIO.
+
+    El total del evento es diamondCount * repeatCount. El mapper canonicamente
+    debe entregar diamond_count = TOTAL acreditable en este frame, y no debe
+    acreditar dos veces el frame final duplicado de un combo (repeatEnd).
+    Fuente: https://tik.tools/websocket — "final total = diamondCount * repeatCount".
+    """
+
+    @staticmethod
+    def _gift_raw(*, repeat_count: int, diamond_count: int, repeat_end: bool,
+                  group_id: str = "g-1") -> dict:
+        return {
+            "event": "gift",
+            "data": {
+                "user": {"id": "u-1", "uniqueId": "fan"},
+                "giftId": 5655,
+                "giftName": "Rose",
+                "repeatCount": repeat_count,
+                "diamondCount": diamond_count,
+                "repeatEnd": repeat_end,
+                "groupId": group_id,
+            },
+        }
+
+    def _map(self, raw: dict, state: dict) -> object:
+        return _ws_event_to_canonical(
+            raw, room_id="r-1", session_id=1, target_user="alice", streak_state=state
+        )
+
+    def test_batch_x10_reports_total_not_unit_price(self) -> None:
+        state: dict = {}
+        event = self._map(
+            self._gift_raw(repeat_count=10, diamond_count=1, repeat_end=True), state
+        )
+        self.assertIsNotNone(event)
+        assert event is not None and event.gift is not None
+        self.assertEqual(event.gift.quantity, 10)
+        # Unit(1) x 10 = 10 totales; hoy devuelve 1 (unit solo) -> RED.
+        self.assertEqual(event.gift.diamond_count, 10)
+
+    def test_streak_frames_accumulate_without_double_count(self) -> None:
+        state: dict = {}
+        credits = []
+        frames = [(1, False), (2, False), (3, True), (3, True)]
+        for repeat_count, repeat_end in frames:
+            event = self._map(
+                self._gift_raw(
+                    repeat_count=repeat_count, diamond_count=1, repeat_end=repeat_end
+                ),
+                state,
+            )
+            if event is not None and event.gift is not None:
+                credits.append(event.gift.diamond_count)
+        # 3 incrementos de 1 diamante = [1, 1, 1]; el frame final duplicado
+        # (repeatEnd sin avance) no emite. Hoy: [1, 1, 1, 1] -> RED.
+        self.assertEqual(credits, [1, 1, 1])
+        self.assertEqual(sum(credits), 3)
+
+    def test_single_streakable_gift_counted_once(self) -> None:
+        # giftType 1 entrega SIEMPRE dos frames: (rC=1, end=false) y
+        # (rC=1, end=true). Debe acreditar solo 1 diamante en total.
+        state: dict = {}
+        first = self._map(
+            self._gift_raw(repeat_count=1, diamond_count=5, repeat_end=False), state
+        )
+        final = self._map(
+            self._gift_raw(repeat_count=1, diamond_count=5, repeat_end=True), state
+        )
+        self.assertIsNotNone(first)
+        assert first is not None and first.gift is not None
+        self.assertEqual(first.gift.diamond_count, 5)
+        # Frame final duplicado sin avance: no emitir (evita el doble cobro
+        # que provocaria el fallback quantity en el timer).
+        self.assertIsNone(final)
+
+    def test_batch_without_streak_state_param_still_maps(self) -> None:
+        # Compat: sin streak_state (llamadas legacy) sigue mapeando el total.
+        event = _ws_event_to_canonical(
+            self._gift_raw(repeat_count=4, diamond_count=2, repeat_end=True),
+            room_id="r-1",
+            session_id=1,
+            target_user="alice",
+        )
+        self.assertIsNotNone(event)
+        assert event is not None and event.gift is not None
+        self.assertEqual(event.gift.diamond_count, 8)
 
 
 if __name__ == "__main__":

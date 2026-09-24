@@ -55,7 +55,14 @@ _WS_EVENT_MAP: dict[str, CanonicalEventType] = {
 }
 
 
-def _ws_event_to_canonical(raw: dict[str, Any], *, room_id: str, session_id: int, target_user: str) -> CanonicalEvent | None:
+def _ws_event_to_canonical(
+    raw: dict[str, Any],
+    *,
+    room_id: str,
+    session_id: int,
+    target_user: str,
+    streak_state: dict[str, tuple[int, bool]] | None = None,
+) -> CanonicalEvent | None:
     event_name = str(raw.get("event", "")).lower()
     event_type = _WS_EVENT_MAP.get(event_name)
     if event_type is None:
@@ -87,11 +94,40 @@ def _ws_event_to_canonical(raw: dict[str, Any], *, room_id: str, session_id: int
     if event_type == CanonicalEventType.CHAT:
         text = str(data.get("comment", data.get("text", "")))
     elif event_type == CanonicalEventType.GIFT:
+        # B8 — tik.tools documenta diamondCount como precio UNITARIO del
+        # regalo; el total acreditable del frame es diamondCount * repeatCount
+        # (https://tik.tools/websocket: "final total = diamondCount * repeatCount").
+        # El canónico exige diamond_count = TOTAL de este frame. Ademas, los
+        # regalos streakables (giftType 1) emiten dos frames con el mismo
+        # repeatCount (abierto + repeatEnd): sin estado se acreditaria dos
+        # veces. `streak_state` lleva (ultima cantidad, vio_frame_abierto)
+        # por groupId (fallback usuario:gift) para acreditar solo deltas.
+        quantity = int(data.get("repeatCount", data.get("gift_count", 1)))
+        unit_diamonds = max(0, int(data.get("diamondCount", data.get("diamond_count", 0))))
+        repeat_end = bool(data.get("repeatEnd", data.get("repeat_end", False)))
+        group_key = str(data.get("groupId", "")) or f"{actor.user_id}:{data.get('giftId', '')}"
+        state = streak_state if streak_state is not None else {}
+        prev_qty, saw_open = state.get(group_key, (0, False))
+        if prev_qty <= 0:
+            credit_units = quantity            # primera vista del grupo (batch o frame 1)
+        elif quantity > prev_qty:
+            credit_units = quantity - prev_qty  # avance de streak
+        elif quantity < prev_qty:
+            credit_units = quantity            # repeatCount reinicio: combo nuevo
+        elif saw_open:
+            credit_units = 0                    # cierre duplicado de un streak ya acreditado
+        else:
+            credit_units = quantity            # batch identico nuevo (solo frames finales)
+        state[group_key] = (quantity, saw_open or not repeat_end)
+        if len(state) > 4096:
+            state.clear()
+        if credit_units <= 0:
+            return None  # frame sin avance: no emitir (evita doble acreditar)
         gift = CanonicalGift(
             gift_id=str(data.get("giftId", "")),
             gift_name=str(data.get("giftName", data.get("gift_name", ""))),
-            quantity=int(data.get("repeatCount", data.get("gift_count", 1))),
-            diamond_count=int(data.get("diamondCount", data.get("diamond_count", 0))),
+            quantity=quantity,
+            diamond_count=min(unit_diamonds * credit_units, 4_294_967_295),
         )
     elif event_type == CanonicalEventType.VIEWER_COUNT:
         viewer_count = int(data.get("totalViewers", data.get("viewerCount", data.get("viewer_count", 0))))
@@ -145,6 +181,8 @@ class TikToolsConnection:
         self._session_events_received: int = 0
         self._session_gifts_received: int = 0
         self._session_chat_received: int = 0
+        # Estado de combos de regalos (B8): group_key -> (repeatCount, vio_frame_abierto)
+        self._gift_streak_state: dict[str, tuple[int, bool]] = {}
 
     @property
     def room_id(self) -> str:
@@ -181,6 +219,7 @@ class TikToolsConnection:
         self._session_events_received = 0
         self._session_gifts_received = 0
         self._session_chat_received = 0
+        self._gift_streak_state = {}
         self._handshake_complete = False
         self._handshake_event = asyncio.Event()
         self._ws_task = asyncio.create_task(self._ws_loop(), name="tiktools-ws")
@@ -311,7 +350,11 @@ class TikToolsConnection:
                         )
 
                         canonical = _ws_event_to_canonical(
-                            msg, room_id=self._room_id, session_id=self._session_id, target_user=self._target_user
+                            msg,
+                            room_id=self._room_id,
+                            session_id=self._session_id,
+                            target_user=self._target_user,
+                            streak_state=self._gift_streak_state,
                         )
                         if canonical is not None:
                             self._session_events_received += 1
@@ -320,7 +363,11 @@ class TikToolsConnection:
 
                     if event_name in ("end", "offline"):
                         canonical = _ws_event_to_canonical(
-                            msg, room_id=self._room_id, session_id=self._session_id, target_user=self._target_user
+                            msg,
+                            room_id=self._room_id,
+                            session_id=self._session_id,
+                            target_user=self._target_user,
+                            streak_state=self._gift_streak_state,
                         )
                         if canonical is not None:
                             self._session_events_received += 1
@@ -339,7 +386,11 @@ class TikToolsConnection:
 
                     # Convert and emit canonical event
                     canonical = _ws_event_to_canonical(
-                        msg, room_id=self._room_id, session_id=self._session_id, target_user=self._target_user
+                        msg,
+                        room_id=self._room_id,
+                        session_id=self._session_id,
+                        target_user=self._target_user,
+                        streak_state=self._gift_streak_state,
                     )
                     if canonical is not None:
                         self._session_events_received += 1

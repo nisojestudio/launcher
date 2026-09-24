@@ -198,9 +198,13 @@ the operator presses Start to continue (contract test `cp6`).
   60 s sliding window** (`kCapWindowS`); the cap *value* is the budget of
   seconds allowed per minute, never the window length.
 - Gift time consumes `diamond_count` as the **total** coins of the event
-  (fallback to `quantity` when 0). Sources that expose a *unit* price must
-  multiply by `quantity` upstream in the mapper — verify against a real
-  payload from the bridge in use before changing this.
+  (fallback to `quantity` when 0). **Verified for `tiktools`** (production
+  provider): tik.tools documents `diamondCount` as the *unit* price and the
+  official total as `diamondCount * repeatCount`, so the Python mapper
+  (`tiktools_connection._ws_event_to_canonical`) converts to a per-frame
+  total with streak-delta state before the event reaches C++. The `direct`
+  (TikTokLive) and `euler` adapters have NOT been re-verified against this
+  contract — if you switch providers, validate against a real payload first.
 
 ## 10. V3 Visual Enhancements (digit effects, palettes, fonts)
 

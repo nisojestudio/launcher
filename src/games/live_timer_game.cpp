@@ -1114,10 +1114,11 @@ void LiveTimerGame::on_game_input_event(
     case gamesdk::GameInputEventKind::gift: {
         double coins = 1.0;
         if (event.gift.has_value()) {
-            // B8 (contrato): diamond_count se interpreta como TOTAL de monedas
-            // del evento; quantity es el tamano de la pila. Si una fuente expone
-            // precio UNITARIO debe multiplicar por quantity aguas arriba (en el
-            // mapper), no aqui. Verificar con un payload real del bridge en uso.
+            // B8 (contrato): diamond_count es el TOTAL de monedas del evento
+            // (quantity = tamano de la pila). Verificado para tiktools: su
+            // diamondCount es unitario y el mapper Python
+            // (tiktools_connection) convierte a total aguas arriba. Otras
+            // fuentes deben cumplir el mismo contrato antes de usarse.
             coins = event.gift->diamond_count > 0
                 ? static_cast<double>(event.gift->diamond_count)
                 : static_cast<double>(event.gift->quantity);
