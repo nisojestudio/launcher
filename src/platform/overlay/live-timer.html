@@ -27,7 +27,6 @@ body.preview-mode #counter   { font-size: 52px; }
 body.preview-mode #subtitle  { font-size: 14px; margin-top: 2px; }
 body.preview-mode #completed-banner { font-size: 20px; margin-top: 4px; }
 body.preview-mode #days-label   { font-size: 14px; margin-bottom: 4px; letter-spacing: 2px; }
-body.preview-mode #event-container { right: 6px; max-width: 45%; max-height: 80%; gap: 3px; }
 
 /* ---- Effect: Pulse ---- */
 .effect-pulse {
@@ -161,48 +160,34 @@ body.preview-mode #event-container { right: 6px; max-width: 45%; max-height: 80%
 @keyframes pulse {
   50% { transform: scale(1.05); }
 }
-/* V2: los popups ocupaban todo el ancho por debajo del reloj y la animacion
-   los hacia subir 40px, asi que cruzaban por delante del contador y ensuciaban
-   la lectura. Ahora viven en una lane lateral derecha y NO se mueven en
-   vertical: entran desde el borde y se desvanecen en el sitio. */
-#event-container {
-  position: absolute;
-  right: 3%;
-  top: 50%;
-  transform: translateY(-50%);
-  display: flex;
-  flex-direction: column;
-  align-items: flex-end;
-  justify-content: flex-end;
-  gap: 6px;
-  max-width: 32%;
-  max-height: 72%;
-  overflow: hidden;
-  pointer-events: none;
-  z-index: 50;
-}
-.event-popup {
-  position: static;
-  text-align: right;
+/* V2: los popups ya no ocupan una lane lateral — se pintan SOBRE el subtítulo
+   (clase subtitle-popup) para no quedar a un costado del reloj. */
+/* F5: #event-container (lane lateral) eliminado — el popup vive en #subtitle. */
+/* V2/V5: los popups NO viven en una lane lateral. Reemplazan la frase del
+   subtítulo en su sitio (debajo del reloj, sin pisar el contador) y al
+   terminar vuelve la frase original. */
+#subtitle.subtitle-popup {
   font-weight: bold;
-  text-shadow: 0 2px 10px rgba(0,0,0,0.95), 0 0 24px rgba(0,0,0,0.8);
-  /* F4: el popup es el gancho de la donación — pastilla sobresaliente con el
-     glow del color del evento (currentColor = color del texto: azul suma,
-     rojo resta) sobre fondo oscuro para leerse sobre cualquier video. */
+  text-align: center;
+  white-space: normal;
+  /* Opción B: máx. 2 líneas — un nombre extenso se corta con "…" y el
+     recuadro nunca desborda hacia la barra ni se sale del marco. */
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  line-clamp: 2;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: min(92%, calc(var(--stage-w, 100vw) * 0.92));
+  line-height: 1.3;
+  margin-top: 16px;
+  padding: 8px 18px;
   background: rgba(0, 0, 0, 0.65);
   border: 2px solid currentColor;
   border-radius: 14px;
-  padding: 8px 18px;
   box-shadow: 0 0 16px currentColor, 0 6px 18px rgba(0,0,0,0.55);
-  max-width: var(--stage-w, 100vw);
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-  opacity: 0;
-}
-.event-popup.add { color: #00AAFF; }
-.event-popup.subtract { color: #FF4444; }
-.event-popup.fade {
+  position: relative;
+  z-index: 20;
   animation: popFade 3s ease-out forwards;
 }
 @keyframes popFade {
@@ -573,16 +558,17 @@ body.preview-mode #perf-notice.visible { display: block; }
 #frame-content.has-ring #progress-ring {
   display: block;
 }
-/* F3: en pantallas angostas (móvil, con viewport meta) el popup envuelve a 2
-   líneas en vez de cortarse con ellipsis a ~120px de ancho real. */
+/* F3+F5: en pantallas angostas el popup (subtítulo reemplazado) mantiene el
+   clamp de 2 líneas con ellipsis — no se corta a ~120px sin "…". */
 @media (max-width: 600px) {
-  .event-popup {
+  #subtitle.subtitle-popup {
     white-space: normal;
     max-width: 100%;
     line-height: 1.3;
-    text-overflow: clip;
+    text-overflow: ellipsis;
+    -webkit-line-clamp: 2;
+    line-clamp: 2;
   }
-  #event-container { gap: 4px; }
 }
 </style>
 </head>
@@ -612,7 +598,6 @@ body.preview-mode #perf-notice.visible { display: block; }
 
     </div>
   </div>
-  <div id="event-container" role="log" aria-live="polite" aria-relevant="additions" aria-label="Eventos recientes del temporizador"></div>
   <canvas id="particles" aria-hidden="true"></canvas>
 </div>
 <div id="connection-error" role="alert" style="display:none;position:fixed;top:10px;left:50%;transform:translateX(-50%);background:rgba(255,0,0,0.7);color:#fff;padding:6px 16px;border-radius:8px;font-size:16px;font-weight:bold;z-index:999;">Desconectado del panel</div>
@@ -634,6 +619,13 @@ let styles = {};
 let popupColors = { add: '#00AAFF', subtract: '#FF4444' };
 let completedStyle = { text: 'TIEMPO CUMPLIDO', color: '#FFD700', size: 48 };
 let lastShownEventId = 0;
+// F5: el popup reemplaza la frase del subtítulo. Mientras esté activo, el
+// polling del overlay no reescribe el texto (subtitlePopupActive) y, al
+// expirar, restoreSubtitlePopup devuelve la frase original.
+let subtitlePopupActive = false;
+let subtitlePopupTimer = null;
+let subtitleSavedText = null;
+let subtitleSavedStyle = null;
 // T1.3: sessionId cursor — when it changes (arm/activate/restore) we reset the
 // event cursor and clear cached effect state so the overlay re-syncs cleanly.
 let currentSessionId = 0;
@@ -807,32 +799,45 @@ function formatCompactDelta(d) {
   return (d >= 0 ? '+' : '') + (Math.round(d * 100) / 100).toString();
 }
 
-function showPopup(icon, label, delta, actorName, capped) {
-  const container = document.getElementById('event-container');
-  if (!container) return;
-  // T3.4: keep the popup stack bounded so rapid event bursts don't pile up
-  // DOM nodes and starve the layout.
-  const MAX_POPUPS = 5;
-  if (container.children.length >= MAX_POPUPS) {
-    container.removeChild(container.firstChild);
+function restoreSubtitlePopup() {
+  subtitlePopupActive = false;
+  subtitlePopupTimer = null;
+  const subtitleEl = document.getElementById('subtitle');
+  if (!subtitleEl) return;
+  subtitleEl.classList.remove('subtitle-popup');
+  subtitleEl.style.color = '';
+  subtitleEl.style.fontSize = '';
+  // Devolver la frase y el estilo de config (el último cacheado del polling).
+  if (subtitleSavedText !== null && subtitleEl.textContent !== subtitleSavedText) {
+    subtitleEl.textContent = subtitleSavedText;
   }
-  const el = document.createElement('div');
-  el.className = 'event-popup ' + (delta >= 0 ? 'add' : 'subtract');
-  el.style.color = delta >= 0 ? popupColors.add : popupColors.subtract;
+  const restoreStyle = styles.subtitle || subtitleSavedStyle;
+  if (restoreStyle) {
+    applyStyles(subtitleEl, restoreStyle);
+  }
+  subtitleSavedText = null;
+  subtitleSavedStyle = null;
+}
+
+function showPopup(icon, label, delta, actorName, capped) {
+  const subtitleEl = document.getElementById('subtitle');
+  if (!subtitleEl) return;
   const deltaText = formatCompactDelta(delta) + 's';
-  // F4: el popup es el gancho de la donación — SOLO nombre y tiempo, sin iconos
-  // (petición del operador: "nombre y tiempo es suficiente"). El icono/label del
-  // evento siguen viajando en el JSON (aria-label y depuración) pero no se pintan.
+  // F4+F5: SOLO nombre y tiempo, sin iconos. El popup sustituye la frase del
+  // subtítulo en su sitio (debajo del reloj) con pastilla y glow — nunca a un
+  // costado del contador.
   const parts = [];
   if (actorName) parts.push(actorName);
   if (capped) parts.push('(tope)');
   parts.push(deltaText);
-  el.textContent = parts.join(' ');
-  el.setAttribute('aria-label', (label || 'evento') + ' ' + deltaText);
-  // V2: la lane lateral apila los popups por flex. Ya no se calcula `top` ni
-  // offsets por indice, y el tamano se acota para que la cola no desborde.
-  // F3+F4: fuente grande (60% del contador, techo 96 de lienzo) y, fuera de
-  // preview, piso físico de ~14px reales — nunca por encima del contador.
+  const text = parts.join(' ');
+  // Guardar la frase original solo la primera vez (ráfagas de eventos).
+  if (!subtitlePopupActive) {
+    subtitleSavedText = subtitleEl.textContent;
+    subtitleSavedStyle = styles.subtitle || null;
+  } else {
+    clearTimeout(subtitlePopupTimer);
+  }
   const counterSize = (styles.counter && styles.counter.font_size_px) || 120;
   const popupScale = previewMode ? 0.26 : 0.6;
   let size = Math.max(16, Math.min(96, Math.round(counterSize * popupScale)));
@@ -841,12 +846,17 @@ function showPopup(icon, label, delta, actorName, capped) {
     const physMin = Math.ceil(14 / k);
     size = Math.max(size, Math.min(physMin, counterSize));
   }
-  el.style.fontSize = size + 'px';
-  // F2: recolocar la lane midiendo el contador antes de insertar el popup.
-  layoutEventLane();
-  container.appendChild(el);
-  requestAnimationFrame(() => { el.classList.add('fade'); });
-  setTimeout(() => { if (el.parentNode) el.parentNode.removeChild(el); }, 3000);
+  subtitlePopupActive = true;
+  subtitleEl.textContent = text;
+  subtitleEl.setAttribute('aria-label', (label || 'evento') + ' ' + deltaText);
+  subtitleEl.style.color = delta >= 0 ? popupColors.add : popupColors.subtract;
+  subtitleEl.style.fontSize = size + 'px';
+  subtitleEl.style.fontWeight = 'bold';
+  // Reiniciar la animación aunque llegue otra ráfaga con el popup vivo.
+  subtitleEl.classList.remove('subtitle-popup');
+  void subtitleEl.offsetWidth;
+  subtitleEl.classList.add('subtitle-popup');
+  subtitlePopupTimer = setTimeout(restoreSubtitlePopup, 3000);
 }
 
 function styleEqual(a, b) {
@@ -1079,7 +1089,6 @@ function applyAnchor() {
     body.style.justifyContent = 'center';
     body.style.alignItems = 'center';
     body.style.padding = '';
-    layoutEventLane();
     return;
   }
   // "top-left", "middle-right", ... separar en eje vertical / horizontal.
@@ -1093,7 +1102,6 @@ function applyAnchor() {
   body.style.alignItems = mapA[vertical] || 'center';
   // Margen como padding global en % del lienzo, respetando el lado opuesto.
   body.style.padding = margin + '%';
-  layoutEventLane();
 }
 
 function applyScale() {
@@ -1124,57 +1132,9 @@ function applyScale() {
   stopParticleLoop();
 }
 
-// F2: la lane de popups no vive en una posición fija. Mide el contador (en
-// unidades de lienzo, descontando el scale del stage) y se sienta A SU DERECHA
-// con un hueco; si no cabe, a su izquierda; si el contador ocupa casi todo el
-// ancho, debajo del bloque. Así nunca pisa los dígitos, sea cual sea el tamaño
-// de fuente o el anclaje del bloque. (En preview iframe manda el CSS propio.)
-function layoutEventLane() {
-  var lane = document.getElementById('event-container');
-  var wrap = document.getElementById('counter-wrap');
-  var stage = document.getElementById('stage');
-  if (!lane || !wrap || !stage || previewMode) return;
-  var rect = stage.getBoundingClientRect();
-  var counterRect = wrap.getBoundingClientRect();
-  if (rect.width <= 0 || counterRect.width <= 0) return;
-  // px de pantalla → unidades de lienzo (en modo auto el stage va con transform).
-  var k = currentScaleK > 0 ? currentScaleK : 1;
-  var stageW = rect.width / k;
-  var counterLeft = (counterRect.left - rect.left) / k;
-  var counterRight = (counterRect.right - rect.left) / k;
-  var counterBottom = (counterRect.bottom - rect.top) / k;
-  var edge = Math.round(stageW * 0.03);
-  var gap = 48;    // aire mínimo: el anillo de progreso sobresale 28px del contador
-  var minLane = 260; // ancho mínimo de lane para que quepa texto legible
-  var spaceRight = stageW - edge - counterRight - gap;
-  var spaceLeft = counterLeft - edge - gap;
-  lane.style.bottom = '';
-  if (spaceRight >= minLane) {
-    lane.style.left = Math.ceil(counterRight + gap) + 'px';
-    lane.style.right = edge + 'px';
-    lane.style.top = '50%';
-    lane.style.transform = 'translateY(-50%)';
-    lane.style.maxWidth = Math.round(stageW * 0.45) + 'px';
-    lane.style.maxHeight = '72%';
-  } else if (spaceLeft >= minLane) {
-    lane.style.left = edge + 'px';
-    lane.style.right = Math.ceil(stageW - (counterLeft - gap)) + 'px';
-    lane.style.top = '50%';
-    lane.style.transform = 'translateY(-50%)';
-    lane.style.maxWidth = Math.round(stageW * 0.45) + 'px';
-    lane.style.maxHeight = '72%';
-  } else {
-    // Contador casi a todo el ancho: la lane queda por debajo del bloque, en la
-    // esquina inferior derecha — fuera de la banda vertical del reloj.
-    lane.style.left = '';
-    lane.style.right = edge + 'px';
-    lane.style.top = Math.ceil(counterBottom + gap) + 'px';
-    lane.style.transform = 'none';
-    lane.style.bottom = '6%';
-    lane.style.maxWidth = Math.round(stageW * 0.42) + 'px';
-    lane.style.maxHeight = 'none';
-  }
-}
+// F5: la lane lateral de popups (F2, layoutEventLane) se retiró. El popup se
+// pinta sobre el subtítulo (showPopup → clase subtitle-popup) y no se sienta a
+// un costado del reloj.
 
 function applyVisualEngine(data) {
   // Las particulas se refrescan siempre (fuera del guard de firma): su estado
@@ -1286,7 +1246,7 @@ function applyVisualEngine(data) {
   }
 }
 
-window.addEventListener('resize', function() { applyScale(); layoutEventLane(); });
+window.addEventListener('resize', function() { applyScale(); });
 
 /* === V11: particulas ========================================================
    Un solo canvas, dibujado con rectangulos y lineas (sin imagenes), y un bucle
@@ -1701,9 +1661,10 @@ function updateOverlay() {
       if (previewBadge) previewBadge.classList.toggle('visible', showPreview);
       subtitleEl.classList.toggle('preview', showPreview);
 
-      // Textos y estilos (siempre se actualizan)
+      // Textos y estilos (siempre se actualizan; el texto del subtítulo cede
+      // al popup mientras subtitlePopupActive — F5).
       if (data.title !== undefined && titleEl.textContent !== data.title) titleEl.textContent = data.title;
-      if (data.subtitle !== undefined && subtitleEl.textContent !== data.subtitle) subtitleEl.textContent = data.subtitle;
+      if (!subtitlePopupActive && data.subtitle !== undefined && subtitleEl.textContent !== data.subtitle) subtitleEl.textContent = data.subtitle;
 
       if (!styleEqual(styles.title, data.titleStyle)) {
         applyStyles(titleEl, data.titleStyle || {font_size_px: 48, font_color: '#FFFFFF', font_family: 'Segoe UI, sans-serif', bold: true});
@@ -1714,7 +1675,11 @@ function updateOverlay() {
         styles.counter = data.counterStyle;
       }
       if (!styleEqual(styles.subtitle, data.subtitleStyle)) {
-        applyStyles(subtitleEl, data.subtitleStyle || {font_size_px: 32, font_color: '#AAAAAA', font_family: 'Segoe UI, sans-serif', bold: false});
+        // Durante el popup no se pisa la fuente grande del gancho; el estilo
+        // de config se cachea y se reaplica al restaurar la frase.
+        if (!subtitlePopupActive) {
+          applyStyles(subtitleEl, data.subtitleStyle || {font_size_px: 32, font_color: '#AAAAAA', font_family: 'Segoe UI, sans-serif', bold: false});
+        }
         styles.subtitle = data.subtitleStyle;
       }
 

@@ -376,19 +376,17 @@ int main() {
         NLP3_TEST_REQUIRE(other.state().particles_density >= 0.25);
     }
 
-    // --- 19. Popup móvil: viewport, lane medida y piso físico de font --------
+    // --- 19. Popup móvil: viewport y piso físico de font ---------------------
     // Reproduce el reporte (patrón Prove-It): sin viewport el browser hace doble
-    // zoom en móvil; la lane fija en right:3% invade el reloj con contadores
-    // anclados a la derecha o grandes; y el font del popup (techo de lienzo)
-    // cae a ~10px físicos con k≈0.2.
+    // zoom en móvil; y el font del popup (techo de lienzo) cae a ~10px físicos
+    // con k≈0.2. La lane lateral (F2) se retiró en F5: el popup vive en el slot
+    // del subtítulo y no se sienta a un costado del reloj.
     {
         const std::string html(nlp3::platform::panel_overlay_live_timer_html());
         // F1: sin este meta, el overlay se escalaba dos veces en pantallas táctiles.
         NLP3_TEST_REQUIRE(html.find("<meta name=\"viewport\"") != std::string::npos);
-        // F2: la lane se recoloca midiendo el contador (derecha → izquierda →
-        // esquina inferior), en vez de una posición fija que puede pisar los dígitos.
-        NLP3_TEST_REQUIRE(html.find("function layoutEventLane()") != std::string::npos);
-        NLP3_TEST_REQUIRE(html.find("layoutEventLane();") != std::string::npos);
+        // F5: la lane lateral derecha/izquierda ya no existe.
+        NLP3_TEST_REQUIRE(html.find("function layoutEventLane()") == std::string::npos);
         // F3: piso físico (~14px reales) y techo ampliado a 96px de lienzo.
         NLP3_TEST_REQUIRE(html.find("physMin") != std::string::npos);
         NLP3_TEST_REQUIRE(html.find("Math.min(96") != std::string::npos);
@@ -403,6 +401,8 @@ int main() {
         // Formato "nombre y tiempo": la composición vieja (icon + label + delta)
         // ya no existe en el JS del overlay.
         NLP3_TEST_REQUIRE(html.find("labelText") == std::string::npos);
+        // El icono del evento NUNCA se concatena al texto visible.
+        NLP3_TEST_REQUIRE(html.find("parts.push(icon)") == std::string::npos);
         // Grande: 60% del contador por defecto (72px con contador de 120).
         NLP3_TEST_REQUIRE(html.find("0.26 : 0.6") != std::string::npos);
         // Sobresaliente: pastilla oscura con glow del color del evento.
@@ -410,6 +410,27 @@ int main() {
         NLP3_TEST_REQUIRE(html.find("box-shadow: 0 0 16px currentColor") != std::string::npos);
         // Entrada con pop de escala (no solo slide lateral).
         NLP3_TEST_REQUIRE(html.find("scale(0.72)") != std::string::npos);
+    }
+
+    // --- 21. F5 — el popup reemplaza la frase del subtítulo (Opción D) --------
+    // Sin lane a un costado: mientras dura el evento, "Cada coin suma Xs" se
+    // sustituye por "Nombre +Ns" en grande con pastilla; al terminar vuelve la
+    // frase original. El polling del overlay no pisa el popup mientras está activo.
+    {
+        const std::string html(nlp3::platform::panel_overlay_live_timer_html());
+        // El popup se aplica sobre #subtitle, no sobre una lane lateral.
+        NLP3_TEST_REQUIRE(html.find("subtitle-popup") != std::string::npos);
+        // Guardia de polling: la frase no se reescribe mientras el popup vive.
+        NLP3_TEST_REQUIRE(html.find("subtitlePopupActive") != std::string::npos);
+        // Al expirar se restaura el texto original del subtítulo.
+        NLP3_TEST_REQUIRE(html.find("restoreSubtitlePopup") != std::string::npos);
+        // El contenedor lateral de eventos ya no recibe popups.
+        NLP3_TEST_REQUIRE(html.find("appendChild(el)") == std::string::npos ||
+                          html.find("getElementById('event-container')") == std::string::npos);
+        // Opción B: nombre extenso → máx. 2 líneas con "…" (el recuadro no
+        // desborda hacia la barra de progreso ni se sale del marco).
+        NLP3_TEST_REQUIRE(html.find("-webkit-line-clamp: 2") != std::string::npos);
+        NLP3_TEST_REQUIRE(html.find("line-clamp: 2") != std::string::npos);
     }
 
     return 0;
