@@ -202,7 +202,8 @@ std::wstring build_runtime_probe_command_line(
     const std::filesystem::path& python_executable,
     const std::filesystem::path& script_path,
     const std::filesystem::path& report_path,
-    const std::string& api_key) {
+    const std::string& api_key,
+    bool has_stored_keys) {
     std::wstring command_line;
     command_line += quote_windows_argument(python_executable.wstring());
     command_line += L" ";
@@ -216,6 +217,11 @@ std::wstring build_runtime_probe_command_line(
     if (!api_key.empty()) {
         command_line += L" --api-key ";
         command_line += quote_windows_argument(widen(api_key));
+    }
+    if (has_stored_keys) {
+        // El pool vive en la boveda (DPAPI): el hijo no recibe la key en la
+        // linea de comandos, pero tampoco es un faltante del usuario.
+        command_line += L" --has-stored-keys";
     }
     return command_line;
 }
@@ -432,7 +438,7 @@ std::optional<std::string> read_text_file(const std::filesystem::path& path) {
     return contents;
 }
 
-BridgeRuntimeProbeResult run_bridge_runtime_probe(const std::string& api_key = "") {
+BridgeRuntimeProbeResult run_bridge_runtime_probe(const std::string& api_key = "", bool has_stored_keys = false) {
     BridgeRuntimeProbeResult result{};
     result.checked = true;
     result.checked_timestamp_ms = now_wall_clock_ms();
@@ -490,7 +496,7 @@ BridgeRuntimeProbeResult run_bridge_runtime_probe(const std::string& api_key = "
 
     PROCESS_INFORMATION process_info{};
     const auto report_path = build_runtime_probe_report_path();
-    auto command_line = build_runtime_probe_command_line(python_executable, probe_script, report_path, api_key);
+    auto command_line = build_runtime_probe_command_line(python_executable, probe_script, report_path, api_key, has_stored_keys);
     auto mutable_command_line = std::vector<wchar_t>(command_line.begin(), command_line.end());
     mutable_command_line.push_back(L'\0');
 
@@ -597,16 +603,22 @@ BridgeRuntimeProbeResult run_bridge_runtime_probe(const std::string& api_key = "
     return result;
 }
 
-BridgeRuntimeProbeResult cached_bridge_runtime_probe(bool force_refresh, const std::string& api_key = "") {
+BridgeRuntimeProbeResult cached_bridge_runtime_probe(
+    bool force_refresh,
+    const std::string& api_key = "",
+    bool has_stored_keys = false) {
     static std::mutex cache_mutex;
     static BridgeRuntimeProbeResult cached_result{};
+    static bool cached_has_stored_keys = false;
 
     std::lock_guard<std::mutex> lock(cache_mutex);
     const auto stale = !cached_result.checked
         || (now_wall_clock_ms() - cached_result.checked_timestamp_ms) > 30000;
     // La key viene de la UI por request: siempre volver a verificar cuando llega una.
-    if (force_refresh || stale || !api_key.empty()) {
-        cached_result = run_bridge_runtime_probe(api_key);
+    // Cambiar la bóveda (con/sin credenciales guardadas) también invalida el cache.
+    if (force_refresh || stale || !api_key.empty() || has_stored_keys != cached_has_stored_keys) {
+        cached_result = run_bridge_runtime_probe(api_key, has_stored_keys);
+        cached_has_stored_keys = has_stored_keys;
     }
     return cached_result;
 }
@@ -705,8 +717,8 @@ bool post_local_shutdown_request(std::uint16_t port) {
 
 namespace nlp3::platform {
 
-ExternalBridgeRunner::ExternalBridgeRunner() noexcept {
-    refresh_runtime_status();
+ExternalBridgeRunner::ExternalBridgeRunner(bool has_stored_keys) noexcept {
+    refresh_runtime_status(false, "", has_stored_keys);
 }
 
 ExternalBridgeRunner::~ExternalBridgeRunner() {
@@ -720,7 +732,9 @@ bool ExternalBridgeRunner::start(const ExternalBridgeRunnerStartRequest& request
     control_port_ = request.control_port;
     status_.target_user = request.target_user;
     status_.ws_url = request.ws_url;
-    refresh_runtime_status(true, request.api_key);
+    // El pool (si la bóveda tiene credenciales) viaja por archivo: el chequeo
+    // debe saberlo para no reportar la API key como faltante.
+    refresh_runtime_status(true, request.api_key, !request.api_keys_file.empty());
 
     if (request.target_user.empty() || request.ws_url.empty()) {
         status_.last_error = "runner target or ws url missing";
@@ -954,12 +968,16 @@ void ExternalBridgeRunner::poll() {
 #endif
 }
 
-void ExternalBridgeRunner::refresh_runtime_status(bool force, const std::string& api_key) {
+void ExternalBridgeRunner::refresh_runtime_status(
+    bool force,
+    const std::string& api_key,
+    bool has_stored_keys) {
 #ifdef _WIN32
-    apply_runtime_probe_to_status(status_, cached_bridge_runtime_probe(force, api_key));
+    apply_runtime_probe_to_status(status_, cached_bridge_runtime_probe(force, api_key, has_stored_keys));
 #else
     (void)force;
     (void)api_key;
+    (void)has_stored_keys;
     status_.runtime_checked = true;
     status_.runtime_ready = false;
     status_.runtime_checked_timestamp_ms = now_wall_clock_ms();

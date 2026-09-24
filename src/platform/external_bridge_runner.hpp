@@ -44,13 +44,19 @@ struct ExternalBridgeRunnerStatus {
 
 class ExternalBridgeRunner {
 public:
-    ExternalBridgeRunner() noexcept;
+    // `has_stored_keys`: la bóveda local ya tiene credenciales del proveedor.
+    // El chequeo de entorno lo recibe para no reportar la API key como faltante
+    // cuando el pool viaja por archivo y no por la línea de comandos.
+    explicit ExternalBridgeRunner(bool has_stored_keys = false) noexcept;
     ~ExternalBridgeRunner();
 
     bool start(const ExternalBridgeRunnerStartRequest& request);
     void stop();
     void poll();
-    void refresh_runtime_status(bool force = false, const std::string& api_key = "");
+    void refresh_runtime_status(
+        bool force = false,
+        const std::string& api_key = "",
+        bool has_stored_keys = false);
 
     ExternalBridgeRunnerStatus status() const noexcept;
 

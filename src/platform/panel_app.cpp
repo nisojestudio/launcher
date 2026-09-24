@@ -855,8 +855,10 @@ bool PanelApp::initialize(const std::string& config_path) {
 
         if (config_.bridge_mode == "external") {
             bridge_session_ = std::make_unique<bridge::TikTokBridgeExternalSession>(config_.bridge);
-            external_runner_ = std::make_unique<ExternalBridgeRunner>();
-            external_runner_->refresh_runtime_status();
+            external_runner_ = std::make_unique<ExternalBridgeRunner>(!bridge_key_vault_.empty());
+            // La bóveda ya está cargada: el chequeo de entorno debe saber que las
+            // credenciales existen aunque este proceso hijo no reciba la key por CLI.
+            external_runner_->refresh_runtime_status(false, "", !bridge_key_vault_.empty());
         } else {
             bridge_session_ = std::make_unique<bridge::TikTokBridgeStubSession>(config_.bridge);
         }
@@ -1893,7 +1895,7 @@ bool PanelApp::start_external_runner(const std::string& target_user, std::uint64
     }
 
     if (external_runner_ == nullptr) {
-        external_runner_ = std::make_unique<ExternalBridgeRunner>();
+        external_runner_ = std::make_unique<ExternalBridgeRunner>(!bridge_key_vault_.empty());
     }
 
     // El pool viaja por archivo transitorio (no en la linea de comandos): asi

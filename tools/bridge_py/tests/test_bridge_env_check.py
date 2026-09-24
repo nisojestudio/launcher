@@ -144,6 +144,38 @@ class BridgeEnvCheckTests(unittest.TestCase):
         self.assertFalse(euler_check["blocking"])
         self.assertTrue(any("Euler" in warning for warning in report["warnings"]))
 
+    def test_stored_keys_in_the_vault_are_not_reported_as_missing(self) -> None:
+        """La bóveda del panel guarda las keys: el chequeo no debe avisar faltante."""
+        with tempfile.TemporaryDirectory() as temp_dir:
+            bridge_root = Path(temp_dir) / "bridge_py"
+            bridge_root.mkdir()
+            (bridge_root / "bridge_config.yaml").write_text(
+                "connection_mode: tiktools\nconnection:\n  api_key: \"\"\n",
+                encoding="utf-8",
+            )
+            config_path = Path(temp_dir) / "panel_config.json"
+            config_path.write_text(
+                json.dumps({"bridge_mode": "external", "auth": {"required": False}}, indent=2),
+                encoding="utf-8",
+            )
+
+            report = perform_bridge_env_check(
+                bridge_root,
+                config_path=config_path,
+                has_stored_keys=True,
+            )
+
+        tiktools_check = next(
+            check for check in report["checks"]
+            if check.get("type") == "provider_connectivity" and check.get("id") == "tiktools"
+        )
+        self.assertTrue(tiktools_check["ok"])
+        self.assertTrue(tiktools_check["api_key_configured"])
+        self.assertEqual(tiktools_check["api_key_source"], "vault")
+        self.assertNotIn("Falta la API key", " ".join(report["warnings"]))
+        self.assertNotIn("Falta la API key", report["summary"])
+        self.assertTrue(report["bridgeApiKeysStored"])
+
     def test_cli_can_write_report_without_stdout(self) -> None:
         bridge_root = Path(__file__).resolve().parents[1]
         script_path = bridge_root / "bridge_env_check.py"

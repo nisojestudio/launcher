@@ -46,6 +46,27 @@ $env:LIVEPANEL_BRIDGE_API_KEY = "tk_..."
 Remove-Item Env:LIVEPANEL_BRIDGE_API_KEY
 ```
 
+### Pool de API keys y rotacion automatica
+
+El panel guarda varias credenciales en la bóveda local y las escribe en un JSON
+transitorio que se pasa al bridge con `--api-keys-file`:
+
+```powershell
+.\.venv\Scripts\python.exe .\run_tiktok_bridge.py --user tuusuario --provider tiktools --api-keys-file "C:\Users\...\AppData\Local\NisojeStudio\run\bridge-api-keys.json"
+```
+
+Formato: `{"keys": [{"label": "cuenta 1", "value": "tk_..."}, ...]}`.
+
+Cuando tik.tools cierra la sesion por cuota o plan (`4401` evaluation period,
+`4429` demo, `4555` daily demo), el bridge:
+
+1. clasifica el cierre como `API_SESSION_ENDED` (accion `rotate_key`);
+2. pone la credencial en cuarentena y sigue con la siguiente del pool, sin
+   reiniciar el proceso ni gastar el presupuesto de reintentos;
+3. si todas agotaron, espera hasta `retry_policy.all_keys_cooldown_max_minutes`;
+   y si no hay otra key que rotar corta ya con un mensaje accionable
+   (no quema `max_attempts` reintentando con la misma credencial muerta).
+
 ### Euler Stream (comunidad)
 
 Euler requiere una API key en formato JWT (3 partes separadas por puntos). La key se obtiene desde https://eulerstream.com/.
@@ -64,7 +85,7 @@ No requiere API key, pero puede ser menos estable.
 python run_tiktok_bridge.py --user tuusuario --provider direct
 ```
 
-Si el proveedor cierra con código de error específico (ej. `4429` en tiktools, `4429`/`4404` en Euler), no es una caída de red: la sesión alcanzó el límite de plan/demo o de WebSockets. El bridge deja de reintentarla para evitar un bucle y muestra el diagnóstico; cierra las sesiones duplicadas o usa una key con cuota disponible.
+Si el proveedor cierra con código de error específico (ej. `4401`/`4429` en tiktools, `4429`/`4404` en Euler), no es una caída de red: la sesión alcanzó el límite de plan/demo o de WebSockets. Con un pool de credenciales el bridge rota a la siguiente key y sigue; sin pool, corta ahí mismo para evitar un bucle y muestra el diagnóstico (cierra las sesiones duplicadas o usa una key con cuota disponible).
 
 WS directo al panel:
 
@@ -133,7 +154,7 @@ AsyncEventDispatcher
 - `NOT_LIVE`: la cuenta no esta en vivo ahora mismo.
 - `ACCESS_BLOCKED` o `RATE_LIMIT`: TikTok o el servicio de firmado rechazaron la sesion.
 - `INVALID_API_KEY` / `INVALID_JWT`: API key invalida o JWT malformado (Euler).
-- `API_SESSION_ENDED`: límite de sesiones concurrentes alcanzado (códigos 4429).
+- `API_SESSION_ENDED`: la key agotó su cuota o venció su plan (códigos `4401`, `4429`, `4555`). Con pool se rota a la siguiente credencial; sin pool, revisa o reemplaza la key en el panel.
 - `BOOTSTRAP_FAILED`: falta dependencia `websockets` (instalar `requirements.txt`).
 - Si `TikTokLive` no esta en el entorno activo, el runner puede reutilizar el bridge legado via `--legacy-bridge-root`.
 - Cuando el runner se lanza desde el panel, `bridge runner stop` intenta primero un shutdown limpio por `POST /shutdown` y solo cae a terminacion forzada si el proceso no responde.

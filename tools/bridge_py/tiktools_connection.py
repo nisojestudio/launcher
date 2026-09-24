@@ -37,6 +37,30 @@ def classify_tiktools_error(raw_error: str) -> tuple[str, str]:
     return code, message_for(code)
 
 
+def classify_ws_exception(exc: BaseException) -> tuple[str, str]:
+    """Clasifica una excepcion del loop WebSocket del proveedor.
+
+    Cuando tik.tools cierra la sesion, la excepcion (`ConnectionClosed`) sale
+    del `async for` y llega al handler generico, NO a la rama de
+    "websocket closed unexpectedly" que usa `classify_close_code`. Si ahi se
+    clasifica solo por texto se pierde el codigo de cierre real: el 4401
+    ("Evaluation period ended") quedaba como UNKNOWN/NETWORK_ERROR, no se
+    rotaba la API key y el runner moria con exit 1 teniendo una key sana en el
+    pool. Ver tests/test_tiktools_connection.py::test_expired_evaluation_key...
+    """
+    if websockets is not None and isinstance(exc, websockets.exceptions.ConnectionClosed):
+        # `rcvd` trae el frame de cierre que mando el proveedor (evita las
+        # properties `.code`/`.reason`, deprecadas desde websockets 13.1).
+        # Sin frame hay cierre abrupto: close_code queda en None y el catalogo
+        # lo trata como STREAM_DISCONNECTED.
+        rcvd = getattr(exc, "rcvd", None)
+        close_code = getattr(rcvd, "code", None)
+        close_reason = str(getattr(rcvd, "reason", "") or "")
+        code = classify_close_code(close_code, close_reason)
+        return code, message_for(code)
+    return classify_tiktools_error(str(exc))
+
+
 _WS_EVENT_MAP: dict[str, CanonicalEventType] = {
     "chat": CanonicalEventType.CHAT,
     "comment": CanonicalEventType.CHAT,
@@ -464,7 +488,7 @@ class TikToolsConnection:
         except TikToolsConnectionError:
             raise
         except Exception as exc:
-            code, message = classify_tiktools_error(str(exc))
+            code, message = classify_ws_exception(exc)
             log_json(self._logger, "error", "tiktools_connection", "ws_loop_error", error=str(exc), code=code)
             raise TikToolsConnectionError(code, message, raw_error=str(exc)) from exc
 

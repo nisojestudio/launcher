@@ -12,6 +12,13 @@ from tiktools_connection import (
     classify_tiktools_error,
 )
 
+try:
+    from websockets.exceptions import ConnectionClosedError
+    from websockets.frames import Close
+except ImportError:  # pragma: no cover - el runtime del panel siempre lo trae
+    ConnectionClosedError = None
+    Close = None
+
 
 async def noop_callback(_value: object) -> None:
     return None
@@ -45,12 +52,34 @@ class LiveEndSocket(ClosedSocket):
             raise StopAsyncIteration
 
 
+class ExpiredKeySocket(ClosedSocket):
+    """tik.tools cierra con 4401 cuando vencio el periodo de evaluacion de la key."""
+
+    close_code = 4401
+    close_reason = "Evaluation period ended. Upgrade at https://tik.tools/pricing"
+
+    def __aiter__(self):
+        return self
+
+    async def __anext__(self):
+        # Asi llega el cierre en produccion: la excepcion sale del `async for`,
+        # no del bloque "websocket closed unexpectedly".
+        raise ConnectionClosedError(Close(4401, self.close_reason), None)
+
+    async def close(self, **_kwargs) -> None:
+        return None
+
+
 async def connect_closed_socket(*_args, **_kwargs) -> ClosedSocket:
     return ClosedSocket()
 
 
 async def connect_live_end_socket(*_args, **_kwargs) -> LiveEndSocket:
     return LiveEndSocket()
+
+
+async def connect_expired_key_socket(*_args, **_kwargs) -> ExpiredKeySocket:
+    return ExpiredKeySocket()
 
 
 class TikToolsConnectionTests(unittest.IsolatedAsyncioTestCase):
@@ -82,6 +111,37 @@ class TikToolsConnectionTests(unittest.IsolatedAsyncioTestCase):
 
         self.assertEqual(raised.code, "API_SESSION_ENDED")
         self.assertIn("4429", raised.raw_error)
+
+    async def test_expired_evaluation_key_reports_session_ended_for_rotation(self) -> None:
+        """El cierre 4401 llega por el `async for`, no por la rama de cierre.
+
+        Si se clasifica solo por texto queda UNKNOWN: sin rotacion de key el
+        pool nunca llega a la credencial sana y el runner muere con exit 1.
+        """
+        connection = TikToolsConnection(
+            logger=logging.getLogger("test.tiktools_connection.expired_key"),
+            legacy_bridge_root="",
+            connect_timeout_sec=5,
+            event_callback=noop_callback,
+            status_callback=noop_callback,
+            target_user="alice",
+            api_key="expired-key",
+        )
+        with mock.patch(
+            "tiktools_connection.websockets.connect",
+            side_effect=connect_expired_key_socket,
+        ):
+            try:
+                await connection.open()
+            except TikToolsConnectionError as exc:
+                raised = exc
+            else:
+                with self.assertRaises(TikToolsConnectionError) as context:
+                    await connection.wait_closed()
+                raised = context.exception
+
+        self.assertEqual(raised.code, "API_SESSION_ENDED")
+        self.assertIn("4401", raised.raw_error)
 
     async def test_live_end_event_is_classified_as_not_live(self) -> None:
         connection = TikToolsConnection(

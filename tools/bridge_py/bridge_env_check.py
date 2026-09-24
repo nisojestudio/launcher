@@ -75,7 +75,7 @@ def _module_version(module_name: str, module: Any | None = None) -> str:
     return "unknown"
 
 
-def _check_euler_connectivity(bridge_config) -> tuple[bool, str, dict[str, Any], bool]:
+def _check_euler_connectivity(bridge_config, has_stored_keys: bool = False) -> tuple[bool, str, dict[str, Any], bool]:
     """Check if Euler Stream is reachable and API key is configured.
 
     Returns (ok, message, details, blocking).
@@ -90,7 +90,10 @@ def _check_euler_connectivity(bridge_config) -> tuple[bool, str, dict[str, Any],
         return True, "Provider is not Euler, skipping Euler connectivity check", {"skipped": True}, False
 
     api_key = getattr(bridge_config.connection, "api_key", "") or ""
-    if not api_key:
+    # `has_stored_keys` = la bóveda del panel (DPAPI) tiene credenciales y se
+    # vuelca al pool transitorio al arrancar el runner. En ese caso la key no
+    # "falta": este proceso hijo simplemente no la recibe en la linea de comandos.
+    if not api_key and not has_stored_keys:
         return False, "Falta la API key de Euler Stream (JWT) para esta sesion.", {
             "provider": "euler",
             "api_key_configured": False,
@@ -98,12 +101,13 @@ def _check_euler_connectivity(bridge_config) -> tuple[bool, str, dict[str, Any],
         }, False
 
     # Check API key format (basic JWT check: should have 3 parts separated by dots)
-    jwt_parts = api_key.split(".")
-    if len(jwt_parts) != 3:
+    jwt_parts = api_key.split(".") if api_key else []
+    if api_key and len(jwt_parts) != 3:
         return False, "La API key de Euler no parece un JWT valido (se esperan 3 partes).", {
             "provider": "euler",
             "api_key_configured": True,
             "api_key_format_valid": False,
+            "api_key_source": "request",
             "endpoint": EULER_WS_BASE,
         }, False
 
@@ -129,12 +133,13 @@ def _check_euler_connectivity(bridge_config) -> tuple[bool, str, dict[str, Any],
         "provider": "euler",
         "api_key_configured": True,
         "api_key_format_valid": True,
+        "api_key_source": "vault" if (has_stored_keys and not api_key) else "request",
         "endpoint": EULER_WS_BASE,
         "dns_ok": dns_ok,
     }, False
 
 
-def _check_tiktools_connectivity(bridge_config) -> tuple[bool, str, dict[str, Any], bool]:
+def _check_tiktools_connectivity(bridge_config, has_stored_keys: bool = False) -> tuple[bool, str, dict[str, Any], bool]:
     """Check if tik.tools is reachable and API key is configured.
 
     Returns (ok, message, details, blocking). Ver la nota de
@@ -146,7 +151,9 @@ def _check_tiktools_connectivity(bridge_config) -> tuple[bool, str, dict[str, An
         return True, "Provider is not tiktools, skipping tiktools connectivity check", {"skipped": True}, False
 
     api_key = getattr(bridge_config.connection, "api_key", "") or ""
-    if not api_key:
+    # Bóveda del panel con credenciales: el pool viaja por archivo transitorio
+    # cuando arranca el runner, asi que "no hay --api-key" no es un faltante.
+    if not api_key and not has_stored_keys:
         return False, "Falta la API key de tik.tools para esta sesion.", {
             "provider": "tiktools",
             "api_key_configured": False,
@@ -171,6 +178,7 @@ def _check_tiktools_connectivity(bridge_config) -> tuple[bool, str, dict[str, An
     return True, "tiktools connectivity check passed (DNS resolution OK)", {
         "provider": "tiktools",
         "api_key_configured": True,
+        "api_key_source": "vault" if (has_stored_keys and not api_key) else "request",
         "endpoint": "wss://api.tik.tools",
         "dns_ok": dns_ok,
     }, False
@@ -180,6 +188,7 @@ def _build_report(
     bridge_root: Path,
     config_path: Path,
     expect_auth_required: bool,
+    has_stored_keys: bool = False,
 ) -> dict[str, Any]:
     runtime_python = bridge_root / "python_runtime" / "python.exe"
     dev_python = bridge_root / ".venv" / "Scripts" / "python.exe"
@@ -379,7 +388,9 @@ def _build_report(
             )
 
     # Euler connectivity check (only if provider is euler)
-    euler_ok, euler_msg, euler_details, euler_blocking = _check_euler_connectivity(bridge_config)
+    euler_ok, euler_msg, euler_details, euler_blocking = _check_euler_connectivity(
+        bridge_config, has_stored_keys
+    )
     checks.append({
         "type": "provider_connectivity",
         "id": "euler_stream",
@@ -395,7 +406,9 @@ def _build_report(
             warnings.append(euler_msg)
 
     # TikTools connectivity check (only if provider is tiktools)
-    tiktools_ok, tiktools_msg, tiktools_details, tiktools_blocking = _check_tiktools_connectivity(bridge_config)
+    tiktools_ok, tiktools_msg, tiktools_details, tiktools_blocking = _check_tiktools_connectivity(
+        bridge_config, has_stored_keys
+    )
     checks.append({
         "type": "provider_connectivity",
         "id": "tiktools",
@@ -431,6 +444,7 @@ def _build_report(
         "alerts": alerts,
         "warnings": warnings,
         "bridgeRoot": str(bridge_root),
+        "bridgeApiKeysStored": bool(has_stored_keys),
         "pythonExecutable": str(current_python),
         "pythonVersion": sys.version.split()[0],
         "runtimeMode": runtime_mode,
@@ -457,10 +471,16 @@ def perform_bridge_env_check(
     bridge_root: Path | str | None = None,
     config_path: Path | str | None = None,
     expect_auth_required: bool = False,
+    has_stored_keys: bool = False,
 ) -> dict[str, Any]:
     normalized_bridge_root = _normalize_bridge_root(bridge_root)
     normalized_config_path = _normalize_config_path(normalized_bridge_root, config_path)
-    return _build_report(normalized_bridge_root, normalized_config_path, expect_auth_required)
+    return _build_report(
+        normalized_bridge_root,
+        normalized_config_path,
+        expect_auth_required,
+        has_stored_keys,
+    )
 
 
 def render_text_report(report: dict[str, Any]) -> str:
@@ -510,6 +530,11 @@ def main() -> int:
         default="",
         help="API key del provider (ingresada en el panel); se aplica solo a este proceso de verificacion.",
     )
+    parser.add_argument(
+        "--has-stored-keys",
+        action="store_true",
+        help="El panel tiene credenciales guardadas (boveda local): no reportes la key como faltante.",
+    )
     args = parser.parse_args()
 
     # La key llega de la UI del panel por peticion: no depende de archivos ni de
@@ -523,6 +548,7 @@ def main() -> int:
         bridge_root,
         args.config_path or None,
         expect_auth_required=args.expect_auth_required,
+        has_stored_keys=args.has_stored_keys,
     )
     serialized = json.dumps(report, ensure_ascii=False, indent=2) if args.format == "json" else render_text_report(report)
 

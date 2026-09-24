@@ -522,17 +522,25 @@ class ConnectionManager:
                     )
 
                 error_message = exc.message
+                provider_label = {"tiktools": "tik.tools", "euler": "Euler Stream"}.get(provider, provider)
                 if rotating_key:
                     if key_delay is not None and key_delay > 0:
                         error_message = (
-                            "Se agoto la cuota de todas las API keys configuradas. "
+                            f"{provider_label} rechazo todas las API keys del pool. "
                             f"Se reintenta cuando alguna se libere (en {key_delay / 60.0:.0f} min)."
                         )
                     else:
                         error_message = (
-                            f"Se agoto la cuota de la credencial en uso ({key_label}). "
-                            "Se rota automaticamente a la siguiente."
+                            f"{provider_label} rechazo la credencial en uso ({key_label}, cuota o plan "
+                            "agotado). Se rota automaticamente a la siguiente."
                         )
+                elif error_action == ACTION_ROTATE_KEY:
+                    # El catalogo pide rotar pero no hay pool: no prometer una
+                    # rotacion que no puede pasar (deja al usuario sin pista).
+                    error_message = (
+                        f"{provider_label} rechazo la unica API key configurada (cuota o plan "
+                        "agotado). Agrega una credencial nueva en Cuentas y API keys."
+                    )
 
                 await emit_status(
                     SessionStatus(
@@ -574,6 +582,8 @@ class ConnectionManager:
                     attempt,
                     waiting_for_live_seconds=waiting_for_live_seconds,
                 )
+                # Motivo por el que la sesion cortaria ahora ("" = sigue reintentando).
+                stop_reason = ""
                 if rotating_key and key_delay is not None:
                     # Rotar de credencial no es un fallo: se reintenta enseguida
                     # (o cuando la cuota se libere) sin gastar el presupuesto de
@@ -583,8 +593,15 @@ class ConnectionManager:
                     )
                     if max_wait_minutes > 0 and key_delay > max_wait_minutes * 60.0:
                         retry_delay = None
+                        stop_reason = "all_keys_busy"
                     else:
                         retry_delay = max(1.0, key_delay)
+                elif error_action == ACTION_ROTATE_KEY:
+                    # El catalogo pide rotar pero no hay otra key: reintentar con
+                    # la misma credencial no cambia nada, no vale la pena quemar
+                    # max_attempts esperando un resultado identico.
+                    retry_delay = None
+                    stop_reason = "rotate_without_pool"
                 if retry_delay is None:
                     log_json(
                         self._logger,
@@ -594,8 +611,22 @@ class ConnectionManager:
                         code=exc.code,
                         attempt=attempt,
                         waiting_for_live_seconds=round(waiting_for_live_seconds, 1),
+                        stop_reason=stop_reason,
                     )
-                    final_message = f"permanent failure: {exc.message}"
+                    # Mensaje final visible en el monitor del live. Debe decir lo
+                    # que realmente paso: nunca "se reintenta" cuando ya no va a
+                    # haber reintento, y siempre dejar la accion del usuario.
+                    if stop_reason == "rotate_without_pool":
+                        final_message = error_message
+                    elif stop_reason == "all_keys_busy":
+                        final_message = (
+                            f"{provider_label} rechazo todas las API keys del pool y ninguna se "
+                            "libera pronto. Revisa las credenciales en Cuentas y API keys."
+                        )
+                    elif not spec_for(exc.code).retryable or attempt <= 0:
+                        final_message = exc.message
+                    else:
+                        final_message = f"Se dejo de reintentar tras {attempt} reintentos. {exc.message}"
                     exit_code = 1
                     break
 
@@ -612,7 +643,10 @@ class ConnectionManager:
                         attempt=attempt,
                         provider=provider,
                     )
-                    final_message = "reconnect rate limit exceeded"
+                    final_message = (
+                        "Se alcanzo el limite de reconexiones por hora. "
+                        "Espera unos minutos y vuelve a conectar."
+                    )
                     exit_code = 1
                     break
 

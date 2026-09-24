@@ -4,6 +4,28 @@ All notable Panel Live changes should be recorded here.
 
 Format follows a lightweight Keep a Changelog style. Versions use SemVer.
 
+## 0.3.6 - 2026-09-24
+
+### Fixed — TikTok no conectaba: cierre 4401 mal clasificado y sin rotación de API keys
+
+- **Causa raiz**: tik.tools cerraba el WebSocket con `4401` ("Evaluation period ended" / "Invalid API key"), pero el `except Exception` de `tiktools_connection.py` clasificaba solo por texto y caía en `UNKNOWN`/`NETWORK_ERROR` (sin acción `rotate_key`). El manager agotaba los 5 intentos con la misma key muerta, el runner salía con `exit 1` y el panel veía `disconnected` — nunca llegaba a la key sana del pool (2 de 3 estaban vencidas).
+- **`error_catalog.py`**: `4401` → `API_SESSION_ENDED`; tokens `evaluation period` / `pricing to continue` clasificados igual desde el texto; mensaje del código hecho neutral (ya no promete una rotación que puede no existir).
+- **`tiktools_connection.py`**: nuevo `classify_ws_exception()` — si la excepción es `ConnectionClosed` se lee `exc.rcvd.code`/`reason` (forma no deprecada de `websockets` ≥13.1) + `classify_close_code`; solo sin código cae a clasificación por texto.
+- **`connection_manager.py`**: mensaje final honesto (`Se dejo de reintentar tras N reintentos. ...` en vez de `permanent failure: ...`, y el rate limit ya no promete reintento); con pool, la rotación se informa por credencial; sin pool, corta en el primer intento con "Agrega una credencial nueva en Cuentas y API keys" en lugar de quemar `max_attempts` con la misma credencial; si todas las keys agotaron y ninguna se libera a tiempo, el mensaje final tampoco promete un reintento que no va a pasar.
+- **Tests**: `test_evaluation_period_close_is_key_rotation_not_unknown`, `test_expired_evaluation_key_reports_session_ended_for_rotation`, `test_rotate_request_without_pool_stops_immediately` y `test_stored_keys_in_the_vault_are_not_reported_as_missing` → **71 tests OK**.
+- **Validación real (E2E contra tik.tools, pool de 3 keys)**: `cuenta musitogamer` (4401 Invalid API key) → `cuenta alternativa` (4401 Evaluation period) → **`cuenta 3` → `session connected`**, 72 eventos en 45 s.
+
+### Fixed — Aviso falso "Falta la API key" en el chequeo de entorno
+
+- **Causa raiz**: `bridge_env_check.py` solo miraba `connection.api_key`, que el panel **no** pasa cuando las credenciales viven en la bóveda DPAPI (el pool viaja por archivo transitorio). El summary del chequeo terminaba en *"TikTok listo: ... Aviso: Falta la API key de tik.tools para esta sesion"*.
+- **`bridge_env_check.py`**: nuevo flag `--has-stored-keys`; con credenciales guardadas no reporta faltante y detalla `api_key_source: "vault"` + `bridgeApiKeysStored` en el reporte (igual para Euler).
+- **`external_bridge_runner.{hpp,cpp}` / `panel_app.cpp`**: el chequeo recibe `has_stored_keys` (constructor `ExternalBridgeRunner(bool)`, `refresh_runtime_status(force, api_key, has_stored_keys)`, flag en la línea de comandos del probe y invalidación del cache cuando cambia la bóveda).
+- **Validación real**: panel compilado corriendo → `GET /api/bridge/status` devuelve `runtime_summary: "TikTok listo: entorno local de desarrollo verificado."` con `runtime_warnings: []`.
+
+### Docs
+
+- `tools/bridge_py/README_bridge.md`: nueva sección "Pool de API keys y rotacion automatica" y troubleshooting de `API_SESSION_ENDED`.
+
 ## 0.3.5 - 2026-09-23
 
 ### Fixed — Overlay timer: conexion perdida al reiniciar el panel

@@ -7,7 +7,7 @@ from unittest import mock
 from bridge_config import BridgeConfig
 from bridge_client import build_chat_event
 from connection_manager import ConnectionManager, compute_retry_delay
-from error_catalog import action_for, classify_close_code
+from error_catalog import action_for, classify_close_code, classify_error_text
 from event_decoder import decode_canonical_event
 from metrics_registry import MetricsRegistry
 from structured_logging import configure_logger
@@ -288,6 +288,24 @@ class ConnectionManagerTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(classify_close_code(4556, "Relay connection error"), "RELAY_ERROR")
         self.assertEqual(classify_close_code(1012, "service restart"), "SERVER_RESTART")
 
+    async def test_evaluation_period_close_is_key_rotation_not_unknown(self) -> None:
+        """4401 'Evaluation period ended' = plan vencido: hay que rotar de key.
+
+        Regresión real (2026-09-24): el 4401 caía como UNKNOWN, no se rotaba
+        la credencial y el runner agotaba max_attempts con la misma key muerta.
+        """
+        reason = (
+            "Evaluation period ended. Upgrade at https://tik.tools/pricing "
+            "to continue using TikTools."
+        )
+        # Texto completo tal como lo arma websockets al reportar el cierre.
+        raw_error = f"received 4401 (private use) {reason}; then sent 4401 (private use) {reason}"
+
+        self.assertEqual(classify_close_code(4401, reason), "API_SESSION_ENDED")
+        self.assertEqual(classify_error_text(raw_error), "API_SESSION_ENDED")
+        # Sin rotación no hay forma de llegar a la key sana del pool.
+        self.assertEqual(action_for("API_SESSION_ENDED"), "rotate_key")
+
     async def test_late_room_confirmation_is_declared_as_connected(self) -> None:
         """Si la sala se confirma despues del timeout, el panel debe ver 'connected'."""
 
@@ -408,6 +426,63 @@ class ConnectionManagerTests(unittest.IsolatedAsyncioTestCase):
         self.assertGreaterEqual(QuotaConnection.attempts, 3)
         self.assertEqual(used_keys[:3], ["key-uno", "key-dos", "key-tres"])
         self.assertTrue(any("cuenta-" in label for label in key_labels))
+
+    async def test_rotate_request_without_pool_stops_immediately(self) -> None:
+        """Con una sola key no hay a quien rotar: no quema max_attempts ni promete rotacion."""
+
+        class SingleKeyQuotaConnection(FakeConnection):
+            async def open(self) -> None:
+                type(self).attempts += 1
+                raise TikToolsConnectionError(
+                    "API_SESSION_ENDED",
+                    "tik.tools cerro la sesion: se agoto la cuota o vencio el plan de la API key.",
+                )
+
+        SingleKeyQuotaConnection.attempts = 0
+        config = bridge_config_with_api_key()  # una unica credencial
+        config.retry_policy.max_attempts = 5
+
+        messages: list[str] = []
+        actions: list[str] = []
+        metrics = MetricsRegistry()
+
+        async def status_callback(status) -> None:
+            messages.append(status.message)
+            if status.alert_action:
+                actions.append(status.alert_action)
+
+        manager = ConnectionManager(
+            config=config,
+            logger=configure_logger(
+                name="livepanel.bridge.test.connection.single_key",
+                log_path="tools/bridge_py/logs/test_connection_single_key.jsonl",
+            ),
+            metrics=metrics,
+            event_callback=accepted_event,
+            status_callback=status_callback,
+        )
+
+        with mock.patch("connection_manager.TikToolsConnection", SingleKeyQuotaConnection):
+            exit_code = await manager.run(target_user="alice", max_events=1, max_seconds=5)
+
+        self.assertEqual(exit_code, 1)
+        # Reintentar con la misma credencial muerta no cambia el resultado.
+        self.assertEqual(SingleKeyQuotaConnection.attempts, 1)
+        self.assertEqual(metrics.snapshot().counters.get("reconnect_total", 0), 0)
+        # El codigo sigue pidiendo rotacion y el usuario ve la accion real.
+        self.assertIn("rotate_key", actions)
+        self.assertTrue(
+            any("Cuentas y API keys" in message for message in messages),
+            f"mensaje final esperado con la accion del usuario, obtuve: {messages!r}",
+        )
+        self.assertFalse(
+            any("Se rota automaticamente" in message for message in messages),
+            f"no debe prometer una rotacion que no puede pasar: {messages!r}",
+        )
+        self.assertFalse(
+            any("Se reintenta" in message for message in messages),
+            f"no debe anunciar reintentos cuando ya no va a haber ninguno: {messages!r}",
+        )
 
     async def test_selects_direct_tiktoklive_provider(self) -> None:
         FakeConnection.attempts = 0

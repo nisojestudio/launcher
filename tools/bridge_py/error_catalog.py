@@ -75,7 +75,7 @@ CATALOG: dict[str, ErrorSpec] = {
     ),
     "API_SESSION_ENDED": ErrorSpec(
         "API_SESSION_ENDED",
-        "tik.tools corto la sesion por limite del plan o de WebSockets. Se rota la API key.",
+        "El proveedor cerro la sesion de la API key: se agoto la cuota o vencio el plan.",
         SEVERITY_WARN,
         ACTION_ROTATE_KEY,
         True,
@@ -159,7 +159,7 @@ CATALOG: dict[str, ErrorSpec] = {
     ),
     "UNKNOWN": ErrorSpec(
         "UNKNOWN",
-        "No se pudo completar la conexion con TikTok. Se reintenta.",
+        "No se pudo completar la conexion con TikTok.",
         SEVERITY_WARN,
         ACTION_RETRY,
         True,
@@ -172,6 +172,7 @@ _TIKTOOLS_CLOSE_CODE_MAP: dict[int, str] = {
     4005: "NOT_LIVE",
     4006: "NOT_LIVE",
     4404: "NOT_LIVE",          # Creator is not currently live
+    4401: "API_SESSION_ENDED",  # Evaluation period ended (plan vencido)
     4429: "API_SESSION_ENDED",  # Demo/concurrent session limit
     4555: "API_SESSION_ENDED",  # Daily Demo Limit Reached
     4556: "RELAY_ERROR",        # Relay connection error
@@ -184,7 +185,17 @@ _TIKTOOLS_CLOSE_CODE_MAP: dict[int, str] = {
 # Textos que el proveedor manda en el motivo de cierre. El orden importa:
 # las condiciones de cuota van antes que los textos genericos de red.
 _TEXT_RULES: tuple[tuple[tuple[str, ...], str], ...] = (
-    (("daily demo limit", "demo session ended", "upgrade required", "quota"), "API_SESSION_ENDED"),
+    (
+        (
+            "daily demo limit",
+            "demo session ended",
+            "upgrade required",
+            "evaluation period",
+            "pricing to continue",
+            "quota",
+        ),
+        "API_SESSION_ENDED",
+    ),
     (("concurrent websocket", "too many connections"), "API_SESSION_ENDED"),
     (("relay connection error",), "RELAY_ERROR"),
     (("service restart", "server restart"), "SERVER_RESTART"),
