@@ -15,6 +15,12 @@
   const VOICE_NOTICES_STORAGE_KEY = "nlp3-custom-voice-notices-v1";
   const FIREBASE_API_KEY = "AIzaSyBWRMoHbPNkOw0zvflcPb_dv9G1Bgg1uLc";
   let _timerOverlayUrl = "";
+  // EC-3 (A1 de la auditoria): debe vivir en el scope del IIFE para que
+  // renderTimer() (que la ASIGNA) y el handler de Start dentro de bindEvents()
+  // (que la LEE) compartan la MISMA variable. Cuando estaba declada dentro de
+  // bindEvents(), renderTimer creaba un global implicito, el confirm() de
+  // reinicio nunca veia el valor real y Start reiniciaba sin avisar.
+  let timerWasRunning = false;
 
   function formatCompactNumber(n) {
     const s = Math.abs(n).toString();
@@ -4366,7 +4372,6 @@
     const timerAction = (path) => {
       apiPostJson(path, {}).catch(() => {});
     };
-    let timerWasRunning = false;
     els.timerStart?.addEventListener("click", () => {
       if (timerWasRunning && !confirm("\u00bfReiniciar el timer? Se perder\u00e1 el progreso actual.")) return;
       timerAction("/api/timer/start");

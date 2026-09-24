@@ -336,6 +336,75 @@ int main() {
         app.stop_http_ui();
     }
 
+    std::puts("live_timer_api_smoke cp8: simulate con coins negativos no infla el reloj");
+    std::fflush(stdout);
+
+    // M2: static_cast<uint32_t>(coins) con coins negativo envuelve a ~4e9 y el
+    // regalo simulado anade una cantidad absurda de tiempo (hasta el clamp de
+    // 1 ano o max_time_s). Un POST /api/timer/simulate con coins<=0 debe ser
+    // un no-op, no un salto al maximo.
+    {
+        const auto config_path = nlp3::testsupport::write_temp_panel_config(
+            "nlp3_live_timer_simulate_neg_config.json",
+            []() {
+                nlp3::platform::PanelConfig config{};
+                config.bridge_mode = "stub";
+                config.bridge.stub_mode = true;
+                config.bridge.source_name = "tiktok-stub";
+                config.default_game_id = "event-counter";
+                return config;
+            }());
+
+        nlp3::platform::PanelApp app;
+        NLP3_TEST_REQUIRE(app.initialize(config_path.string()));
+        NLP3_TEST_REQUIRE(app.start_http_ui(19133));
+        std::this_thread::sleep_for(std::chrono::milliseconds(400));
+
+        const std::string base = "http://127.0.0.1:19133";
+
+        const auto pump_request = [&app](const std::string& method, const std::string& url,
+                                         const std::string& body) {
+            nlp3::platform::HttpResponse response{};
+            std::atomic<bool> finished{false};
+            std::thread worker([&]() {
+                response = nlp3::platform::http_request(
+                    method, url, body, body.empty() ? std::string_view{} : std::string_view{"application/json"}, {});
+                finished.store(true);
+            });
+            const auto deadline = std::chrono::steady_clock::now() + std::chrono::seconds(8);
+            while (!finished.load() && std::chrono::steady_clock::now() < deadline) {
+                app.tick(nlp3::platform::now_wall_clock_ms());
+                std::this_thread::sleep_for(std::chrono::milliseconds(2));
+            }
+            worker.join();
+            return response;
+        };
+
+        // 60 s iniciales y 1 s por coin: sin el clamp, coins=-5 multiplica a
+        // ~4e9 s y el reloj salta al tope razonable.
+        const auto cfg = pump_request("POST", base + "/api/timer/configure",
+                                      R"JSON({"initial_time_s":60,"time_per_gift_coin_s":1.0})JSON");
+        NLP3_TEST_REQUIRE(cfg.status_code == 200);
+        const auto start = pump_request("POST", base + "/api/timer/start", "{}");
+        NLP3_TEST_REQUIRE(start.status_code == 200);
+
+        const auto* timer = app.live_timer();
+        NLP3_TEST_REQUIRE(timer != nullptr);
+        const double before = timer->remaining_seconds();
+        NLP3_TEST_REQUIRE(before > 55.0 && before <= 60.0);
+
+        const auto sim = pump_request("POST", base + "/api/timer/simulate",
+                                      R"JSON({"kind":"gift","coins":-5,"name":"neg"})JSON");
+        NLP3_TEST_REQUIRE(sim.status_code == 200);
+
+        const double after = timer->remaining_seconds();
+        // Regalo de coins<=0: no anade tiempo (tras el fix ~before; con el bug
+        // saltaria a ~4e9 clampeado a 1 ano).
+        NLP3_TEST_REQUIRE(after < before + 10.0);
+
+        app.stop_http_ui();
+    }
+
     std::error_code cleanup_ec;
     std::filesystem::remove_all(timer_state_dir, cleanup_ec);
 

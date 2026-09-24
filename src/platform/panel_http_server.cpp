@@ -2107,7 +2107,10 @@ std::string build_route_response(
             return make_http_response("200 OK", "application/json; charset=utf-8", make_simple_result(false, "timer_hidden"));
         }
         const auto kind = parse_json_string(request.body, "kind").value_or("gift");
-        const auto coins = parse_json_double(request.body, "coins").value_or(1.0);
+        // M2: coins <= 0 o no-finito no puede envolver a uint32 (regalo simulado
+        // de ~4e9 monedas que inflaba el reloj hasta el clamp de 1 ano).
+        const double coins_raw = parse_json_double(request.body, "coins").value_or(1.0);
+        const double coins = (coins_raw > 0.0) ? std::min(coins_raw, 4294967295.0) : 0.0;
         const auto name = parse_json_string(request.body, "name").value_or("Simulacion");
         nlp3::gamesdk::GameInputEvent ev;
         ev.actor.username = name;
@@ -2118,7 +2121,7 @@ std::string build_route_response(
             ev.gift = nlp3::gamesdk::GameInputGift{"sim", name, static_cast<uint32_t>(coins), static_cast<uint32_t>(coins)};
         } else if (kind == "like") {
             ev.kind = nlp3::gamesdk::GameInputEventKind::like;
-            ev.like_count = static_cast<uint32_t>(std::max(0.0, coins));
+            ev.like_count = static_cast<uint32_t>(coins);
         } else if (kind == "share") {
             ev.kind = nlp3::gamesdk::GameInputEventKind::share;
         } else if (kind == "follow") {

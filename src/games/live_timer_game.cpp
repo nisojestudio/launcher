@@ -1269,9 +1269,11 @@ double LiveTimerGame::apply_caps(double delta, const std::string& actor_key, boo
     const auto now = std::chrono::steady_clock::now();
 
     // M5 — cap por usuario durante la ventana deslizante.
+    // A2: la ventana es SIEMPRE kCapWindowS (60 s); antes se pasaba el valor
+    // del tope y con topes < 60 s la ventana se encogia (~2x tasa por minuto).
     if (state_.cap_per_user_per_minute_s > 0.0 && !actor_key.empty() && actor_key != "_anon") {
         auto& win = user_contributions_[actor_key];
-        const double already = win.sum_recent(state_.cap_per_user_per_minute_s, now);
+        const double already = win.sum_recent(kCapWindowS, now);
         const double remaining = state_.cap_per_user_per_minute_s - already;
         if (remaining <= 0.0) {
             delta = 0.0;
@@ -1283,7 +1285,7 @@ double LiveTimerGame::apply_caps(double delta, const std::string& actor_key, boo
 
     // M5 — cap global (todos los eventos) durante la ventana.
     if (state_.cap_total_per_minute_s > 0.0) {
-        const double already = total_contributions_.sum_recent(state_.cap_total_per_minute_s, now);
+        const double already = total_contributions_.sum_recent(kCapWindowS, now);
         const double remaining = state_.cap_total_per_minute_s - already;
         if (remaining <= 0.0) {
             delta = 0.0;

@@ -1198,6 +1198,47 @@ void test_m5_suelo_no_completa() {
     std::cout << "PASS: m5_suelo_no_completa\n";
 }
 
+// A2: el tope "por minuto" usa SIEMPRE una ventana deslizante de 60 s
+// (kCapWindowS). Antes apply_caps pasaba el VALOR del tope como longitud de
+// ventana a sum_recent(), asi que con topes < 60 s la ventana efectiva se
+// encogia (tope 5 s -> ventana 5 s) y se permitia ~2x la tasa pretendida por
+// minuto. Con eventos espaciados mas alla del valor del tope pero todavia
+// dentro del minuto, el segundo aporte debe seguir bloqueado.
+void test_m5_ventana_deslizante_60s() {
+    LiveTimerGame game;
+    auto cfg = game.default_config();
+    cfg.set("initial_time_s", 300.0);
+    cfg.set("time_per_like_s", 5.0);
+    cfg.set("like_use_magnitude", true);
+    cfg.set("cap_per_user_per_minute_s", 5.0);  // ventana correcta = 60 s, no 5 s
+    game.apply_config(cfg);
+    game.on_activated();
+
+    auto like = make_test_event(GameInputEventKind::like);
+    like.like_count = 1;
+    game.on_game_input_event(like, kEmptySnapshot);   // +5 s: gasta el tope entero
+    game.tick();
+    assert(std::abs(game.state().remaining_seconds - 305.0) < 1.0);
+    assert(game.state().recent_events.size() == 1);
+
+    // Pasada la "ventana erronea" de 5 s pero todavia dentro del minuto.
+    std::this_thread::sleep_for(std::chrono::seconds(6));
+    game.tick();
+    const double before = game.state().remaining_seconds;
+
+    game.on_game_input_event(like, kEmptySnapshot);
+    game.tick();
+    const double after = game.state().remaining_seconds;
+
+    // Ventana 60 s: el aporte de hace 6 s sigue contado -> tope activo -> +0 s
+    // y sin popup. Con la ventana erronea de 5 s ya habria expirado: +5 s y un
+    // segundo popup.
+    assert(after < before + 2.0);
+    assert(game.state().recent_events.size() == 1);
+
+    std::cout << "PASS: m5_ventana_deslizante_60s\n";
+}
+
 void test_bloque_a_serializacion_en_json() {
     LiveTimerGame game;
     auto cfg = game.default_config();
@@ -1348,6 +1389,7 @@ int main() {
     test_m5_tope_por_usuario();
     test_m5_tope_total_global();
     test_m5_suelo_no_completa();
+    test_m5_ventana_deslizante_60s();
     test_bloque_a_serializacion_en_json();
     test_r2_popups_ocultables();
     test_r2_nombre_oculto_en_popup();

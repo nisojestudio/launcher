@@ -625,6 +625,8 @@ let tickAudio = null;
 let addAudio = null;
 let completeAudio = null;
 let lastTickSecondPlayed = -1;
+// A1: flanco false->true de "completed" para disparar el sonido UNA sola vez.
+let lastCompletedSound = false;
 
 // Local clock — mantiene el contador fluido segundo a segundo
 // desacoplado de la latencia del polling HTTP.
@@ -934,7 +936,12 @@ function tickLocalClock(timestamp) {
 function applySounds(data) {
   try {
     const compPath = data.on_complete_sound_path || '';
-    if (data.completed && compPath) {
+    const completedNow = !!data.completed;
+    if (completedNow && compPath) {
+      // A1/contrato T1.4: suena en el flanco false->true de completed. Antes
+      // se llamaba play() en CADA poll; al terminarse el audio, play() lo
+      // reiniciaba y el sonido entraba en bucle mientras completed=true.
+      const edge = !lastCompletedSound;
       if (!completeAudio || completeAudio._path !== compPath) {
         if (completeAudio) { try { completeAudio.pause(); } catch (e) {} }
         completeAudio = new Audio(compPath);
@@ -942,10 +949,16 @@ function applySounds(data) {
         completeAudio.volume = clampVolume(data.on_complete_volume);
         completeAudio.loop = !!data.on_complete_repeat;
       }
-      try { completeAudio.play().catch(function () {}); } catch (e) {}
+      // play en el flanco, o como retry si el navegador bloqueo el autoplay
+      // (paused y aun no terminado); NO reintenta cuando el audio ya termino.
+      if (edge || (completeAudio.paused && !completeAudio.ended)) {
+        try { completeAudio.play().catch(function () {}); } catch (e) {}
+      }
+      lastCompletedSound = true;
     } else {
       // State left completion (or path cleared): stop and release so the next
       // completion can replay cleanly.
+      lastCompletedSound = false;
       if (completeAudio) { try { completeAudio.pause(); } catch (e) {} completeAudio = null; }
     }
 
