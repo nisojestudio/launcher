@@ -379,7 +379,7 @@ int main() {
     // --- 19. Popup móvil: viewport, lane medida y piso físico de font --------
     // Reproduce el reporte (patrón Prove-It): sin viewport el browser hace doble
     // zoom en móvil; la lane fija en right:3% invade el reloj con contadores
-    // anclados a la derecha o grandes; y el font del popup (techo 48px de lienzo)
+    // anclados a la derecha o grandes; y el font del popup (techo de lienzo)
     // cae a ~10px físicos con k≈0.2.
     {
         const std::string html(nlp3::platform::panel_overlay_live_timer_html());
@@ -389,11 +389,27 @@ int main() {
         // esquina inferior), en vez de una posición fija que puede pisar los dígitos.
         NLP3_TEST_REQUIRE(html.find("function layoutEventLane()") != std::string::npos);
         NLP3_TEST_REQUIRE(html.find("layoutEventLane();") != std::string::npos);
-        // F3: piso físico (~14px reales) y techo ampliado a 72px de lienzo.
+        // F3: piso físico (~14px reales) y techo ampliado a 96px de lienzo.
         NLP3_TEST_REQUIRE(html.find("physMin") != std::string::npos);
-        NLP3_TEST_REQUIRE(html.find("Math.min(72") != std::string::npos);
+        NLP3_TEST_REQUIRE(html.find("Math.min(96") != std::string::npos);
         // F3: en pantallas angostas el texto del popup envuelve en 2 líneas.
         NLP3_TEST_REQUIRE(html.find("@media (max-width: 600px)") != std::string::npos);
+    }
+
+    // --- 20. El popup es el gancho de donación: nombre + tiempo, sin iconos,
+    //         grande y sobresaliente (pastilla con glow y pop de entrada) ------
+    {
+        const std::string html(nlp3::platform::panel_overlay_live_timer_html());
+        // Formato "nombre y tiempo": la composición vieja (icon + label + delta)
+        // ya no existe en el JS del overlay.
+        NLP3_TEST_REQUIRE(html.find("labelText") == std::string::npos);
+        // Grande: 60% del contador por defecto (72px con contador de 120).
+        NLP3_TEST_REQUIRE(html.find("0.26 : 0.6") != std::string::npos);
+        // Sobresaliente: pastilla oscura con glow del color del evento.
+        NLP3_TEST_REQUIRE(html.find("background: rgba(0, 0, 0, 0.65)") != std::string::npos);
+        NLP3_TEST_REQUIRE(html.find("box-shadow: 0 0 16px currentColor") != std::string::npos);
+        // Entrada con pop de escala (no solo slide lateral).
+        NLP3_TEST_REQUIRE(html.find("scale(0.72)") != std::string::npos);
     }
 
     return 0;

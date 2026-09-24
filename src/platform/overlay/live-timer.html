@@ -186,6 +186,14 @@ body.preview-mode #event-container { right: 6px; max-width: 45%; max-height: 80%
   text-align: right;
   font-weight: bold;
   text-shadow: 0 2px 10px rgba(0,0,0,0.95), 0 0 24px rgba(0,0,0,0.8);
+  /* F4: el popup es el gancho de la donación — pastilla sobresaliente con el
+     glow del color del evento (currentColor = color del texto: azul suma,
+     rojo resta) sobre fondo oscuro para leerse sobre cualquier video. */
+  background: rgba(0, 0, 0, 0.65);
+  border: 2px solid currentColor;
+  border-radius: 14px;
+  padding: 8px 18px;
+  box-shadow: 0 0 16px currentColor, 0 6px 18px rgba(0,0,0,0.55);
   max-width: var(--stage-w, 100vw);
   overflow: hidden;
   text-overflow: ellipsis;
@@ -198,10 +206,11 @@ body.preview-mode #event-container { right: 6px; max-width: 45%; max-height: 80%
   animation: popFade 3s ease-out forwards;
 }
 @keyframes popFade {
-  0%   { opacity: 0; transform: translateX(28px); }
-  10%  { opacity: 1; transform: translateX(0); }
-  72%  { opacity: 1; transform: translateX(0); }
-  100% { opacity: 0; transform: translateX(0); }
+  0%   { opacity: 0; transform: translateX(28px) scale(0.72); }
+  12%  { opacity: 1; transform: translateX(0) scale(1.06); }
+  20%  { transform: translateX(0) scale(1); }
+  78%  { opacity: 1; transform: translateX(0) scale(1); }
+  100% { opacity: 0; transform: translateX(0) scale(0.98); }
 }
 #completed-banner {
   display: none;
@@ -811,27 +820,22 @@ function showPopup(icon, label, delta, actorName, capped) {
   el.className = 'event-popup ' + (delta >= 0 ? 'add' : 'subtract');
   el.style.color = delta >= 0 ? popupColors.add : popupColors.subtract;
   const deltaText = formatCompactDelta(delta) + 's';
-  // A13: show the label consistently for every event so the operator can
-  // always tell what triggered the popup, regardless of the magnitude.
-  // We only suppress the label for the auto-generated "manual" entry to
-  // avoid duplicating the icon already in the manual marker.
-  const showLabel = label !== 'manual';
-  const labelText = showLabel ? icon + ' ' + label + ' ' + deltaText : icon + ' ' + deltaText;
-  // Bloque A / M1: el nombre del actor, si vino, es lo que hace gracias al directo.
-  // Bloque A / M5: si el tope recortó, el operador lo ve marcado de inmediato.
+  // F4: el popup es el gancho de la donación — SOLO nombre y tiempo, sin iconos
+  // (petición del operador: "nombre y tiempo es suficiente"). El icono/label del
+  // evento siguen viajando en el JSON (aria-label y depuración) pero no se pintan.
   const parts = [];
   if (actorName) parts.push(actorName);
   if (capped) parts.push('(tope)');
-  const finalText = parts.length > 0 ? parts.join(' ') + ' · ' + labelText : labelText;
-  el.textContent = finalText;
+  parts.push(deltaText);
+  el.textContent = parts.join(' ');
   el.setAttribute('aria-label', (label || 'evento') + ' ' + deltaText);
   // V2: la lane lateral apila los popups por flex. Ya no se calcula `top` ni
   // offsets por indice, y el tamano se acota para que la cola no desborde.
-  // F3: techo ampliado (48→72 de lienzo) y, fuera de preview, piso físico de
-  // ~14px reales (dividiendo por el scale activo) — nunca por encima del contador.
+  // F3+F4: fuente grande (60% del contador, techo 96 de lienzo) y, fuera de
+  // preview, piso físico de ~14px reales — nunca por encima del contador.
   const counterSize = (styles.counter && styles.counter.font_size_px) || 120;
-  const popupScale = previewMode ? 0.26 : 0.4;
-  let size = Math.max(16, Math.min(72, Math.round(counterSize * popupScale)));
+  const popupScale = previewMode ? 0.26 : 0.6;
+  let size = Math.max(16, Math.min(96, Math.round(counterSize * popupScale)));
   if (!previewMode) {
     const k = currentScaleK > 0 ? currentScaleK : 1;
     const physMin = Math.ceil(14 / k);
