@@ -230,7 +230,9 @@ public:
     void reset() noexcept;
     void stop() noexcept;
 
-    void adjust_time(double delta) noexcept;
+    // Returns the actually-applied delta (0.0 when blocked: hidden, paused,
+    // completed or non-finite input) so HTTP callers can report honestly.
+    double adjust_time(double delta) noexcept;
     void set_enabled(bool enabled) noexcept;
     bool is_enabled() const noexcept;
     bool is_running() const noexcept;

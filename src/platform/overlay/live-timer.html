@@ -1658,7 +1658,8 @@ function updateOverlay() {
         var digitsDis = document.querySelectorAll('#counter .digit');
         for (var di = 0; di < digitsDis.length; di++) {
           digitsDis[di].textContent = '-';
-          digitsDis[di].classList.remove('digit-flip', 'digit-roll', 'digit-pop', 'digit-fade');
+          digitsDis[di].classList.remove('digit-flip', 'digit-roll', 'digit-pop', 'digit-fade',
+            'digit-odometer', 'digit-typewriter', 'digit-blur');
           lastDigits[di] = '-';
         }
         setCounterState(counterEl, null, localCounterEffectName);

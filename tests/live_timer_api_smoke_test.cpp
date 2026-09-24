@@ -402,6 +402,17 @@ int main() {
         // saltaria a ~4e9 clampeado a 1 ano).
         NLP3_TEST_REQUIRE(after < before + 10.0);
 
+        // M4: honestidad del ajuste manual. Pausado, el motor ignora el delta
+        // (adjust_time retorna sin tocar nada) y el HTTP no puede responder
+        // "adjusted": debe decir adjust_blocked.
+        const auto pause = pump_request("POST", base + "/api/timer/pause", "{}");
+        NLP3_TEST_REQUIRE(pause.status_code == 200);
+        const auto adj = pump_request("POST", base + "/api/timer/adjust",
+                                      R"JSON({"delta":5})JSON");
+        NLP3_TEST_REQUIRE(adj.status_code == 200);
+        NLP3_TEST_REQUIRE(adj.body.find("adjust_blocked") != std::string::npos);
+        NLP3_TEST_REQUIRE(adj.body.find("\"ok\":false") != std::string::npos);
+
         app.stop_http_ui();
     }
 

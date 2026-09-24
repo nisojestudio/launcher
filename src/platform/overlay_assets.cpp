@@ -27,7 +27,7 @@ std::string build_live_timer_state_json(const games::LiveTimerGame* game) {
     if (game == nullptr) {
         return "{"
             "\"remainingSeconds\":0,"
-            "\"initial_seconds\":300,"
+            "\"initial_seconds\":0,"
             "\"max_time_s\":0,"
             "\"format\":\"00:00:00\","
             "\"running\":false,"
@@ -101,13 +101,22 @@ std::string build_live_timer_state_json(const games::LiveTimerGame* game) {
     auto json_quote = [](std::string_view v) -> std::string {
         std::string r;
         r.reserve(v.size() + 8);
-        for (auto c : v) {
+        for (unsigned char c : v) {
             if (c == '\\') r += "\\\\";
             else if (c == '"') r += "\\\"";
             else if (c == '\n') r += "\\n";
             else if (c == '\r') r += "\\r";
             else if (c == '\t') r += "\\t";
-            else r += c;
+            else if (c < 0x20) {
+                // B2: escapar el resto de controles como \u00XX — un byte crudo
+                // invalida el JSON.parse del overlay y deja el sonido sin sonar.
+                static constexpr char kHex[] = "0123456789abcdef";
+                r += "\\u00";
+                r += kHex[(c >> 4) & 0xF];
+                r += kHex[c & 0xF];
+            } else {
+                r += static_cast<char>(c);
+            }
         }
         return "\"" + r + "\"";
     };

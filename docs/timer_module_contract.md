@@ -1,6 +1,7 @@
 # Live Timer Module Contract
 
-Last updated: post audit + fix pass (5 phases).
+Last updated: 2026-09-24 (contract reconciled against the code; see the fix
+pass notes inline).
 
 This document freezes the runtime and HTTP contract for the `live_timer` game
 module after the audit/fix pass. It is the source of truth when changing the
@@ -13,7 +14,7 @@ for the timer's remaining time in every mode:
 
 | Mode | `state_.running` | `state_.paused` | `state_.completed` | `state_.remaining_seconds` |
 |------|------------------|-----------------|--------------------|----------------------------|
-| Idle (never started) | false | false | false | `0.0` (set by `on_activated` when start fires) |
+| Idle (never started) | false | false | false | `0.0` until armed; `arm()` / an `initial_time_s` change while idle set it to `initial_seconds` |
 | Running | true | false | false | baseline - elapsed |
 | Paused | false | true | false | frozen at pause time |
 | Completed | false | false | true | `0.0` |
@@ -30,6 +31,9 @@ Invariants:
 - `set_enabled(false)` enters `hidden_` mode but **preserves** `remaining_seconds`,
   `recent_events`, `event_id_counter_`, `total_time_added_`. The operator must
   call `on_activated()` to start a new run; it does not auto-resume.
+- `on_activated()` **continues** from the current remaining when it is `> 0`
+  (restored time wins); it only falls back to `initial_seconds` on a clean
+  start. If there is no time to count it stays not-running.
 
 ## 2. Event id monotonicity
 
@@ -37,7 +41,7 @@ Invariants:
 
 - `on_activated()` (multiple activations in one process).
 - `arm()` and `restore_state()`.
-- Process restarts (persisted in `live_timer_save.json`).
+- Process restarts (persisted in `live-timer.json`, see section 8).
 
 The overlay's `lastShownEventId` is reset whenever the JSON `sessionId` field
 changes. `sessionId` is regenerated on:
@@ -77,10 +81,11 @@ change re-arms the audio element. The cursor is released when leaving completed.
 
 | Field | Effect on runtime |
 |-------|-------------------|
-| `initial_time_s` | Only adjusts `state_.remaining_seconds` when the timer is **actively running** (`running && !paused && !completed`). When paused, completed or hidden, the SSOT is left intact; the new initial takes effect on the next `on_activated()`. |
-| `max_time_s` | Immediately clamps `state_.remaining_seconds` to the new ceiling when `max_time_s > 0`. |
+| `initial_time_s` | Only adjusts `state_.remaining_seconds` when the timer is **idle** (`!running && !paused && !completed`) **and** the value actually changed. While running, paused, completed or hidden the SSOT is left intact; the new initial is adopted on the next `arm()` / `on_activated()`. |
+| `max_time_s` | Does NOT move the clock by itself (the clamp lives in `on_game_input_event` and `adjust_time`, where the applied delta can be reported honestly). |
+| `floor_time_s` | Reconciled against `max_time_s`: if `floor > max` (with `max > 0`) the floor is clamped down to the max and the config is rewritten. |
 | `time_per_*` | Applied to subsequent events. Already-pending buffered events are not retro-applied. |
-| `*_effect`, `*_glow_enabled`, `glow_*`, `wave_*`, `pulse_*`, `shake_intensity`, `particles_*` | Applied on the next overlay poll when the snapshot differs. |
+| `*_effect`, `*_glow_enabled`, `glow_*`, `pulse_*`, `particles_*` | Applied on the next overlay poll when the snapshot differs. |
 | `*_font_size/color/family/bold` | Applied on the next overlay poll. |
 | Sound paths/volumes | Re-applied on the next overlay poll; audio elements are recreated on path change. |
 | `on_complete_text/color/size` | Applied on the next poll, including while in `completed` state. |
@@ -106,7 +111,10 @@ shows the warning count and logs to `console.warn` for inspection.
 | POST | `/api/timer/resume` | `resume()`. |
 | POST | `/api/timer/reset` | `reset()` (resets to `initial_seconds`, starts running). |
 | POST | `/api/timer/stop` | `stop()` (forces completed, remaining=0). |
-| POST | `/api/timer/adjust` | Body: `{"delta": <seconds>}`. `adjust_time()`. |
+| POST | `/api/timer/adjust` | Body: `{"delta": <seconds>}`. Returns `{ok:true,"message":"adjusted"}` with the actually-applied delta, or `{ok:false,"message":"adjust_blocked"}` when the engine ignored it (paused, completed, hidden, clamp to zero) / `delta_zero` for `delta == 0`. |
+| POST | `/api/timer/reset-config` | `reset_config_to_defaults()`. |
+| POST | `/api/timer/toggle` | Toggles `enabled` (show/hide the overlay). |
+| POST | `/api/timer/simulate` | R4: injects a synthetic event. Body `{"kind":"gift|like|share|follow|chat","coins":<n>,"name":"..."}`. `coins` is clamped to `[0, UINT32_MAX]`; `coins <= 0` is a no-op (never wraps). |
 | GET | `/api/overlay/live-timer/state` | Returns the JSON consumed by the overlay (see section 6). |
 
 ## 6. Overlay JSON contract
@@ -127,9 +135,11 @@ Top-level fields (relevant subset):
 | `popupAddColor`, `popupSubtractColor` | string | Hex. |
 | `completedText`, `completedTextColor`, `completedTextSize` | string/int | |
 | `recentEvents` | array | Each `{id, icon, label, delta, isAddition}`. Overlay filters by `id > lastShownEventId`. |
-| `*_effect` | string | One of `none|glow|pulse|shake|wave`. Backend normalizes invalid values to `none` and reports in `warnings`. |
+| `*_effect` | string | One of `none\|glow\|pulse\|heartbeat\|float\|flicker\|shake`. Backend normalizes invalid values to `none` and reports in `warnings`. |
 | `*_glow_enabled`, `glow_color`, `glow_intensity_px` | various | Per-element glow. |
-| `wave_colors`, `pulse_speed_s`, `shake_intensity` | various | Effect parameters. |
+| `pulse_speed_s` | number | Pulse period for the `pulse` effect. |
+| `digit_effect` | string | One of `none\|flip\|roll\|pop\|fade\|odometer\|typewriter\|blur` (see section 10.1). |
+| `color_preset` | string | One of `neon-green\|cyber-blue\|clean-white\|rose-gold` (see section 10.2). |
 | `particles_enabled`, `particle_count`, `particle_color` | various | Global particle system. |
 | `tick_sound_path`, `tick_sound_volume` | string/number | See section 3. |
 | `add_sound_path`, `add_sound_volume` | string/number | See section 3. |
@@ -146,18 +156,34 @@ emitting events must add external synchronization.
 
 ## 8. Persistence
 
-`live_timer_save.json` (next to `panel_config.json`) contains:
+The save lives at `%LOCALAPPDATA%\NisojeStudio\timer\live-timer.json`
+(overridable with the `NLP3_TIMER_STATE_DIR` env var for tests; a legacy save
+in `%TEMP%\NisojeStudio\live_timer_save.json` is migrated once on first run).
+A `.bak` snapshot of the previous good save is rotated on every write.
 
-- `version`: int (currently 1).
-- `config`: full key-value snapshot of the current `LiveTimerGame::config()`.
+JSON shape:
+
+- `version`: int (currently **3**; v2 files still load). Since v3 the clock
+  freezes on close and the saved `running` flag is **ignored on load** — the
+  panel never auto-resumes; wall-clock compensation is gone.
+- `config`: full key-value snapshot of `LiveTimerGame::config()`.
 - `state`:
   - `remaining_seconds` (committed via `tick()` before save).
   - `running`, `paused`, `completed`, `enabled`.
-  - `saved_at_ms` (wall-clock at save).
+  - `saved_at_ms` (wall-clock at save; informational only since v3).
   - `event_id_counter`, `session_id`, `total_time_added`.
 
-The save is rewritten on every configure/start/pause/resume/reset/stop/adjust
-operation.
+Write strategy: atomic (`.tmp` + rename) with `.bak` rotation; on load the
+primary file is tried first, then `.bak`, then defaults. Saves happen:
+
+- on every configure/start/pause/resume/reset/stop/adjust/simulate/toggle endpoint,
+- on `PanelApp` shutdown (timer state is flushed before anything else is torn
+  down),
+- autosave every **10 s while running**, or every **30 s** when only
+  events/config changed.
+
+On load the timer **never auto-starts**: the remaining time is preserved and
+the operator presses Start to continue (contract test `cp6`).
 
 ## 9. Known limitations (post-fix)
 
@@ -168,6 +194,9 @@ operation.
   loses in-flight effect deltas until the next server poll.
 - The `panel_http_ui_test` integration test is environment-dependent
   (requires free port 18881). Not a regression of the timer module.
+- Caps (`cap_per_user_per_minute_s` / `cap_total_per_minute_s`) use a **fixed
+  60 s sliding window** (`kCapWindowS`); the cap *value* is the budget of
+  seconds allowed per minute, never the window length.
 
 ## 10. V3 Visual Enhancements (digit effects, palettes, fonts)
 
@@ -184,6 +213,9 @@ Per-digit transition animation when the counter changes.
 | `roll` | Slot-machine roll (translateY + blur, 0.3s) |
 | `pop` | Scale bounce (scale 1→1.15→1, 0.2s) |
 | `fade` | Opacity fade (0→1, 0.3s) |
+| `odometer` | Odometer roll (0.35s) |
+| `typewriter` | Typewriter steps (0.16s) |
+| `blur` | Blur in (0.25s) |
 
 **Validation:** Backend normalizes invalid values to `none`. Overlay has defensive CSS class check.
 **Config key:** `digit_effect` (string)

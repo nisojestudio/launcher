@@ -359,6 +359,9 @@ void apply_visual_style(const gamesdk::GameConfig& config, LiveTimerVisualStyle&
         } else if (std::holds_alternative<double>(*v)) {
             style.font_size_px = static_cast<int>(std::get<double>(*v));
         }
+        // B4: misma barrera que el HTTP (8..400) — la ruta save-file ->
+        // apply_config no pasa por el clamp del servidor.
+        style.font_size_px = std::clamp(style.font_size_px, 8, 400);
     }
     if (const auto* v = config.find(color_key); v != nullptr) {
         if (const auto* s = std::get_if<std::string>(v)) {
@@ -506,7 +509,7 @@ gamesdk::GameConfig LiveTimerGame::default_config() const {
 void LiveTimerGame::apply_config(const gamesdk::GameConfig& config) {
     auto effective = config_;
 
-    double old_initial = effective.get_double(kInitialTimeS, 300.0);
+    double old_initial = effective.get_double(kInitialTimeS, 0.0);
 
     // A12: sanitize numeric values before storing so NaN/inf cannot poison
     // the SSOT. The server already clamps, but the gameplay layer must also
@@ -684,6 +687,13 @@ void LiveTimerGame::apply_config(const gamesdk::GameConfig& config) {
     state_.cap_per_user_per_minute_s = clamp_nonneg(kCapPerUserPerMinS, 0.0);
     state_.cap_total_per_minute_s = clamp_nonneg(kCapTotalPerMinS, 0.0);
     state_.floor_time_s = clamp_nonneg(kFloorTimeS, 0.0);
+    // M5: el suelo no puede superar el tope. Con floor > max el reloj oscila
+    // entre ambos en cada evento negativo. Se reconcilia aqui y se persiste en
+    // config para que el export refleje el valor real.
+    if (state_.max_time_s > 0.0 && state_.floor_time_s > state_.max_time_s) {
+        state_.floor_time_s = state_.max_time_s;
+        config_.set(std::string(kFloorTimeS), state_.floor_time_s);
+    }
     // M4 — tramos de regalo. Se parsean aqui y se cachean; el texto queda como
     // config para persistencia/serializacion.
     state_.gift_tiers = config_.get_string(kGiftTiers, "");
@@ -708,7 +718,7 @@ void LiveTimerGame::apply_config(const gamesdk::GameConfig& config) {
         ? std::vector<GiftTier>{}
         : parse_gift_tiers_text(state_.gift_tiers);
 
-    double new_initial = config_.get_double(kInitialTimeS, 300.0);
+    double new_initial = config_.get_double(kInitialTimeS, 0.0);
     state_.initial_seconds = new_initial;
     // V2 (Fase 2): apply_config solo toca el reloj en la fase de PREPARACION, y
     // solo si el tiempo inicial cambio de verdad.
@@ -1454,13 +1464,13 @@ void LiveTimerGame::stop() noexcept {
     completion_sound_triggered_ = false;
 }
 
-void LiveTimerGame::adjust_time(double delta) noexcept {
+double LiveTimerGame::adjust_time(double delta) noexcept {
     // T2.6: blocked while hidden; runtime preserved.
-    if (hidden_) return;
-    if (state_.completed) return;
-    if (state_.paused) return;   // B1: no ajustar mientras esta pausado
+    if (hidden_) return 0.0;
+    if (state_.completed) return 0.0;
+    if (state_.paused) return 0.0;   // B1: no ajustar mientras esta pausado
     // A12: ignore non-finite deltas so the SSOT never gets poisoned with NaN.
-    if (!std::isfinite(delta)) return;
+    if (!std::isfinite(delta)) return 0.0;
     // T1.1f-r2: no tick() here. remaining_seconds() computes dynamically from
     // the stable SSOT. We add delta directly to state_.remaining_seconds so the
     // countdown baseline stays intact.
@@ -1500,6 +1510,7 @@ void LiveTimerGame::adjust_time(double delta) noexcept {
     if (applied_delta != 0.0) {
         add_event_popup("\xf0\x9f\x93\x9d", "manual", applied_delta);
     }
+    return applied_delta;
 }
 
 void LiveTimerGame::set_enabled(bool enabled) noexcept {

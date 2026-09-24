@@ -1215,8 +1215,8 @@ std::string handle_timer_configure(PanelApp* app, std::string_view body) {
     if (maybe_str.has_value()) config.set("on_complete_text", maybe_str->substr(0, 128));
     maybe_str = parse_json_string(body, "on_complete_text_color");
     if (maybe_str.has_value()) config.set("on_complete_text_color", *maybe_str);
-    maybe_i64 = parse_json_uint64(body, "on_complete_text_size");
-    if (maybe_i64.has_value()) config.set("on_complete_text_size", static_cast<std::int64_t>(std::clamp<uint64_t>(*maybe_i64, 8, 200)));
+        maybe_i64 = parse_json_uint64(body, "on_complete_text_size");
+        if (maybe_i64.has_value()) config.set("on_complete_text_size", static_cast<std::int64_t>(std::clamp<uint64_t>(*maybe_i64, 8, 400)));
 
     maybe_str = parse_json_string(body, "tick_sound_path");
     if (maybe_str.has_value()) config.set("tick_sound_path", *maybe_str);
@@ -2082,8 +2082,14 @@ std::string build_route_response(
         if (delta == 0.0) {
             return make_http_response("200 OK", "application/json; charset=utf-8", make_simple_result(false, "delta_zero"));
         }
-        timer->adjust_time(delta);
+        // M4: honestidad — el motor devuelve el delta REAL aplicado. Si esta
+        // bloqueado (pausado/completado/oculto) o el clamp lo dejó en cero,
+        // no se puede responder "adjusted".
+        const double applied = timer->adjust_time(delta);
         app->save_timer_state();
+        if (applied == 0.0) {
+            return make_http_response("200 OK", "application/json; charset=utf-8", make_simple_result(false, "adjust_blocked"));
+        }
         return make_http_response("200 OK", "application/json; charset=utf-8", make_simple_result(true, "adjusted"));
     }
     if (request.method == "POST" && request.path == "/api/timer/reset-config") {

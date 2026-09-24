@@ -1239,6 +1239,67 @@ void test_m5_ventana_deslizante_60s() {
     std::cout << "PASS: m5_ventana_deslizante_60s\n";
 }
 
+// M5: el suelo (floor_time_s) no puede superar el tope (max_time_s). Con
+// floor > max cada evento negativo oscila entre ambos (el suelo sube a floor,
+// la rama de tope vuelve a bajar a max). apply_config debe reconciliarlos.
+void test_m5_suelo_no_supera_el_tope() {
+    LiveTimerGame game;
+    auto cfg = game.default_config();
+    cfg.set("initial_time_s", 300.0);
+    cfg.set("max_time_s", 50.0);
+    cfg.set("floor_time_s", 100.0);
+    cfg.set("time_per_like_s", -800.0);
+    game.apply_config(cfg);
+
+    // Reconciliacion visible en estado y en config (export/get).
+    assert(game.state().floor_time_s <= game.state().max_time_s);
+    assert(game.config().get_double("floor_time_s", 0.0) <= 50.0);
+
+    game.on_activated();
+    game.on_game_input_event(make_test_event(GameInputEventKind::like), kEmptySnapshot);
+    // El reloj queda en el suelo ya reconciliado (= tope), sin completarse.
+    assert(std::abs(game.state().remaining_seconds - 50.0) < 0.5);
+    assert(!game.state().completed);
+
+    std::cout << "PASS: m5_suelo_no_supera_el_tope\n";
+}
+
+// B1: el JSON de arranque (game == nullptr) debe reflejar el default V2
+// initial_time_s = 0, no el legacy 300.
+void test_state_json_null_game_uses_v2_defaults() {
+    const std::string json = nlp3::platform::build_live_timer_state_json(nullptr);
+    assert(json.find("\"initial_seconds\":0") != std::string::npos);
+    assert(json.find("\"remainingSeconds\":0") != std::string::npos);
+    std::cout << "PASS: state_json_null_game_uses_v2_defaults\n";
+}
+
+// B2: json_quote debe escapar los caracteres de control (< 0x20) como \\u00XX.
+// Un byte crudo en el titulo haria que el overlay no pudiera JSON.parse del
+// estado y dejara de pintar (sonido silencioso, poll detenido).
+void test_state_json_escapes_control_chars() {
+    LiveTimerGame game;
+    auto cfg = game.default_config();
+    cfg.set("title_text", std::string("bad\x01" "title"));
+    game.apply_config(cfg);
+    const std::string json = nlp3::platform::build_live_timer_state_json(&game);
+    assert(json.find("\\u0001") != std::string::npos);
+    assert(json.find('\x01') == std::string::npos);
+    std::cout << "PASS: state_json_escapes_control_chars\n";
+}
+
+// B4: apply_visual_style acota font_size_px al mismo rango que el HTTP
+// (8..400). La ruta save-file -> apply_config no pasa por el clamp del HTTP,
+// asi que el motor es la ultima linea de defensa.
+void test_visual_style_font_size_clamped() {
+    LiveTimerGame game;
+    auto cfg = game.default_config();
+    cfg.set("counter_font_size", static_cast<std::int64_t>(99999));
+    game.apply_config(cfg);
+    assert(game.state().counter_style.font_size_px <= 400);
+    assert(game.state().counter_style.font_size_px >= 8);
+    std::cout << "PASS: visual_style_font_size_clamped\n";
+}
+
 void test_bloque_a_serializacion_en_json() {
     LiveTimerGame game;
     auto cfg = game.default_config();
@@ -1390,6 +1451,10 @@ int main() {
     test_m5_tope_total_global();
     test_m5_suelo_no_completa();
     test_m5_ventana_deslizante_60s();
+    test_m5_suelo_no_supera_el_tope();
+    test_state_json_null_game_uses_v2_defaults();
+    test_state_json_escapes_control_chars();
+    test_visual_style_font_size_clamped();
     test_bloque_a_serializacion_en_json();
     test_r2_popups_ocultables();
     test_r2_nombre_oculto_en_popup();
