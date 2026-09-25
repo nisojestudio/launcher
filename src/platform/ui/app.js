@@ -1395,7 +1395,9 @@
       })
       .join("");
     if (markup !== state.liveAlertsMarkup) {
-      state.liveAlertsList.innerHTML = markup;
+      // El elemento vive en `els`, no en `state` (con `state.liveAlertsList`
+      // esto tiraba TypeError y la lista de alertas nunca se pintaba).
+      els.liveAlertsList.innerHTML = markup;
       state.liveAlertsMarkup = markup;
     }
   }
@@ -5413,5 +5415,23 @@
     window.setInterval(updateTitlebarClock, 1000);
   }
 
-  init();
+  // Hooks para los tests de Node (tests/ui/*.test.mjs): ese runner carga este
+  // archivo con un DOM minimo y necesita llegar a las funciones de alertas y de
+  // estado. En el navegador nunca se cumple (no se define __NLP3_UI_TEST__), asi
+  // que aqui entra por el else y todo sigue igual que antes.
+  if (globalThis.__NLP3_UI_TEST__) {
+    globalThis.__NLP3_UI_TEST__.expose({
+      state,
+      els,
+      escapeHtml,
+      pushLiveAlert,
+      dismissLiveAlert,
+      clearLiveAlerts,
+      liveAlertActionView,
+      renderLiveAlerts,
+      detectIssueTransitions,
+    });
+  } else {
+    init();
+  }
 })();

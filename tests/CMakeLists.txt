@@ -292,6 +292,19 @@ add_test(
         -v
 )
 
+# Tests de la UI del panel (src/platform/ui/app.js) corriendo en Node: cargan el
+# archivo real con un DOM minimo y ejercitan la logica de alertas del live. Si la
+# maquina no tiene node en el PATH no se registra el test y ctest sigue en verde.
+find_program(NLP3_TEST_NODE NAMES node)
+if(NLP3_TEST_NODE)
+    add_test(
+        NAME nlp3_panel_ui_js_tests
+        COMMAND
+            "${NLP3_TEST_NODE}" --test
+            "${PROJECT_SOURCE_DIR}/tests/ui/*.test.mjs"
+    )
+endif()
+
 # V2: el estado del Live Timer vive en %LOCALAPPDATA%\NisojeStudio\timer. Los
 # tests NO deben leerlo ni pisarlo: es el estado real del usuario, y ademas su
 # resultado no puede depender de lo que tenga guardado. Sin esto, cualquier test
