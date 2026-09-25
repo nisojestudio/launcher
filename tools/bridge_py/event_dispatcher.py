@@ -36,12 +36,17 @@ class PanelWsSink:
         """
         return self._connection is not None or self._consecutive_failures == 0
 
+    def _reconnect_cooldown_sec(self) -> float:
+        return self._retry_cooldown_sec * (2 ** min(self._consecutive_failures, 5))
+
+    def _in_reconnect_cooldown(self) -> bool:
+        if self._last_failure_monotonic <= 0:
+            return False
+        return (time.monotonic() - self._last_failure_monotonic) < self._reconnect_cooldown_sec()
+
     async def _ensure_connection(self) -> Any:
         if self._connection is None:
-            now = time.monotonic()
-            # Exponential cooldown on consecutive failures
-            cooldown = self._retry_cooldown_sec * (2 ** min(self._consecutive_failures, 5))
-            if self._last_failure_monotonic > 0 and (now - self._last_failure_monotonic) < cooldown:
+            if self._in_reconnect_cooldown():
                 raise RuntimeError("panel ws reconnect cooldown")
             self._connection = await self._connect_factory(self._ws_url)
             self._consecutive_failures = 0
@@ -49,6 +54,13 @@ class PanelWsSink:
 
     async def send_json(self, payload: dict[str, Any]) -> None:
         serialized = json.dumps(payload, ensure_ascii=False, separators=(",", ":"))
+        # El cooldown se evalua ANTES del try: un envio rechazado por esperar
+        # no es un fallo del panel. Si contaba como tal, cada intento corria el
+        # reloj del backoff y sumaba un fallo mas, y con trafico constante (el
+        # latido de 30s y los eventos del vivo) la ventana nunca expiraba: el
+        # sink quedaba desconectado para siempre aunque el panel volviera.
+        if self._connection is None and self._in_reconnect_cooldown():
+            raise RuntimeError("panel ws reconnect cooldown")
         try:
             connection = await self._ensure_connection()
             await connection.send(serialized)

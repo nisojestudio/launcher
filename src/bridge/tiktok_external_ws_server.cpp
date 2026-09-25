@@ -733,6 +733,13 @@ const auto origin = extract_header_value(request, "origin");
             continue;
         }
 
+        // Pong del cliente (respuesta a un ping nuestro o de su propia lib): es
+        // trafico de control, no un mensaje. Antes caia en el rechazo general y
+        // cerraba la conexion con el bridge.
+        if (opcode == 0xAu) {
+            continue;
+        }
+
         if (opcode != 0x1u) {
             close_socket(impl_->client_socket);
             impl_->handshake_complete = false;

@@ -160,6 +160,24 @@ public:
             == static_cast<int>(frame.size());
     }
 
+    bool send_pong() const {
+        // Pong sin payload (FIN + opcode 0xA, enmascarado). Es el frame de
+        // control que un cliente manda al responder un ping: el servidor lo
+        // ignora y la conexion sigue viva.
+        if (socket_ == INVALID_SOCKET) {
+            return false;
+        }
+
+        std::string frame;
+        frame.push_back(static_cast<char>(0x8Au));
+        frame.push_back(static_cast<char>(0x80u));
+        const std::array<unsigned char, 4> mask{0x12u, 0x34u, 0x56u, 0x78u};
+        frame.append(reinterpret_cast<const char*>(mask.data()), mask.size());
+
+        return send(socket_, frame.data(), static_cast<int>(frame.size()), 0)
+            == static_cast<int>(frame.size());
+    }
+
     void close() {
         if (socket_ != INVALID_SOCKET) {
             closesocket(socket_);
@@ -393,6 +411,9 @@ assert(panel_console.execute_line("bridge demo live 8765"));
     assert(ws_test_client.send_handshake_request("Origin: http://127.0.0.1:8765\r\n"));
     assert(panel_console.execute_line("bridge demo ws run 5 0"));
     assert(ws_test_client.receive_handshake_response());
+    // Un pong es frame de control: no cierra el enlace. Todo lo que mande
+    // despues de este frame tiene que seguir siendo aceptado por el servidor.
+    assert(ws_test_client.send_pong());
 
     const auto before_socket_total_events = panel_app.snapshot().total_events;
     const auto socket_status_payload = status_codec.encode_json(nlp3::bridge::TikTokExternalSessionStatus{

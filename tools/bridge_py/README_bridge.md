@@ -213,6 +213,31 @@ Descartar una alerta (✕ o *Limpiar*) la borra del monitor y la recuerda mientr
 el mismo `alert_code` siga activo; cuando el bridge manda un status sano sin
 código, la lista de descartes se limpia y un problema repetido vuelve a avisar.
 
+## Canal directo de estado: `PanelWsSink`
+
+El estado **no** pasa por la cola de eventos. `ConnectionManager` llama a
+`emit_status` → `AsyncEventDispatcher.emit_status` → `PanelWsSink`, que abre su
+propio WebSocket contra el panel (el runner lo recibe con
+`--ws ws://127.0.0.1:<puerto>`, el puerto real que eligió el panel en el rango
+8765-8800). Así la franja y las alertas se actualizan sin esperar el lote de
+eventos. Los eventos canónicos siguen yendo por la cola con `batch_size`.
+
+- El mismo payload también se espeja en el WebSocket de broadcast
+  (`broadcast_ws_port`), para consumidores que no sean el panel.
+- Fallos de envío = métrica `panel_ws_send_failures_total`.
+- **Backoff**: 2 s × 2^n con tope en 64 s tras un fallo real. Un envío
+  *rechazado por cooldown* no cuenta como fallo ni corre el reloj: antes sí lo
+  hacía, y con tráfico constante (latido + eventos) la ventana nunca expiraba,
+  así que el sink quedaba desconectado para siempre aunque el panel volviera.
+- `is_attached` (conexión viva o cero fallos) es lo que usa `ConnectionManager`
+  para silenciar las alertas sonoras cuando no hay panel mirando.
+- Sin keepalive (`ping_interval=None`): en loopback el cierre del socket se
+  nota en el primer envío, y el servidor del panel ya contesta los pings y
+  ignora el pong del cliente. Si algún día se activan los pings, el servidor
+  los soporta.
+- El servidor del panel acepta **un solo cliente**: si el socket viejo no se
+  cierra, el siguiente queda esperando en la cola del `accept`.
+
 ## Rate Limiting por Proveedor
 
 El bridge limita reconexiones a **10 por hora por proveedor** (configurable con

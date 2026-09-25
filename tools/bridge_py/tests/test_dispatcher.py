@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import asyncio
+import json
 import tempfile
 import unittest
 from pathlib import Path
@@ -8,6 +9,7 @@ from pathlib import Path
 from bridge_client import build_chat_event
 from event_decoder import decode_canonical_event
 from event_dispatcher import AsyncEventDispatcher, PanelWsSink
+from event_models import ConnectionState, SessionStatus
 from metrics_registry import MetricsRegistry
 
 
@@ -56,6 +58,104 @@ class PanelWsSinkAttachmentTests(unittest.IsolatedAsyncioTestCase):
         await sink.send_json({"message_type": "canonical_event"})
 
         self.assertTrue(sink.is_attached)
+
+
+class PanelWsSinkCooldownTests(unittest.IsolatedAsyncioTestCase):
+    """Un rechazo por cooldown NO es un fallo nuevo.
+
+    Antes de la correccion, cada envio rechazado por el cooldown refrescaba el
+    reloj del backoff y sumaba un fallo mas. Con trafico constante (latido cada
+    30s + eventos del vivo) la ventana nunca llegaba a expirar: el sink quedaba
+    desconectado para siempre y las alertas sonoras se quedaban silenciadas,
+    aunque el panel hubiera vuelto.
+    """
+
+    async def test_cooldown_rejection_does_not_extend_the_backoff(self) -> None:
+        attempts: list[str] = []
+
+        async def factory(url: str) -> _FakePanelConnection:
+            attempts.append(url)
+            if len(attempts) == 1:
+                raise ConnectionRefusedError("el panel estaba abajo")
+            return _FakePanelConnection()
+
+        sink = PanelWsSink("ws://127.0.0.1:8765", factory)
+
+        with self.assertRaises(ConnectionRefusedError):
+            await sink.send_json({"message_type": "session_status"})
+        self.assertEqual(len(attempts), 1)
+        self.assertFalse(sink.is_attached)
+
+        # Trafico durante el cooldown: no reconecta todavia, pero tampoco
+        # deberia sumar fallos ni correr el reloj de la espera.
+        for _ in range(3):
+            with self.assertRaises(RuntimeError):
+                await sink.send_json({"message_type": "session_status"})
+        self.assertEqual(len(attempts), 1)
+        self.assertEqual(
+            sink._consecutive_failures,
+            1,
+            "los rechazos por cooldown no deben contar como fallos",
+        )
+
+        # Cumplido el cooldown, el siguiente envio reconecta aunque haya
+        # seguido habiendo trafico en el medio.
+        sink._last_failure_monotonic -= 10_000.0
+        await sink.send_json({"message_type": "session_status"})
+        self.assertEqual(len(attempts), 2)
+        self.assertTrue(sink.is_attached)
+
+
+class DispatcherStatusTests(unittest.IsolatedAsyncioTestCase):
+    """El status viaja por el canal directo con todo lo que el panel necesita."""
+
+    async def test_emit_status_delivers_the_diagnostic_payload(self) -> None:
+        connection = _FakePanelConnection()
+
+        async def factory(_url: str) -> _FakePanelConnection:
+            return connection
+
+        dispatcher = AsyncEventDispatcher(
+            metrics=MetricsRegistry(),
+            queue_size=4,
+            batch_size=1,
+            overflow_policy="drop_oldest",
+            panel_ws_sink=PanelWsSink("ws://127.0.0.1:8765", factory),
+        )
+
+        await dispatcher.emit_status(
+            SessionStatus(
+                target_user="alice",
+                connection_state=ConnectionState.RECONNECTING,
+                message="Rotando de API key",
+                timestamp_ms=1710000001000,
+                phase="waiting",
+                severity="warn",
+                alert_code="API_KEY_ROTATION_REQUESTED",
+                alert_action="rotate_key",
+                retry_in_sec=30.0,
+                daily_budget_total=50,
+                daily_budget_remaining=12,
+                daily_budget_manual_reserve=10,
+                daily_budget_remaining_auto=2,
+            )
+        )
+        payload = json.loads(connection.sent[0])
+        self.assertEqual(payload["message_type"], "session_status")
+        self.assertEqual(payload["connection_state"], "reconnecting")
+        self.assertEqual(payload["phase"], "waiting")
+        self.assertEqual(payload["alert_code"], "API_KEY_ROTATION_REQUESTED")
+        self.assertEqual(payload["alert_action"], "rotate_key")
+        self.assertEqual(payload["daily_budget_total"], 50)
+        self.assertEqual(payload["daily_budget_remaining"], 12)
+
+        # Sin tope ni alerta los campos no viajan: el panel no debe ver ceros
+        # que parezcan "hoy no queda nada" ni una accion inventada.
+        await dispatcher.emit_status(SessionStatus(target_user="alice"))
+        payload = json.loads(connection.sent[1])
+        self.assertNotIn("daily_budget_total", payload)
+        self.assertNotIn("alert_action", payload)
+        self.assertNotIn("alert_code", payload)
 
 
 class DispatcherTests(unittest.IsolatedAsyncioTestCase):
