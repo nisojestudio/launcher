@@ -30,10 +30,16 @@ struct TikTokExternalSessionStatus {
     std::string message{};
     std::int64_t timestamp_ms = 0;
     // Diagnostico visible en el panel (opcionales: el bridge viejo no los manda).
-    std::string phase{};        // starting | connecting | waiting | connected | error
+    std::string phase{};        // starting | connecting | waiting | rate_limited | connected | error
     std::string severity{};     // info | warn | error
     std::string alert_code{};   // codigo del catalogo de errores del bridge
     double retry_in_sec = 0.0;  // segundos hasta el proximo intento
+    // Presupuesto diario de aperturas contra el proveedor (0 = sin tope: no se
+    // emite). El panel lo muestra para que el operador vea cuanto le queda hoy.
+    std::int32_t daily_budget_total = 0;
+    std::int32_t daily_budget_remaining = 0;
+    std::int32_t daily_budget_manual_reserve = 0;
+    std::int32_t daily_budget_remaining_auto = 0;
 };
 
 constexpr std::string_view to_string(TikTokExternalSessionConnectionState state) noexcept {

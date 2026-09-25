@@ -50,6 +50,12 @@ struct ExternalBridgeManifest {
     std::int32_t runner_last_exit_code = 0;
     std::string runner_last_error{};
     std::vector<std::string> runner_recent_log_lines{};
+    // Presupuesto diario de conexiones del proveedor (0 = sin tope / sin
+    // bridge). Va al final por el initialize posicional de panel_app.cpp.
+    std::int32_t daily_budget_total = 0;
+    std::int32_t daily_budget_remaining = 0;
+    std::int32_t daily_budget_manual_reserve = 0;
+    std::int32_t daily_budget_remaining_auto = 0;
 };
 
 } // namespace nlp3::platform

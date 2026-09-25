@@ -342,6 +342,17 @@ std::string TikTokExternalSessionStatusCodec::encode_json(const TikTokExternalSe
     if (status.retry_in_sec > 0.0) {
         payload += ",\"retry_in_sec\":" + std::to_string(status.retry_in_sec);
     }
+    // Presupuesto diario: solo si hay tope, para que un bridge sin limite no
+    // mande ceros que el panel interpretaria como "agotado".
+    if (status.daily_budget_total > 0) {
+        payload += ",\"daily_budget_total\":" + std::to_string(status.daily_budget_total);
+        payload += ",\"daily_budget_remaining\":" + std::to_string(
+            status.daily_budget_remaining > 0 ? status.daily_budget_remaining : 0);
+        payload += ",\"daily_budget_manual_reserve\":" + std::to_string(
+            status.daily_budget_manual_reserve > 0 ? status.daily_budget_manual_reserve : 0);
+        payload += ",\"daily_budget_remaining_auto\":" + std::to_string(
+            status.daily_budget_remaining_auto > 0 ? status.daily_budget_remaining_auto : 0);
+    }
 
     payload += "}";
     return payload;
@@ -396,6 +407,19 @@ std::optional<TikTokExternalSessionStatus> TikTokExternalSessionStatusCodec::dec
     if (const auto retry_in_sec = as_number(find_field(root->object_value, "retry_in_sec")); retry_in_sec.has_value()) {
         status.retry_in_sec = static_cast<double>(*retry_in_sec);
     }
+    // Presupuesto diario (opcional): un bridge viejo no lo manda y un valor
+    // raro nunca puede dejar el contador en negativo en el panel.
+    const auto budget_int = [&root](const char* key) -> std::int32_t {
+        const auto value = as_number(find_field(root->object_value, key));
+        if (!value.has_value() || *value <= 0) {
+            return 0;
+        }
+        return static_cast<std::int32_t>(*value);
+    };
+    status.daily_budget_total = budget_int("daily_budget_total");
+    status.daily_budget_remaining = budget_int("daily_budget_remaining");
+    status.daily_budget_manual_reserve = budget_int("daily_budget_manual_reserve");
+    status.daily_budget_remaining_auto = budget_int("daily_budget_remaining_auto");
 
     return status;
 }

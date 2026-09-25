@@ -178,7 +178,15 @@
     liveStatusPhase: "",
     liveStatusSinceMs: 0,
     liveStatusUser: "",
+    // Fase que la franja esta mostrando ahora (la que decide el cronometro).
+    liveStatusShownPhase: "",
+    // Instante del ultimo cambio de fase local: solo manda un rato, hasta que
+    // el bridge arranque y mande su propio estado.
+    liveStatusSetAtMs: 0,
     lastBridgeAlertKey: "",
+    // Ultima alerta del bridge (objeto dentro de liveAlerts): si el mensaje
+    // cambia (cuenta atras) se reescribe esa misma alerta en vez de apilar otra.
+    liveBridgeAlert: null,
     keyPool: [],
     activityClearBeforeMs: 0,
     selectedGiftValue: ACTIVITY_GIFT_PRESETS[0].value,
@@ -197,6 +205,7 @@
     connectionTargetUser: $("#connection-target-user"),
     liveRoom: $("#live-room"),
     connectionNote: $("#connection-note"),
+    connectionBudget: $("#connection-budget"),
     connectForm: $("#connect-form"),
     liveStatusStrip: $("#live-status-strip"),
     liveStatusDot: $("#live-status-dot"),
@@ -901,7 +910,7 @@
     const tone = ["info", "warn", "error"].includes(severity) ? severity : "info";
     const cleanTitle = String(title ?? "").trim();
     if (!cleanTitle) {
-      return;
+      return null;
     }
     const cleanDetail = String(detail ?? "").trim();
     const key = `${tone}|${cleanTitle}|${cleanDetail}`;
@@ -910,18 +919,20 @@
       existing.count = Number(existing.count || 1) + 1;
       existing.timestampMs = Date.now();
       renderLiveAlerts();
-      return;
+      return existing;
     }
-    state.liveAlerts.unshift({
+    const alert = {
       key,
       tone,
       title: cleanTitle,
       detail: cleanDetail,
       count: 1,
       timestampMs: Date.now(),
-    });
+    };
+    state.liveAlerts.unshift(alert);
     state.liveAlerts = state.liveAlerts.slice(0, 8);
     renderLiveAlerts();
+    return alert;
   }
 
   function clearLiveAlerts() {
@@ -1031,6 +1042,10 @@
   // status con la sesion diciendo "connected", el bridge dejo de reportar y la
   // sesion deja de ser confiable.
   const BRIDGE_STATUS_STALE_MS = 45000;
+  // La fase local del ultimo click (Conectar/Reintentar) solo manda un rato:
+  // hasta que el runner arranque y mande su propio estado. Sin este tope la
+  // franja se quedaba en "Abriendo el bridge..." toda la sesion.
+  const LOCAL_PHASE_TTL_MS = 5000;
   // connection_state que significan "la sesion termino/murio": una fase
   // obsoleta ("connected") no puede anularlos.
   const TERMINAL_CONNECTION_STATES = new Set([
@@ -1105,6 +1120,8 @@
       }
     } else if (phase === "waiting") {
       return "waiting";
+    } else if (phase === "rate_limited") {
+      return "rate_limited";
     } else if (phase === "starting") {
       return "starting";
     } else if (phase === "connecting") {
@@ -1131,6 +1148,12 @@
         return { tone: "warn", label: "Conectando", detail: "Estableciendo la sesion con TikTok." };
       case "waiting":
         return { tone: "warn", label: "Esperando el vivo", detail: "La cuenta no esta en vivo todavia. El panel sigue intentando." };
+      case "rate_limited":
+        return {
+          tone: "warn",
+          label: "Esperando reconexi\u00f3n",
+          detail: "Se alcanz\u00f3 el l\u00edmite de reconexiones por hora: el bridge espera a que se libre un intento.",
+        };
       case "connected":
         return { tone: "live", label: "Conectado", detail: "Escuchando eventos del live en tiempo real." };
       case "stale": {
@@ -1155,6 +1178,7 @@
       state.liveStatusSinceMs = Date.now();
     }
     state.liveStatusPhase = nextPhase;
+    state.liveStatusSetAtMs = Date.now();
     state.liveStatusUser = String(user || "").replace(/^@+/, "");
     renderLiveStatus();
   }
@@ -1171,11 +1195,17 @@
   function renderLiveStatus() {
     const external = state.payload?.snapshot?.externalBridge || {};
     const snapshotPhase = livePhaseFromSnapshot(external);
-    const phase = state.liveStatusPhase || snapshotPhase || "idle";
-    // La sesion viva y la falta de datos del bridge las decide el snapshot:
-    // no las puede ocultar la fase local que quedo del ultimo click de Conectar.
-    const snapshotWins = snapshotPhase === "connected" || snapshotPhase === "stale";
-    const view = livePhaseView(snapshotWins ? snapshotPhase : phase, external);
+    const localPhase = state.liveStatusPhase || "";
+    // La fase local (ultimo click de Conectar/Reintentar) solo manda mientras
+    // es fresca: despues manda lo que diga el bridge. Asi la franja no se
+    // queda en "Abriendo el bridge..." toda la sesion ni oculta que el bridge
+    // esta esperando el vivo, esperando un hueco o ya murio.
+    const localFresh = !!localPhase
+      && state.liveStatusSetAtMs > 0
+      && (Date.now() - state.liveStatusSetAtMs) < LOCAL_PHASE_TTL_MS;
+    const phase = localFresh ? localPhase : (snapshotPhase || localPhase || "idle");
+    state.liveStatusShownPhase = phase;
+    const view = livePhaseView(phase, external);
     const user = external.targetUser ? `@${external.targetUser}` : (state.liveStatusUser ? `@${state.liveStatusUser}` : "");
     if (els.liveStatusStrip) {
       els.liveStatusStrip.dataset.tone = view.tone;
@@ -1189,8 +1219,10 @@
     if (!els.liveStatusTimer) {
       return;
     }
-    const phase = state.liveStatusPhase || "";
-    const tracking = ["connected", "waiting", "connecting", "launching", "starting"].includes(phase);
+    // El cronometro sigue a la fase que la franja muestra, no a la local:
+    // si el bridge ya esta en reposo no hay nada que cronometrar.
+    const phase = state.liveStatusShownPhase || "";
+    const tracking = ["connected", "waiting", "rate_limited", "connecting", "launching", "starting"].includes(phase);
     if (!tracking || !state.liveStatusSinceMs) {
       els.liveStatusTimer.hidden = true;
       return;
@@ -1628,17 +1660,30 @@
     const bridgeAlertCode = String(external?.lastAlertCode || "");
     const bridgeAlertSeverity = String(external?.lastAlertSeverity || "");
     if (bridgeAlertCode) {
-      const bridgeAlertKey = `${bridgeAlertCode}|${external?.lastStatusMessage || ""}`;
-      if (state.lastBridgeAlertKey !== bridgeAlertKey) {
+      const severity = bridgeAlertSeverity === "error" ? "error" : (bridgeAlertSeverity === "warn" ? "warn" : "info");
+      const message = String(external?.lastStatusMessage || bridgeAlertCode);
+      const detail = `Código: ${bridgeAlertCode}`;
+      // La clave es el codigo, no el mensaje: la cuenta atras del reintento
+      // cambia cada 30s y no debe apilar una alerta distinta por cada tic.
+      const bridgeAlertKey = `${severity}|${bridgeAlertCode}`;
+      const current = state.liveBridgeAlert && state.liveAlerts.includes(state.liveBridgeAlert)
+        ? state.liveBridgeAlert
+        : null;
+      if (state.lastBridgeAlertKey !== bridgeAlertKey || !current) {
         state.lastBridgeAlertKey = bridgeAlertKey;
-        pushLiveAlert(
-          bridgeAlertSeverity === "error" ? "error" : (bridgeAlertSeverity === "warn" ? "warn" : "info"),
-          String(external?.lastStatusMessage || bridgeAlertCode),
-          `Código: ${bridgeAlertCode}`
-        );
+        state.liveBridgeAlert = pushLiveAlert(severity, message, detail);
+      } else if (current.title !== message) {
+        // Mismo aviso con texto nuevo: se reescribe esa alerta en el lugar.
+        current.title = message;
+        current.detail = detail;
+        current.timestampMs = Date.now();
+        current.key = `${severity}|${message}|${detail}`;
+        state.liveAlertsMarkup = "";
+        renderLiveAlerts();
       }
     } else if (state.lastBridgeAlertKey) {
       state.lastBridgeAlertKey = "";
+      state.liveBridgeAlert = null;
     }
 
     const runnerIssue = humanizeRunnerIssue(external);
@@ -2266,6 +2311,40 @@
     }
   }
 
+  // Presupuesto diario de conexiones: cuanto le queda al operador hoy.
+  // Vive en su propia linea porque cambia con cada apertura y no debe
+  // ensuciar el motivo (connection-note) ni la fase de la franja.
+  function renderConnectionBudget(external) {
+    if (!els.connectionBudget) {
+      return;
+    }
+    const total = Number(external?.dailyBudgetTotal || 0);
+    if (!(total > 0)) {
+      els.connectionBudget.hidden = true;
+      els.connectionBudget.textContent = "";
+      els.connectionBudget.dataset.tone = "";
+      return;
+    }
+    const remaining = Math.max(0, Number(external.dailyBudgetRemaining || 0));
+    const remainingAuto = Math.max(0, Number(external.dailyBudgetRemainingAuto || 0));
+    const manualReserve = Math.max(0, Number(external.dailyBudgetManualReserve || 0));
+    let text;
+    let tone = "";
+    if (remaining <= 0) {
+      text = "Conexiones de hoy agotadas: se renuevan ma\u00f1ana (UTC).";
+      tone = "danger";
+    } else if (remainingAuto <= 0) {
+      text = `Quedan ${remaining} de ${total} conexiones hoy, pero ninguna para reconexiones: s\u00f3lo sirven para conectar a mano.`;
+      tone = "warn";
+    } else {
+      text = `Conexiones hoy: ${remaining} de ${total} disponibles (${remainingAuto} para reconexiones`;
+      text += manualReserve > 0 ? `, ${manualReserve} reservadas para conectar).` : ").";
+    }
+    els.connectionBudget.textContent = text;
+    els.connectionBudget.dataset.tone = tone;
+    els.connectionBudget.hidden = false;
+  }
+
   function renderConnection(payload) {
     const external = payload?.snapshot?.externalBridge || {};
     const diagnosticsOk = !!payload?.diagnostics?.ok;
@@ -2339,6 +2418,7 @@
       els.connectionNote.dataset.tone = noteTone;
       els.connectionNote.hidden = !note;
     }
+    renderConnectionBudget(external);
 
     if (document.activeElement !== els.tiktokUser) {
       const desiredValue = external.targetUser ? `@${external.targetUser}` : els.tiktokUser.value;
@@ -3245,6 +3325,9 @@
   }
 
   async function disconnectLive() {
+    // La franja pasa a reposo de inmediato: no puede quedarse en "Conectando"
+    // mientras el runner se cierra.
+    setLivePhase("idle");
     try {
       await runCommand("bridge runner stop");
     } catch (error) {

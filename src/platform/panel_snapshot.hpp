@@ -57,6 +57,11 @@ struct PanelExternalBridgeStatus {
     std::string last_alert_code{};
     std::string last_alert_severity{};
     double retry_in_sec = 0.0;
+    // Presupuesto diario de conexiones del proveedor (0 = sin tope).
+    std::int32_t daily_budget_total = 0;
+    std::int32_t daily_budget_remaining = 0;
+    std::int32_t daily_budget_manual_reserve = 0;
+    std::int32_t daily_budget_remaining_auto = 0;
     std::string current_room_id{};
     std::string last_event_kind{};
     std::string last_event_actor{};

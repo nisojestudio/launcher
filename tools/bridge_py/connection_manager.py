@@ -329,6 +329,14 @@ class ConnectionManager:
                     await self._sound.play_reconnecting()
                     log_json(self._logger, "info", "sound_alert", "play: reconnecting")
             self._last_played_state = state_key
+            # Presupuesto diario viaja en todos los status: el panel muestra
+            # cuanto queda hoy sin tener que preguntarle al bridge.
+            budget = self._budget
+            if budget is not None and budget.enabled:
+                status.daily_budget_total = budget.total_per_day
+                status.daily_budget_remaining = budget.remaining_total
+                status.daily_budget_manual_reserve = budget.manual_reserve
+                status.daily_budget_remaining_auto = budget.remaining_auto
             await self._status_callback(status)
 
         async def sleep_with_updates(
@@ -890,7 +898,10 @@ class ConnectionManager:
                             f"de mas en {provider_label}."
                         )
 
-                    retry_phase = "connecting"
+                    # Fase propia: la franja del panel no puede decir
+                    # "Conectando" mientras el bridge se queda esperando a que
+                    # se libre un hueco del limite horario.
+                    retry_phase = "rate_limited"
                 else:
                     def retry_message_for(left: float) -> str:
                         return f"Reintentando conexion ({attempt}) en {left:.0f}s..."

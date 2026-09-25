@@ -272,6 +272,46 @@ int main() {
     assert(decoded_fractional->alert_code == "NETWORK_ERROR");
     assert(decoded_fractional->retry_in_sec >= 4.0 && decoded_fractional->retry_in_sec < 5.0);
 
+    // Presupuesto diario: viaja del status del bridge hasta el snapshot del
+    // panel para que el operador vea cuantas conexiones le quedan hoy.
+    const auto budget_status_payload = status_codec.encode_json(nlp3::bridge::TikTokExternalSessionStatus{
+        "ws_budget_target",
+        "room-ws-budget-001",
+        nlp3::bridge::TikTokExternalSessionConnectionState::connected,
+        "Estado con presupuesto",
+        1710000008000,
+        "connected",
+        "info",
+        "",
+        0.0,
+        50,
+        12,
+        10,
+        2,
+    });
+    assert(panel_app.submit_external_ws_payload(budget_status_payload));
+    const auto snapshot_with_budget = panel_app.snapshot();
+    assert(snapshot_with_budget.external_bridge.daily_budget_total == 50);
+    assert(snapshot_with_budget.external_bridge.daily_budget_remaining == 12);
+    assert(snapshot_with_budget.external_bridge.daily_budget_manual_reserve == 10);
+    assert(snapshot_with_budget.external_bridge.daily_budget_remaining_auto == 2);
+
+    // Sin tope configurado el campo no viaja: el panel no debe ver ceros que
+    // parezcan "hoy no queda nada".
+    const auto no_budget_payload = status_codec.encode_json(nlp3::bridge::TikTokExternalSessionStatus{
+        "ws_budget_target",
+        "room-ws-budget-001",
+        nlp3::bridge::TikTokExternalSessionConnectionState::connected,
+        "Estado sin tope",
+        1710000009000,
+    });
+    assert(no_budget_payload.find("daily_budget_total") == std::string::npos);
+    const auto decoded_no_budget = status_codec.decode_json(no_budget_payload);
+    assert(decoded_no_budget.has_value());
+    assert(decoded_no_budget->daily_budget_total == 0);
+    assert(decoded_no_budget->daily_budget_remaining == 0);
+    assert(decoded_no_budget->daily_budget_remaining_auto == 0);
+
     std::istringstream console_input;
     std::ostringstream console_output;
     nlp3::platform::PanelConsole panel_console{

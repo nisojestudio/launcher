@@ -183,6 +183,10 @@ retry_policy:
   25%) para que la ventana de espera llegue a durar lo que tiene que durar.
 - Se cobra justo antes de `open()`: una key inválida no llega a conectar y no
   debe gastar una conexión.
+- **Visible en el panel**: cada `session_status` lleva
+  `daily_budget_total/remaining/manual_reserve/remaining_auto` y la tarjeta de
+  Conexión muestra la línea `Conexiones hoy: X de Y ...`. Sin tope (`0`) los
+  campos no viajan y la línea no aparece.
 
 Métricas: `daily_budget_remaining` (y el snapshot completo en el log
 `daily connection budget loaded`).
@@ -197,7 +201,8 @@ Al llegar al tope **no se rinde**: calcula cuándo se libera el hueco
 (`seconds_until_slot`), lo anuncia en el monitor ("se espera X min...") y
 espera. El contador se cobra al abrir la sesión, no al programarla, para que la
 espera no consuma el límite. Esperar el vivo o rotar de credencial siguen sin
-contar.
+contar. Durante esa espera el status sale con fase `rate_limited`, para que la
+franja del panel diga "Esperando reconexión" y no "Conectando".
 
 `retry_policy.max_attempts` está en `0` (sin tope de intentos): los guardias
 reales son este límite horario y el presupuesto diario.

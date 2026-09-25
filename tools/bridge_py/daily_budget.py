@@ -86,6 +86,16 @@ class DailyConnectionBudget:
         return max(0, self._total - self._manual_reserve)
 
     @property
+    def total_per_day(self) -> int:
+        """Tope diario configurado (0 = sin tope)."""
+        return self._total
+
+    @property
+    def manual_reserve(self) -> int:
+        """Parte del tope reservada para conexiones manuales del operador."""
+        return self._manual_reserve
+
+    @property
     def date(self) -> str:
         return self._date
 

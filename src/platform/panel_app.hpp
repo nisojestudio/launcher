@@ -279,6 +279,12 @@ private:
     std::string external_bridge_last_alert_code_{};
     std::string external_bridge_last_alert_severity_{};
     double external_bridge_retry_in_sec_ = 0.0;
+    // Presupuesto diario de conexiones del proveedor (0 = sin tope). No se
+    // borra al desconectar: sigue siendo el contador real del dia.
+    std::int32_t external_bridge_daily_budget_total_ = 0;
+    std::int32_t external_bridge_daily_budget_remaining_ = 0;
+    std::int32_t external_bridge_daily_budget_manual_reserve_ = 0;
+    std::int32_t external_bridge_daily_budget_remaining_auto_ = 0;
     std::string external_bridge_current_room_id_{};
     std::string external_bridge_last_event_kind_{};
     std::string external_bridge_last_event_actor_{};

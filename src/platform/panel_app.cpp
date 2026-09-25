@@ -805,6 +805,10 @@ bool PanelApp::initialize(const std::string& config_path) {
         external_bridge_last_alert_code_.clear();
         external_bridge_last_alert_severity_.clear();
         external_bridge_retry_in_sec_ = 0.0;
+        external_bridge_daily_budget_total_ = 0;
+        external_bridge_daily_budget_remaining_ = 0;
+        external_bridge_daily_budget_manual_reserve_ = 0;
+        external_bridge_daily_budget_remaining_auto_ = 0;
         external_bridge_current_room_id_.clear();
         external_bridge_last_event_kind_.clear();
         external_bridge_last_event_actor_.clear();
@@ -1309,6 +1313,12 @@ PanelSnapshot PanelApp::snapshot() const {
         empty_snapshot.external_bridge.last_alert_code = external_manifest.last_alert_code;
         empty_snapshot.external_bridge.last_alert_severity = external_manifest.last_alert_severity;
         empty_snapshot.external_bridge.retry_in_sec = external_manifest.retry_in_sec;
+        empty_snapshot.external_bridge.daily_budget_total = external_manifest.daily_budget_total;
+        empty_snapshot.external_bridge.daily_budget_remaining = external_manifest.daily_budget_remaining;
+        empty_snapshot.external_bridge.daily_budget_manual_reserve =
+            external_manifest.daily_budget_manual_reserve;
+        empty_snapshot.external_bridge.daily_budget_remaining_auto =
+            external_manifest.daily_budget_remaining_auto;
         empty_snapshot.external_bridge.current_room_id = external_manifest.current_room_id;
         empty_snapshot.external_bridge.last_event_kind = external_manifest.last_event_kind;
         empty_snapshot.external_bridge.last_event_actor = external_manifest.last_event_actor;
@@ -1668,6 +1678,10 @@ ExternalBridgeManifest PanelApp::external_bridge_manifest() const {
         runner_status.last_exit_code,
         runner_status.last_error,
         runner_status.recent_log_lines,
+        external_bridge_daily_budget_total_,
+        external_bridge_daily_budget_remaining_,
+        external_bridge_daily_budget_manual_reserve_,
+        external_bridge_daily_budget_remaining_auto_,
     };
 }
 
@@ -1821,6 +1835,12 @@ bool PanelApp::submit_external_session_status(const bridge::TikTokExternalSessio
         external_bridge_last_alert_severity_.clear();
     }
     external_bridge_retry_in_sec_ = status.retry_in_sec;
+    // Presupuesto diario: se pisa en cada status (0 = el bridge no tiene tope
+    // o mostro el ultimo contador) para no arrastrar un valor de otra sesion.
+    external_bridge_daily_budget_total_ = status.daily_budget_total;
+    external_bridge_daily_budget_remaining_ = status.daily_budget_remaining;
+    external_bridge_daily_budget_manual_reserve_ = status.daily_budget_manual_reserve;
+    external_bridge_daily_budget_remaining_auto_ = status.daily_budget_remaining_auto;
     if (!status.room_id.empty()) {
         external_bridge_current_room_id_ = status.room_id;
     }

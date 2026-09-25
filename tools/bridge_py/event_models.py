@@ -150,6 +150,13 @@ class SessionStatus:
     provider: str = ""
     key_label: str = ""
     retry_in_sec: float = 0.0
+    # Presupuesto diario de conexiones (0 = sin tope configurado, no se envia).
+    # El panel lo muestra para que el operador vea cuantas aperturas le quedan
+    # hoy antes de que el proveedor corte la sesion.
+    daily_budget_total: int = 0
+    daily_budget_remaining: int = 0
+    daily_budget_manual_reserve: int = 0
+    daily_budget_remaining_auto: int = 0
 
     def to_panel_payload(self) -> dict[str, Any]:
         payload = {
@@ -181,6 +188,13 @@ class SessionStatus:
             payload["key_label"] = self.key_label
         if self.retry_in_sec > 0:
             payload["retry_in_sec"] = round(float(self.retry_in_sec), 2)
+        # Presupuesto diario: solo si hay tope (total > 0), para que un bridge
+        # sin limite no mande ceros que el panel interpretaria como "agotado".
+        if self.daily_budget_total > 0:
+            payload["daily_budget_total"] = int(self.daily_budget_total)
+            payload["daily_budget_remaining"] = max(0, int(self.daily_budget_remaining))
+            payload["daily_budget_manual_reserve"] = max(0, int(self.daily_budget_manual_reserve))
+            payload["daily_budget_remaining_auto"] = max(0, int(self.daily_budget_remaining_auto))
         return payload
 
 

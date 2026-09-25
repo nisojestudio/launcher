@@ -56,6 +56,12 @@ PanelSnapshot build_panel_snapshot(
     snapshot.external_bridge.last_alert_code = std::move(external_bridge_manifest.last_alert_code);
     snapshot.external_bridge.last_alert_severity = std::move(external_bridge_manifest.last_alert_severity);
     snapshot.external_bridge.retry_in_sec = external_bridge_manifest.retry_in_sec;
+    snapshot.external_bridge.daily_budget_total = external_bridge_manifest.daily_budget_total;
+    snapshot.external_bridge.daily_budget_remaining = external_bridge_manifest.daily_budget_remaining;
+    snapshot.external_bridge.daily_budget_manual_reserve =
+        external_bridge_manifest.daily_budget_manual_reserve;
+    snapshot.external_bridge.daily_budget_remaining_auto =
+        external_bridge_manifest.daily_budget_remaining_auto;
     snapshot.external_bridge.current_room_id = std::move(external_bridge_manifest.current_room_id);
     snapshot.external_bridge.last_event_kind = std::move(external_bridge_manifest.last_event_kind);
     snapshot.external_bridge.last_event_actor = std::move(external_bridge_manifest.last_event_actor);

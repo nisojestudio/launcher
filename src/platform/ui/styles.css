@@ -2108,6 +2108,24 @@ body::-webkit-scrollbar-corner,
   color: #fecaca;
 }
 
+/* Presupuesto diario de conexiones del proveedor: cuantas quedan hoy.
+   Se muestra solo cuando el bridge informa tope (dailyBudgetTotal > 0). */
+.connection-budget {
+  margin: -4px 0 -6px;
+  font-size: 11px;
+  line-height: 1.4;
+  color: var(--text-soft);
+}
+
+.connection-budget[data-tone="warn"] {
+  color: #fde68a;
+}
+
+.connection-budget[data-tone="danger"] {
+  color: #fecaca;
+  font-weight: 600;
+}
+
 /* Alertas visibles del live (errores y avisos del bridge). */
 .live-alerts {
   display: grid;

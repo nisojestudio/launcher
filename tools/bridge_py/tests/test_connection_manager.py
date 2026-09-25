@@ -649,6 +649,46 @@ class StabilityGuardTests(unittest.IsolatedAsyncioTestCase):
             "el presupuesto agotado debe llegar al panel como alerta propia",
         )
         self.assertIn("presupuesto diario", messages[-1])
+        # El presupuesto viaja en todos los status: el panel muestra cuanto
+        # queda hoy sin tener que preguntarle al bridge.
+        self.assertTrue(
+            any(status.daily_budget_total == 1 for status in statuses),
+            "el tope diario debe viajar en el status",
+        )
+        self.assertTrue(
+            any(status.daily_budget_remaining == 0 for status in statuses),
+            "al agotarse el status debe decir que quedan 0 conexiones",
+        )
+
+    def test_status_payload_carries_the_daily_budget(self) -> None:
+        """El status lleva el presupuesto solo cuando hay tope configurado."""
+        from event_models import SessionStatus
+
+        # Sin tope no se envia: el panel no debe ver ceros que parezcan agotado.
+        payload = SessionStatus(target_user="alice").to_panel_payload()
+        self.assertNotIn("daily_budget_total", payload)
+        self.assertNotIn("daily_budget_remaining", payload)
+
+        payload = SessionStatus(
+            target_user="alice",
+            daily_budget_total=50,
+            daily_budget_remaining=47,
+            daily_budget_manual_reserve=10,
+            daily_budget_remaining_auto=37,
+        ).to_panel_payload()
+        self.assertEqual(payload["daily_budget_total"], 50)
+        self.assertEqual(payload["daily_budget_remaining"], 47)
+        self.assertEqual(payload["daily_budget_manual_reserve"], 10)
+        self.assertEqual(payload["daily_budget_remaining_auto"], 37)
+
+        # Un contador corrupto nunca manda un negativo al panel.
+        payload = SessionStatus(
+            daily_budget_total=50,
+            daily_budget_remaining=-3,
+            daily_budget_manual_reserve=-1,
+        ).to_panel_payload()
+        self.assertEqual(payload["daily_budget_remaining"], 0)
+        self.assertEqual(payload["daily_budget_manual_reserve"], 0)
 
     async def test_reconnects_are_charged_to_the_auto_bag(self) -> None:
         """Intento 0 = manual, el resto = reconexiones automaticas."""
@@ -734,6 +774,12 @@ class StabilityGuardTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(AlwaysFailingConnection.attempts, 3)
         messages = [status.message for status in statuses]
         self.assertTrue(any("por hora" in message for message in messages), messages)
+        # La franja del panel no puede decir "Conectando" mientras el bridge
+        # se queda esperando a que se libre un hueco del limite horario.
+        self.assertTrue(
+            any(status.phase == "rate_limited" for status in statuses),
+            f"fases vistas: {[status.phase for status in statuses]}",
+        )
         # El reintento espera el hueco entero, no el backoff corto.
         self.assertTrue(
             any(status.retry_in_sec >= 3.0 for status in statuses),

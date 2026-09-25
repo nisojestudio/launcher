@@ -243,6 +243,33 @@ int main() {
     NLP3_TEST_REQUIRE(snapshot_after_stop.external_bridge.last_alert_code.empty());
     NLP3_TEST_REQUIRE(snapshot_after_stop.external_bridge.last_alert_severity.empty());
 
+    // 5) El presupuesto diario viaja del status al snapshot y sobrevive al
+    //    Desconectar: sigue siendo el contador real de conexiones del dia.
+    NLP3_TEST_REQUIRE(panel_app.submit_external_session_status({
+        "external-panel-user-01",
+        "room-external-panel-001",
+        nlp3::bridge::TikTokExternalSessionConnectionState::connected,
+        "estado con presupuesto",
+        1710000008000,
+        "connected",
+        "info",
+        "",
+        0.0,
+        50,
+        12,
+        10,
+        2,
+    }));
+    const auto snapshot_with_budget = panel_app.snapshot();
+    NLP3_TEST_REQUIRE(snapshot_with_budget.external_bridge.daily_budget_total == 50);
+    NLP3_TEST_REQUIRE(snapshot_with_budget.external_bridge.daily_budget_remaining == 12);
+    NLP3_TEST_REQUIRE(snapshot_with_budget.external_bridge.daily_budget_manual_reserve == 10);
+    NLP3_TEST_REQUIRE(snapshot_with_budget.external_bridge.daily_budget_remaining_auto == 2);
+    panel_app.stop_external_runner();
+    const auto snapshot_budget_after_stop = panel_app.snapshot();
+    NLP3_TEST_REQUIRE(snapshot_budget_after_stop.external_bridge.daily_budget_total == 50);
+    NLP3_TEST_REQUIRE(snapshot_budget_after_stop.external_bridge.daily_budget_remaining == 12);
+
     std::filesystem::remove(record_path);
     std::filesystem::remove(config_path);
     return 0;
