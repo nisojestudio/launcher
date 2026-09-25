@@ -1,6 +1,7 @@
 #include "bridge/tiktok_external_ws_server.hpp"
 
 #include <array>
+#include <chrono>
 #include <cstdint>
 #include <cstring>
 #include <optional>
@@ -26,6 +27,11 @@ namespace {
 #ifdef _WIN32
 
 constexpr std::string_view kWebSocketGuid = "258EAFA5-E914-47DA-95CA-C5AB0DC85B11";
+
+// Tope del buffer mientras no termina el handshake HTTP: sin el, un cliente que
+// manda bytes sin cerrar los headers hace crecer la memoria sin control (el
+// deadline corta igual, esto evita el pico antes de que llegue).
+constexpr std::size_t kMaxHandshakeBytes = 8 * 1024;
 
 bool ensure_winsock_initialized() {
     static const bool initialized = []() {
@@ -386,6 +392,9 @@ struct TikTokExternalWsServer::Impl {
     SOCKET client_socket = INVALID_SOCKET;
     bool handshake_complete = false;
     std::string receive_buffer{};
+    // Momento en que llego el socket sin completar todavia el handshake: es el
+    // inicio del deadline (si no existiera, un cliente mudo ocuparia el slot).
+    std::chrono::steady_clock::time_point handshake_since{};
 #endif
 };
 
@@ -395,6 +404,8 @@ TikTokExternalWsServer::TikTokExternalWsServer(platform::PanelApp* app) noexcept
 }
 
 bool TikTokExternalWsServer::test_mode_ = false;
+std::uint64_t TikTokExternalWsServer::handshake_timeout_ms_ =
+    TikTokExternalWsServer::kDefaultHandshakeTimeoutMs;
 
 TikTokExternalWsServer::~TikTokExternalWsServer() = default;
 
@@ -576,6 +587,7 @@ std::size_t TikTokExternalWsServer::poll() {
             impl_->client_socket = accepted_socket;
             impl_->handshake_complete = false;
             impl_->receive_buffer.clear();
+            impl_->handshake_since = std::chrono::steady_clock::now();
         } else {
             const auto error_code = WSAGetLastError();
             if (error_code != WSAEWOULDBLOCK) {
@@ -615,8 +627,28 @@ std::size_t TikTokExternalWsServer::poll() {
     }
 
     if (!impl_->handshake_complete) {
+        // Un socket aceptado que nunca completa el handshake (o que manda bytes
+        // sin cerrar los headers) ocuparia el UNICO slot del servidor: el panel
+        // dejaria de aceptar al sink del bridge y se quedaria sin estado del
+        // live para siempre. Se corta por tope de buffer y por deadline.
+        if (impl_->receive_buffer.size() > kMaxHandshakeBytes) {
+            close_socket(impl_->client_socket);
+            impl_->handshake_complete = false;
+            impl_->receive_buffer.clear();
+            return 0;
+        }
+
         const auto header_end = impl_->receive_buffer.find("\r\n\r\n");
         if (header_end == std::string::npos) {
+            const auto elapsed_ms = std::chrono::duration_cast<std::chrono::milliseconds>(
+                                        std::chrono::steady_clock::now() - impl_->handshake_since)
+                                        .count();
+            if (elapsed_ms >= static_cast<std::int64_t>(handshake_timeout_ms_)) {
+                close_socket(impl_->client_socket);
+                impl_->handshake_complete = false;
+                impl_->receive_buffer.clear();
+                return 0;
+            }
             return 0;
         }
 

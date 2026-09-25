@@ -31,6 +31,17 @@ public:
         return test_mode_;
     }
 
+    // Deadline del handshake HTTP del unico slot de cliente. Sin esto, un socket
+    // que conecta y nunca manda la peticion (escaner de puertos, proceso colgado)
+    // se queda con el slot para siempre y el panel pierde el estado del live.
+    static constexpr std::uint64_t kDefaultHandshakeTimeoutMs = 5000;
+    static void set_handshake_timeout_ms(std::uint64_t ms) noexcept {
+        handshake_timeout_ms_ = ms;
+    }
+    static std::uint64_t handshake_timeout_ms() noexcept {
+        return handshake_timeout_ms_;
+    }
+
     explicit TikTokExternalWsServer(platform::PanelApp* app) noexcept;
     ~TikTokExternalWsServer();
 
@@ -56,6 +67,7 @@ private:
     std::size_t rejected_messages_ = 0;
 
     static bool test_mode_;
+    static std::uint64_t handshake_timeout_ms_;
 };
 
 } // namespace nlp3::bridge

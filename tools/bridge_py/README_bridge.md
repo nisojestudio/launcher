@@ -236,7 +236,13 @@ eventos. Los eventos canónicos siguen yendo por la cola con `batch_size`.
   ignora el pong del cliente. Si algún día se activan los pings, el servidor
   los soporta.
 - El servidor del panel acepta **un solo cliente**: si el socket viejo no se
-  cierra, el siguiente queda esperando en la cola del `accept`.
+  cierra, el siguiente queda esperando en la cola del `accept`. Por eso el
+  handshake HTTP corre contra un **deadline de 5 s**
+  (`TikTokExternalWsServer::kDefaultHandshakeTimeoutMs`) y el buffer de headers
+  está limitado a 8 KiB: un socket que conecta y nunca completa la petición (o
+  que manda bytes sin cerrar los headers) se corta y libera el slot para el
+  sink real. Sin eso, un proceso colgado dejaba al panel sin estado del live
+  para siempre. El cierre es abortivo (RST), igual que el del listener.
 
 ## Rate Limiting por Proveedor
 

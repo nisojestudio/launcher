@@ -131,6 +131,29 @@ public:
             && response.find("Sec-WebSocket-Accept:") != std::string::npos;
     }
 
+    // true si el SERVIDOR cerro el enlace (recv devuelve 0). Si el enlace sigue
+    // abierto, recv esperara hasta el timeout de 2s y devolvera false.
+    // true si el SERVIDOR ya no quiere este enlace: FIN limpio (recv -> 0) o
+    // aborto (WSAECONNRESET/WSAECONNABORTED: el servidor hereda el
+    // SO_LINGER{1,0} del listener, asi que su cierre es RST y no FIN). Si el
+    // enlace sigue abierto, recv espera hasta el timeout de 2s y da false.
+    bool server_closed_connection() const {
+        if (socket_ == INVALID_SOCKET) {
+            return false;
+        }
+
+        char buffer[64];
+        const auto received = recv(socket_, buffer, static_cast<int>(sizeof(buffer)), 0);
+        if (received == 0) {
+            return true;
+        }
+        if (received == SOCKET_ERROR) {
+            const auto error_code = WSAGetLastError();
+            return error_code == WSAECONNRESET || error_code == WSAECONNABORTED;
+        }
+        return false;
+    }
+
     bool send_text(std::string_view payload) const {
         if (socket_ == INVALID_SOCKET) {
             return false;
@@ -541,6 +564,30 @@ assert(panel_console.execute_line("bridge demo live 8765"));
     assert(snapshot_after_observe.external_ws.accepted_messages == 5);
 
     ws_test_client.close();
+
+    // Un cliente que abre el socket y nunca manda el handshake no puede quedarse
+    // con el UNICO slot del servidor: sin deadline el panel dejaria de aceptar al
+    // sink del bridge y se quedaria sin estado del live para siempre. Con el
+    // deadline cortado, el servidor cierra ese socket y el siguiente cliente
+    // completa el suyo.
+    nlp3::bridge::TikTokExternalWsServer::set_handshake_timeout_ms(150);
+    assert(panel_app.start_external_ws(8765));
+    WsTestClient stuck_client;
+    assert(stuck_client.connect_tcp(8765));
+    // 10 ticks con 30ms de paso => ~270ms en total, pasados los 150ms.
+    assert(panel_console.execute_line("bridge demo ws run 10 30"));
+    assert(stuck_client.server_closed_connection());
+    stuck_client.close();
+
+    // Con el deadline de produccion, el slot liberado vuelve a aceptar.
+    nlp3::bridge::TikTokExternalWsServer::set_handshake_timeout_ms(
+        nlp3::bridge::TikTokExternalWsServer::kDefaultHandshakeTimeoutMs);
+    WsTestClient recovered_client;
+    assert(recovered_client.connect_tcp(8765));
+    assert(recovered_client.send_handshake_request("Origin: http://127.0.0.1:8765\r\n"));
+    assert(panel_console.execute_line("bridge demo ws run 5 0"));
+    assert(recovered_client.receive_handshake_response());
+    recovered_client.close();
 #else
     assert(panel_console.execute_line("bridge demo ws run 1 0"));
     assert(panel_console.execute_line("bridge demo ws await 1 1 0"));
