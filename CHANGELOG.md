@@ -4,6 +4,52 @@ All notable Panel Live changes should be recorded here.
 
 Format follows a lightweight Keep a Changelog style. Versions use SemVer.
 
+## 0.3.7 - 2026-09-25
+
+### Added — Presupuesto diario de conexiones visible en el panel
+
+- **Reglas (Fase A)**: tope diario de aperturas de sesión por cuenta con reserva manual y restante automático; el contador no se cobra mientras se espera el vivo ni mientras se rota credencial. Nuevo `tools/bridge_py/daily_budget.py`, `DAILY_BUDGET_EXHAUSTED`, `SILENCE_TIMEOUT` (reconexión por silencio a los 300 s), espera programada del hueco horario y `retry_policy.max_attempts: 0` (los guardias reales son el límite horario y este presupuesto).
+- **Contrato completo en la cadena**: `daily_budget_total` / `daily_budget_remaining` / `daily_budget_manual_reserve` / `daily_budget_remaining_auto` viajan desde `SessionStatus.to_panel_payload()` → dispatcher → `PanelWsSink` → codec C++ (`tiktok_external_session_status_codec`) → `ExternalBridgeManifest` → snapshot → `external_bridge_json` → `snapshot.externalBridge` → `app.js`.
+- **UI**: línea `#connection-budget` en la tarjeta Conexión (diario / restante / restante automático).
+- **Franja de estado honesta**: `LOCAL_PHASE_TTL_MS = 5000` — la fase local (`starting`, `connecting`, `waiting`, `rate_limited`) sólo se muestra 5 s; después manda el snapshot del bridge. `Desconectar` vuelve a `idle` y la fase `rate_limited` informa "Esperando reconexión" en vez de "Conectando".
+
+### Added — Alertas del live con acción sugerida y descarte que se recuerda
+
+- **Contrato `alert_action`** extremo a extremo (`none`, `retry`, `wait_for_live`, `rotate_key`, `fix_user`, `check_key`, `wait_provider`) con `error_catalog.py::action_for()`; `NETWORK_ERROR` → `wait_provider`.
+- **UI rica**: cabecera con hora, badge de severidad y botón ✕; detalle `Código: <codigo>`; fila **"Qué hacer"** con botón. `LIVE_ALERT_ACTIONS` en `app.js` traduce la acción: `rotate_key` / `check_key` → botón **"Ver API keys"** (abre y enfoca el pool), `retry` → **"Reintentar"** (`POST /api/system/reconnect`).
+- **Descarte con memoria**: `state.dismissedBridgeAlerts` (clave `severidad|código`) evita que la alerta vuelva mientras el código siga activo; ✕ y **Limpiar** lo activan y un status sano lo borra. La alerta de bridge se reescribe en el mismo lugar con cada cuenta atras en vez de apilar filas.
+- La alerta **"Falta la API key"** ahora sugiere `check_key`.
+
+### Fixed — El canal directo de estado podía quedarse mudo para siempre
+
+- **Causa raíz**: en `PanelWsSink.send_json()` el cooldown de reconexión se evaluaba **después** del `try`, así que un envío rechazado por cooldown contaba como fallo y reiniciaba el reloj. Con tráfico constante (latido + eventos) la ventana nunca expiraba y el sink quedaba desconectado de forma permanente aunque el panel volviera (reproducido: `AssertionError: 4 != 1`).
+- **Fix**: el cooldown se evalúa antes del `try` (rechazo ≠ fallo).
+- **Fix**: el servidor WS ignoraba el `pong` del cliente, pero un `0xA` con `FIN` terminaba cerrando la conexión; ahora se continúa sin cortar.
+
+### Fixed — El listado de alertas del live nunca se pintaba
+
+- **Causa raíz**: `renderLiveAlerts()` escribía en `state.liveAlertsList`, propiedad inexistente, en vez de `els.liveAlertsList`: cada alerta nueva lanzaba `TypeError` y la lista no aparecía. Detectado por los nuevos tests de UI, no por la revisión visual.
+- **Fix**: `els.liveAlertsList.innerHTML = markup`.
+
+### Fixed — Handshake del servidor WS sin deadline
+
+- **Causa raíz**: el servidor acepta **un solo cliente** y no tenía límite de tiempo ni de buffer para el handshake HTTP: un socket que conecta y nunca manda la petición (escáner, proceso colgado) ocupaba el slot para siempre y el `PanelWsSink` del bridge no podía conectarse → panel sin estado del live, sin aviso.
+- **Fix**: deadline de 5 s (`TikTokExternalWsServer::kDefaultHandshakeTimeoutMs`) desde el `accept` + tope de 8 KiB para el buffer de headers; cierre abortivo (RST), como el del listener.
+
+### Fixed — Verdad de estado de la sesión y visibilidad de la conexión
+
+- La UI ya no presume "conectada" por una fase local: el estado real lo define el bridge, se agrega la franja de conexión con punto/estado y se corrige la visibilidad del bloque cuando la sesión cambia de estado.
+
+### Tests
+
+- `ctest` → **34/34 (100 %)**, incluido el nuevo `nlp3_panel_ui_js_tests` (7 tests de la UI de alertas, con el `app.js` real cargado en Node) y el caso de deadline de handshake del servidor WS (FAIL sin el fix → PASS con el fix).
+- Python bridge → **106 tests OK** (`tools/bridge_py/tests`).
+- `node --check src/platform/ui/app.js` OK.
+
+### Docs
+
+- `tools/bridge_py/README_bridge.md`: secciones nuevas de presupuesto diario, "Diagnóstico de la sesión en el panel", rate limiting y "Canal directo de estado: `PanelWsSink`" (incluye el deadline de handshake).
+
 ## 0.3.6 - 2026-09-24
 
 ### Fixed — TikTok no conectaba: cierre 4401 mal clasificado y sin rotación de API keys
