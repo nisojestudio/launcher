@@ -191,6 +191,28 @@ retry_policy:
 Métricas: `daily_budget_remaining` (y el snapshot completo en el log
 `daily connection budget loaded`).
 
+## Diagnóstico de la sesión en el panel
+
+Cada `session_status` que sale de `emit_status` arrastra lo que el monitor del
+live necesita para no mentir:
+
+| Campo | Qué lo usa el panel |
+|---|---|
+| `phase` | Franja de estado: `starting`/`connecting`/`waiting`/`rate_limited`/`connected`/`error`. |
+| `severity` | Tono de la alerta (`info`/`warn`/`error`) y su etiqueta. |
+| `alert_code` | Texto de detalle de la alerta (`Código: ...`) y su clave de dedupe. |
+| `alert_action` | **Qué hacer** al respecto: la tarjeta de alertas lo traduce a una línea "Qué hacer: ..." y, si aplica, a un botón. |
+| `retry_in_sec` | Cuenta atrás del reintento, que se reescribe en la misma alerta en vez de apilar otra. |
+
+`alert_action` sale de `error_catalog.py` (`action_for(codigo)`): `rotate_key` y
+`check_key` abren *Cuentas y API keys*, `retry` ofrece *Reintentar*, `wait_for_live`
+y `wait_provider` sólo explican la espera y `none` no muestra nada. El puente
+del panel está en `LIVE_ALERT_ACTIONS`, en `src/platform/ui/app.js`.
+
+Descartar una alerta (✕ o *Limpiar*) la borra del monitor y la recuerda mientras
+el mismo `alert_code` siga activo; cuando el bridge manda un status sano sin
+código, la lista de descartes se limpia y un problema repetido vuelve a avisar.
+
 ## Rate Limiting por Proveedor
 
 El bridge limita reconexiones a **10 por hora por proveedor** (configurable con

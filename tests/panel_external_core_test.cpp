@@ -270,6 +270,47 @@ int main() {
     NLP3_TEST_REQUIRE(snapshot_budget_after_stop.external_bridge.daily_budget_total == 50);
     NLP3_TEST_REQUIRE(snapshot_budget_after_stop.external_bridge.daily_budget_remaining == 12);
 
+    // 6) La accion sugerida viaja con el codigo de alerta (el panel ofrece
+    //    "que hacer") y se limpia al detener el runner: sobre una sesion que ya
+    //    murio no queda ninguna accion que ofrecer.
+    NLP3_TEST_REQUIRE(panel_app.submit_external_session_status({
+        "external-panel-user-01",
+        "room-external-panel-001",
+        nlp3::bridge::TikTokExternalSessionConnectionState::reconnecting,
+        "Rotando de API key",
+        1710000009000,
+        "waiting",
+        "warn",
+        "API_KEY_ROTATION_REQUESTED",
+        30.0,
+        0,
+        0,
+        0,
+        0,
+        "rotate_key",
+    }));
+    const auto snapshot_with_action = panel_app.snapshot();
+    NLP3_TEST_REQUIRE(snapshot_with_action.external_bridge.last_alert_code == "API_KEY_ROTATION_REQUESTED");
+    NLP3_TEST_REQUIRE(snapshot_with_action.external_bridge.last_alert_action == "rotate_key");
+    // Un status que no trae accion no arrastra la anterior.
+    NLP3_TEST_REQUIRE(panel_app.submit_external_session_status({
+        "external-panel-user-01",
+        "room-external-panel-001",
+        nlp3::bridge::TikTokExternalSessionConnectionState::faulted,
+        "Otro fallo",
+        1710000010000,
+        "error",
+        "error",
+        "OTHER_CODE",
+        0.0,
+    }));
+    const auto snapshot_without_action = panel_app.snapshot();
+    NLP3_TEST_REQUIRE(snapshot_without_action.external_bridge.last_alert_code == "OTHER_CODE");
+    NLP3_TEST_REQUIRE(snapshot_without_action.external_bridge.last_alert_action.empty());
+    panel_app.stop_external_runner();
+    const auto snapshot_action_after_stop = panel_app.snapshot();
+    NLP3_TEST_REQUIRE(snapshot_action_after_stop.external_bridge.last_alert_action.empty());
+
     std::filesystem::remove(record_path);
     std::filesystem::remove(config_path);
     return 0;

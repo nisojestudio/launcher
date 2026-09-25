@@ -56,6 +56,9 @@ struct ExternalBridgeManifest {
     std::int32_t daily_budget_remaining = 0;
     std::int32_t daily_budget_manual_reserve = 0;
     std::int32_t daily_budget_remaining_auto = 0;
+    // Accion sugerida para la ultima alerta (rotate_key, retry, ...). Vacio si
+    // el bridge no mando nada. Al final por el initialize posicional.
+    std::string last_alert_action{};
 };
 
 } // namespace nlp3::platform

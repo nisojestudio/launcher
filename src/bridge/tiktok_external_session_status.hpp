@@ -40,6 +40,10 @@ struct TikTokExternalSessionStatus {
     std::int32_t daily_budget_remaining = 0;
     std::int32_t daily_budget_manual_reserve = 0;
     std::int32_t daily_budget_remaining_auto = 0;
+    // Accion sugerida al operador para salir del error (rotate_key, retry,
+    // wait_for_live, fix_user, check_key, wait_provider, none). El panel la
+    // traduce a texto y a un boton en la alerta correspondiente.
+    std::string alert_action{};
 };
 
 constexpr std::string_view to_string(TikTokExternalSessionConnectionState state) noexcept {

@@ -217,6 +217,7 @@ std::string external_bridge_json(const PanelExternalBridgeStatus& status) {
            << "\"dailyBudgetRemaining\":" << status.daily_budget_remaining << ","
            << "\"dailyBudgetManualReserve\":" << status.daily_budget_manual_reserve << ","
            << "\"dailyBudgetRemainingAuto\":" << status.daily_budget_remaining_auto << ","
+           << "\"lastAlertAction\":" << quote(status.last_alert_action) << ","
            << "\"currentRoomId\":" << quote(status.current_room_id) << ","
            << "\"lastEventKind\":" << quote(status.last_event_kind) << ","
            << "\"lastEventActor\":" << quote(status.last_event_actor) << ","

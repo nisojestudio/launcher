@@ -2165,8 +2165,7 @@ body::-webkit-scrollbar-corner,
 
 .live-alert {
   display: grid;
-  grid-template-columns: auto 1fr;
-  gap: 4px 8px;
+  gap: 4px;
   padding: 8px 10px;
   border-radius: 12px;
   border: 1px solid rgba(148, 163, 184, 0.16);
@@ -2175,20 +2174,86 @@ body::-webkit-scrollbar-corner,
   line-height: 1.35;
 }
 
+/* Fila superior: hora, etiqueta de severidad, titulo y descarte. */
+.live-alert-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
 .live-alert-time {
   font-family: var(--font-mono);
   font-size: 11px;
   color: var(--text-soft);
 }
 
+.live-alert-badge {
+  padding: 1px 7px;
+  border-radius: 999px;
+  border: 1px solid rgba(148, 163, 184, 0.3);
+  background: rgba(148, 163, 184, 0.12);
+  color: var(--text-soft);
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
 .live-alert-title {
+  flex: 1 1 auto;
+  min-width: 0;
   color: #e2e8f0;
   font-weight: 600;
 }
 
 .live-alert-detail {
-  grid-column: 2;
+  font-family: var(--font-mono);
+  font-size: 11px;
   color: var(--text-soft);
+}
+
+.live-alert-action {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  padding-top: 2px;
+}
+
+.live-alert-action-text {
+  flex: 1 1 auto;
+  min-width: 0;
+  color: #cbd5e1;
+}
+
+.live-alert-action-button {
+  padding: 3px 10px;
+  border: 1px solid rgba(56, 189, 248, 0.4);
+  border-radius: 8px;
+  background: rgba(56, 189, 248, 0.14);
+  color: #bae6fd;
+  font-size: 11px;
+  font-weight: 600;
+}
+
+.live-alert-action-button:hover {
+  background: rgba(56, 189, 248, 0.24);
+}
+
+.live-alert-dismiss {
+  padding: 2px 6px;
+  border: 1px solid transparent;
+  border-radius: 8px;
+  background: transparent;
+  color: var(--text-soft);
+  font-size: 12px;
+  line-height: 1.2;
+}
+
+.live-alert-dismiss:hover {
+  border-color: rgba(148, 163, 184, 0.35);
+  color: #e2e8f0;
 }
 
 .live-alert-count {
@@ -2205,6 +2270,12 @@ body::-webkit-scrollbar-corner,
   color: #fecaca;
 }
 
+.live-alert-error .live-alert-badge {
+  border-color: rgba(239, 68, 68, 0.45);
+  background: rgba(239, 68, 68, 0.16);
+  color: #fecaca;
+}
+
 .live-alert-warn {
   border-color: rgba(245, 158, 11, 0.3);
 }
@@ -2213,11 +2284,23 @@ body::-webkit-scrollbar-corner,
   color: #fde68a;
 }
 
+.live-alert-warn .live-alert-badge {
+  border-color: rgba(245, 158, 11, 0.45);
+  background: rgba(245, 158, 11, 0.14);
+  color: #fde68a;
+}
+
 .live-alert-info {
   border-color: rgba(56, 189, 248, 0.28);
 }
 
 .live-alert-info .live-alert-title {
+  color: #bae6fd;
+}
+
+.live-alert-info .live-alert-badge {
+  border-color: rgba(56, 189, 248, 0.4);
+  background: rgba(56, 189, 248, 0.14);
   color: #bae6fd;
 }
 

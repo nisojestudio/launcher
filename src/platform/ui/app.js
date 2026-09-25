@@ -187,6 +187,9 @@
     // Ultima alerta del bridge (objeto dentro de liveAlerts): si el mensaje
     // cambia (cuenta atras) se reescribe esa misma alerta en vez de apilar otra.
     liveBridgeAlert: null,
+    // Alertas del bridge que el operador descarto a mano (clave severidad|codigo):
+    // mientras ese codigo siga activo no vuelve a aparecer.
+    dismissedBridgeAlerts: new Set(),
     keyPool: [],
     activityClearBeforeMs: 0,
     selectedGiftValue: ACTIVITY_GIFT_PRESETS[0].value,
@@ -904,20 +907,70 @@
     renderAdvancedLogs();
   }
 
-  // Alertas visibles del live. Cada alerta tiene severidad, titulo y detalle, y
-  // se muestran en el monitor del live (no solo en el log avanzado).
-  function pushLiveAlert(severity, title, detail = "") {
+  // Acciones sugeridas para cada alerta. Vienen del bridge en
+  // externalBridge.lastAlertAction y corresponden al catalogo de errores
+  // (tools/bridge_py/error_catalog.py): none, retry, wait_for_live, rotate_key,
+  // fix_user, check_key, wait_provider. El texto es copia de la interfaz, asi
+  // que vive aqui y no en el contrato.
+  const LIVE_ALERT_ACTIONS = {
+    rotate_key: {
+      text: "Rotá o agregá una API key en Cuentas y API keys y volvé a conectar.",
+      button: "Ver API keys",
+      intent: "keys",
+    },
+    check_key: {
+      text: "Revisá la API key guardada: puede estar vencida o sin saldo.",
+      button: "Ver API keys",
+      intent: "keys",
+    },
+    retry: {
+      text: "El panel reintenta solo; si persiste, reconectá a mano o mirá el log avanzado.",
+      button: "Reintentar",
+      intent: "retry",
+    },
+    fix_user: {
+      text: "Corregí el @ del usuario en el campo de conexión e intentá de nuevo.",
+      button: null,
+      intent: "",
+    },
+    wait_for_live: {
+      text: "La cuenta todavía no está en vivo: el panel reintenta solo en cuanto empiece.",
+      button: null,
+      intent: "",
+    },
+    wait_provider: {
+      text: "El proveedor está fallando o limitando: esperá unos minutos antes de reintentar.",
+      button: null,
+      intent: "",
+    },
+  };
+
+  function liveAlertActionView(action) {
+    return LIVE_ALERT_ACTIONS[String(action || "")] || null;
+  }
+
+  // Alertas visibles del live. Cada alerta tiene severidad, titulo, detalle y,
+  // cuando el bridge la manda, la accion sugerida (texto + boton).
+  function pushLiveAlert(severity, title, detail = "", extra = {}) {
     const tone = ["info", "warn", "error"].includes(severity) ? severity : "info";
     const cleanTitle = String(title ?? "").trim();
     if (!cleanTitle) {
       return null;
     }
     const cleanDetail = String(detail ?? "").trim();
+    const cleanAction = String(extra.action ?? "").trim();
+    const bridgeKey = String(extra.bridgeKey ?? "").trim();
     const key = `${tone}|${cleanTitle}|${cleanDetail}`;
     const existing = state.liveAlerts.find((alert) => alert.key === key);
     if (existing) {
       existing.count = Number(existing.count || 1) + 1;
       existing.timestampMs = Date.now();
+      if (cleanAction) {
+        existing.action = cleanAction;
+      }
+      if (bridgeKey) {
+        existing.bridgeKey = bridgeKey;
+      }
       renderLiveAlerts();
       return existing;
     }
@@ -926,6 +979,8 @@
       tone,
       title: cleanTitle,
       detail: cleanDetail,
+      action: cleanAction,
+      bridgeKey,
       count: 1,
       timestampMs: Date.now(),
     };
@@ -935,8 +990,50 @@
     return alert;
   }
 
+  function dismissLiveAlert(alertKey) {
+    const key = String(alertKey || "");
+    const target = state.liveAlerts.find((alert) => alert.key === key);
+    if (!target) {
+      return;
+    }
+    state.liveAlerts = state.liveAlerts.filter((alert) => alert !== target);
+    // La alerta del bridge vuelve con el proximo status si no se recuerda el
+    // descarte; el codigo despejado la habilita de nuevo sola.
+    if (target.bridgeKey) {
+      state.dismissedBridgeAlerts.add(target.bridgeKey);
+    }
+    if (state.liveBridgeAlert === target) {
+      state.liveBridgeAlert = null;
+      state.lastBridgeAlertKey = target.bridgeKey || "";
+    }
+    renderLiveAlerts();
+  }
+
+  // Acciones de la alerta: abrir el pool de API keys o pedir reconexion. Es el
+  // mismo camino que usan los botones del panel, no uno nuevo.
+  function handleLiveAlertIntent(intent) {
+    const action = String(intent || "");
+    if (action === "keys") {
+      if (els.keyPool) {
+        els.keyPool.open = true;
+        els.keyPool.scrollIntoView({ behavior: "smooth", block: "nearest" });
+      }
+      els.keyPoolSecret?.focus();
+      return;
+    }
+    if (action === "retry") {
+      void postJsonAction("/api/system/reconnect", {}, "reconectar live");
+    }
+  }
+
   function clearLiveAlerts() {
+    // "Limpiar" descarta tambien la alerta que el bridge acaba de avisar: sin
+    // esto el siguiente status la vuelve a empujar al instante.
+    if (state.lastBridgeAlertKey) {
+      state.dismissedBridgeAlerts.add(state.lastBridgeAlertKey);
+    }
     state.liveAlerts = [];
+    state.liveBridgeAlert = null;
     renderLiveAlerts();
   }
 
@@ -1257,21 +1354,42 @@
         : "Alertas del live";
     }
 
+    const TONE_LABELS = { error: "Error", warn: "Aviso", info: "Info" };
     const markup = alerts
       .map((alert) => {
         const stamp = new Date(alert.timestampMs || Date.now()).toLocaleTimeString([], {
           hour: "2-digit",
           minute: "2-digit",
         });
-        const repeat = alert.count > 1 ? ` <span class="live-alert-count">x${alert.count}</span>` : "";
+        const repeat = alert.count > 1 ? `<span class="live-alert-count">x${alert.count}</span>` : "";
+        const badge = `<span class="live-alert-badge">${TONE_LABELS[alert.tone] || "Info"}</span>`;
         const detail = alert.detail
           ? `<span class="live-alert-detail">${escapeHtml(alert.detail)}</span>`
           : "";
+        // Accion sugerida por el bridge: texto + boton cuando hay algo que
+        // apretar (abrir las API keys, pedir reconexion).
+        const actionView = liveAlertActionView(alert.action);
+        const action = actionView
+          ? `<div class="live-alert-action">` +
+            `<span class="live-alert-action-text">Qu&eacute; hacer: ${escapeHtml(actionView.text)}</span>` +
+            (actionView.button
+              ? `<button class="live-alert-action-button" type="button" data-alert-intent="${escapeHtml(actionView.intent)}">${escapeHtml(actionView.button)}</button>`
+              : "") +
+            `</div>`
+          : "";
+        const dismiss =
+          `<button class="live-alert-dismiss" type="button" data-alert-dismiss="${escapeHtml(alert.key)}"` +
+          ` title="Descartar aviso" aria-label="Descartar aviso">&#10005;</button>`;
         return (
           `<li class="live-alert live-alert-${escapeHtml(alert.tone)}">` +
+          `<div class="live-alert-head">` +
           `<span class="live-alert-time">${escapeHtml(stamp)}</span>` +
+          badge +
           `<span class="live-alert-title">${escapeHtml(alert.title)}${repeat}</span>` +
+          dismiss +
+          `</div>` +
           detail +
+          action +
           `</li>`
         );
       })
@@ -1663,19 +1781,30 @@
       const severity = bridgeAlertSeverity === "error" ? "error" : (bridgeAlertSeverity === "warn" ? "warn" : "info");
       const message = String(external?.lastStatusMessage || bridgeAlertCode);
       const detail = `Código: ${bridgeAlertCode}`;
+      const action = String(external?.lastAlertAction || "");
       // La clave es el codigo, no el mensaje: la cuenta atras del reintento
       // cambia cada 30s y no debe apilar una alerta distinta por cada tic.
       const bridgeAlertKey = `${severity}|${bridgeAlertCode}`;
       const current = state.liveBridgeAlert && state.liveAlerts.includes(state.liveBridgeAlert)
         ? state.liveBridgeAlert
         : null;
-      if (state.lastBridgeAlertKey !== bridgeAlertKey || !current) {
+      if (state.dismissedBridgeAlerts.has(bridgeAlertKey)) {
+        // El operador descarto este aviso: mientras el codigo siga activo no
+        // vuelve a aparecer (el codigo despejado borra la lista de descartes).
         state.lastBridgeAlertKey = bridgeAlertKey;
-        state.liveBridgeAlert = pushLiveAlert(severity, message, detail);
-      } else if (current.title !== message) {
-        // Mismo aviso con texto nuevo: se reescribe esa alerta en el lugar.
+        state.liveBridgeAlert = null;
+      } else if (state.lastBridgeAlertKey !== bridgeAlertKey || !current) {
+        state.lastBridgeAlertKey = bridgeAlertKey;
+        state.liveBridgeAlert = pushLiveAlert(severity, message, detail, {
+          action,
+          bridgeKey: bridgeAlertKey,
+        });
+      } else if (current.title !== message || current.action !== action) {
+        // Mismo aviso con texto o accion nueva: se reescribe esa alerta en el
+        // lugar, sin apilar otra fila.
         current.title = message;
         current.detail = detail;
+        current.action = action;
         current.timestampMs = Date.now();
         current.key = `${severity}|${message}|${detail}`;
         state.liveAlertsMarkup = "";
@@ -1684,6 +1813,9 @@
     } else if (state.lastBridgeAlertKey) {
       state.lastBridgeAlertKey = "";
       state.liveBridgeAlert = null;
+      // La condicion desaparecio (sesion sana): se olvidan los descartes para
+      // que una recurrencia futura del mismo codigo vuelva a avisar.
+      state.dismissedBridgeAlerts.clear();
     }
 
     const runnerIssue = humanizeRunnerIssue(external);
@@ -3259,7 +3391,9 @@
     if (needsApiKey && !apiKey) {
       const alert = "Falta la API key del proveedor seleccionado.";
       appendLog(alert);
-      pushLiveAlert("warn", "Falta la API key", "Ingresá la API key de tik.tools o Euler Stream y volvé a conectar.");
+      pushLiveAlert("warn", "Falta la API key", "Ingresá la API key de tik.tools o Euler Stream y volvé a conectar.", {
+        action: "check_key",
+      });
       return;
     }
 
@@ -3733,6 +3867,20 @@
 
     els.liveAlertsClear?.addEventListener("click", () => {
       clearLiveAlerts();
+    });
+
+    // Las alertas se re-dibujan por innerHTML: los botones de cada fila
+    // (descartar, abrir API keys, reintentar) se atienden por delegacion.
+    els.liveAlertsList?.addEventListener("click", (event) => {
+      const dismiss = event.target.closest("[data-alert-dismiss]");
+      if (dismiss) {
+        dismissLiveAlert(dismiss.getAttribute("data-alert-dismiss"));
+        return;
+      }
+      const intent = event.target.closest("[data-alert-intent]");
+      if (intent) {
+        handleLiveAlertIntent(intent.getAttribute("data-alert-intent"));
+      }
     });
 
     els.keyPoolAddButton?.addEventListener("click", () => {

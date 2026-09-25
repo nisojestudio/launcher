@@ -339,6 +339,9 @@ std::string TikTokExternalSessionStatusCodec::encode_json(const TikTokExternalSe
     if (!status.alert_code.empty()) {
         payload += ",\"alert_code\":\"" + escape_json_string(status.alert_code) + "\"";
     }
+    if (!status.alert_action.empty()) {
+        payload += ",\"alert_action\":\"" + escape_json_string(status.alert_action) + "\"";
+    }
     if (status.retry_in_sec > 0.0) {
         payload += ",\"retry_in_sec\":" + std::to_string(status.retry_in_sec);
     }
@@ -403,6 +406,9 @@ std::optional<TikTokExternalSessionStatus> TikTokExternalSessionStatusCodec::dec
     }
     if (const auto alert_code = as_string(find_field(root->object_value, "alert_code")); alert_code.has_value()) {
         status.alert_code = std::move(*alert_code);
+    }
+    if (const auto alert_action = as_string(find_field(root->object_value, "alert_action")); alert_action.has_value()) {
+        status.alert_action = std::move(*alert_action);
     }
     if (const auto retry_in_sec = as_number(find_field(root->object_value, "retry_in_sec")); retry_in_sec.has_value()) {
         status.retry_in_sec = static_cast<double>(*retry_in_sec);

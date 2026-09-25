@@ -690,6 +690,22 @@ class StabilityGuardTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(payload["daily_budget_remaining"], 0)
         self.assertEqual(payload["daily_budget_manual_reserve"], 0)
 
+    def test_status_payload_carries_the_alert_action(self) -> None:
+        """La accion sugerida viaja en el status para mostrarla en la alerta."""
+        from event_models import SessionStatus
+
+        # Sin accion no se envia: el panel no debe inventar un "que hacer".
+        payload = SessionStatus(target_user="alice", alert_code="RATE_LIMITED").to_panel_payload()
+        self.assertNotIn("alert_action", payload)
+        self.assertIn("alert_code", payload)
+
+        payload = SessionStatus(
+            target_user="alice",
+            alert_code="API_KEY_ROTATION_REQUESTED",
+            alert_action="rotate_key",
+        ).to_panel_payload()
+        self.assertEqual(payload["alert_action"], "rotate_key")
+
     async def test_reconnects_are_charged_to_the_auto_bag(self) -> None:
         """Intento 0 = manual, el resto = reconexiones automaticas."""
         FakeConnection.attempts = 0
@@ -780,6 +796,12 @@ class StabilityGuardTests(unittest.IsolatedAsyncioTestCase):
             any(status.phase == "rate_limited" for status in statuses),
             f"fases vistas: {[status.phase for status in statuses]}",
         )
+        # Ese mismo status trae el codigo y la accion: sin ellos el panel solo
+        # podria decir "esperando" y no que esta pasando ni que hacer.
+        limited = next((status for status in statuses if status.phase == "rate_limited"), None)
+        self.assertIsNotNone(limited)
+        self.assertEqual(limited.alert_code, "NETWORK_ERROR")
+        self.assertEqual(limited.alert_action, "wait_provider")
         # El reintento espera el hueco entero, no el backoff corto.
         self.assertTrue(
             any(status.retry_in_sec >= 3.0 for status in statuses),

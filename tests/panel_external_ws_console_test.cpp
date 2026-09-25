@@ -312,6 +312,48 @@ int main() {
     assert(decoded_no_budget->daily_budget_remaining == 0);
     assert(decoded_no_budget->daily_budget_remaining_auto == 0);
 
+    // Accion sugerida: viaja junto al codigo para que la alerta del panel no
+    // solo diga que fallo sino que hacer para salir de eso.
+    const auto action_status_payload = status_codec.encode_json(nlp3::bridge::TikTokExternalSessionStatus{
+        "ws_alert_target",
+        "room-ws-action-001",
+        nlp3::bridge::TikTokExternalSessionConnectionState::reconnecting,
+        "Rotando de API key",
+        1710000010000,
+        "waiting",
+        "warn",
+        "API_KEY_ROTATION_REQUESTED",
+        30.0,
+        0,
+        0,
+        0,
+        0,
+        "rotate_key",
+    });
+    assert(action_status_payload.find("\"alert_action\":\"rotate_key\"") != std::string::npos);
+    assert(panel_app.submit_external_ws_payload(action_status_payload));
+    const auto snapshot_with_action = panel_app.snapshot();
+    assert(snapshot_with_action.external_bridge.last_alert_code == "API_KEY_ROTATION_REQUESTED");
+    assert(snapshot_with_action.external_bridge.last_alert_action == "rotate_key");
+
+    // Un status sin accion no inventa una: el panel muestra solo codigo y
+    // mensaje, sin boton de "que hacer".
+    const auto no_action_payload = status_codec.encode_json(nlp3::bridge::TikTokExternalSessionStatus{
+        "ws_alert_target",
+        "room-ws-action-001",
+        nlp3::bridge::TikTokExternalSessionConnectionState::faulted,
+        "Algo fallo",
+        1710000011000,
+        "error",
+        "error",
+        "SOME_CODE",
+        0.0,
+    });
+    assert(no_action_payload.find("alert_action") == std::string::npos);
+    const auto decoded_no_action = status_codec.decode_json(no_action_payload);
+    assert(decoded_no_action.has_value());
+    assert(decoded_no_action->alert_action.empty());
+
     std::istringstream console_input;
     std::ostringstream console_output;
     nlp3::platform::PanelConsole panel_console{

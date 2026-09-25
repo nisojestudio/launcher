@@ -804,6 +804,7 @@ bool PanelApp::initialize(const std::string& config_path) {
         external_bridge_last_phase_.clear();
         external_bridge_last_alert_code_.clear();
         external_bridge_last_alert_severity_.clear();
+        external_bridge_last_alert_action_.clear();
         external_bridge_retry_in_sec_ = 0.0;
         external_bridge_daily_budget_total_ = 0;
         external_bridge_daily_budget_remaining_ = 0;
@@ -1319,6 +1320,7 @@ PanelSnapshot PanelApp::snapshot() const {
             external_manifest.daily_budget_manual_reserve;
         empty_snapshot.external_bridge.daily_budget_remaining_auto =
             external_manifest.daily_budget_remaining_auto;
+        empty_snapshot.external_bridge.last_alert_action = external_manifest.last_alert_action;
         empty_snapshot.external_bridge.current_room_id = external_manifest.current_room_id;
         empty_snapshot.external_bridge.last_event_kind = external_manifest.last_event_kind;
         empty_snapshot.external_bridge.last_event_actor = external_manifest.last_event_actor;
@@ -1682,6 +1684,7 @@ ExternalBridgeManifest PanelApp::external_bridge_manifest() const {
         external_bridge_daily_budget_remaining_,
         external_bridge_daily_budget_manual_reserve_,
         external_bridge_daily_budget_remaining_auto_,
+        external_bridge_last_alert_action_,
     };
 }
 
@@ -1828,11 +1831,15 @@ bool PanelApp::submit_external_session_status(const bridge::TikTokExternalSessio
     if (!status.alert_code.empty()) {
         external_bridge_last_alert_code_ = status.alert_code;
         external_bridge_last_alert_severity_ = status.severity;
+        // La accion se conserva junto al codigo: la alerta que queda visible en
+        // el panel es la misma que dispara ese "que hago ahora".
+        external_bridge_last_alert_action_ = status.alert_action;
     } else if (
         status.connection_state == bridge::TikTokExternalSessionConnectionState::connected
         && status.phase == "connected") {
         external_bridge_last_alert_code_.clear();
         external_bridge_last_alert_severity_.clear();
+        external_bridge_last_alert_action_.clear();
     }
     external_bridge_retry_in_sec_ = status.retry_in_sec;
     // Presupuesto diario: se pisa en cada status (0 = el bridge no tiene tope
@@ -1982,6 +1989,7 @@ void PanelApp::stop_external_runner() {
         external_bridge_last_phase_.clear();
         external_bridge_last_alert_code_.clear();
         external_bridge_last_alert_severity_.clear();
+        external_bridge_last_alert_action_.clear();
     }
 }
 
@@ -2419,6 +2427,7 @@ void PanelApp::logout_access() noexcept {
     external_bridge_last_phase_.clear();
     external_bridge_last_alert_code_.clear();
     external_bridge_last_alert_severity_.clear();
+    external_bridge_last_alert_action_.clear();
     external_bridge_last_event_kind_.clear();
     external_bridge_last_event_actor_.clear();
     external_bridge_last_event_timestamp_ms_ = 0;

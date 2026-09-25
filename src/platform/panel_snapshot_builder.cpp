@@ -62,6 +62,7 @@ PanelSnapshot build_panel_snapshot(
         external_bridge_manifest.daily_budget_manual_reserve;
     snapshot.external_bridge.daily_budget_remaining_auto =
         external_bridge_manifest.daily_budget_remaining_auto;
+    snapshot.external_bridge.last_alert_action = std::move(external_bridge_manifest.last_alert_action);
     snapshot.external_bridge.current_room_id = std::move(external_bridge_manifest.current_room_id);
     snapshot.external_bridge.last_event_kind = std::move(external_bridge_manifest.last_event_kind);
     snapshot.external_bridge.last_event_actor = std::move(external_bridge_manifest.last_event_actor);

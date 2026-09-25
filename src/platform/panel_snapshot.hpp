@@ -90,6 +90,9 @@ struct PanelExternalBridgeStatus {
     std::int32_t runner_last_exit_code = 0;
     std::string runner_last_error{};
     std::vector<std::string> runner_recent_log_lines{};
+    // Accion sugerida para la ultima alerta (rotate_key, retry, ...). Vacio si
+    // el bridge no mando nada. Al final para no romper los inits posicionales.
+    std::string last_alert_action{};
 };
 
 struct PanelExternalWsStatus {

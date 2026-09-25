@@ -278,6 +278,9 @@ private:
     std::string external_bridge_last_phase_{};
     std::string external_bridge_last_alert_code_{};
     std::string external_bridge_last_alert_severity_{};
+    // Accion sugerida para la ultima alerta (rotate_key, retry, ...): viaja con
+    // el codigo para que el panel pueda ofrecer "que hago ahora".
+    std::string external_bridge_last_alert_action_{};
     double external_bridge_retry_in_sec_ = 0.0;
     // Presupuesto diario de conexiones del proveedor (0 = sin tope). No se
     // borra al desconectar: sigue siendo el contador real del dia.
