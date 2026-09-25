@@ -12,17 +12,31 @@ connection:
   heartbeat_interval_sec: 15
   heartbeat_warning_after_sec: 60
   silence_timeout_sec: 0
+  # Si la sesion sigue abierta pero pasan estos segundos sin ningun evento,
+  # se cierra y se reconecta (socket a medias / proveedor sin eventos).
+  # 0 = desactivado. El aviso previo (silence_timeout_sec) sigue siendo 120s.
+  silence_reconnect_sec: 300
 
 retry_policy:
   enabled: true
   base_delay_sec: 2
   max_delay_sec: 45
   not_live_delay_sec: 20
-  max_attempts: 5
+  # 0 = sin tope de intentos: los guardias reales son el presupuesto diario y
+  # el tope de reconexiones por hora, que esperan en vez de rendirse.
+  max_attempts: 0
   max_reconnect_per_hour: 10
   jitter_sec: 1.0
   # Tiempo maximo esperando a que la cuenta empiece el vivo (0 = sin limite).
   waiting_for_live_max_minutes: 30
+  # Presupuesto diario de aperturas contra el proveedor (UTC). 0 = sin tope.
+  # 50/dia = 10 para el operador + 40 para reconexiones (caidas, silencio,
+  # espera del vivo). Cuando se acaba, el bridge para con un mensaje claro en
+  # lugar de quemar la cuota restante.
+  daily_connection_budget: 50
+  daily_manual_reserve: 10
+  # Contador diario entre reinicios del panel. Vacio = solo en memoria.
+  daily_budget_state_path: tools/bridge_py/logs/connection_budget.json
 
 buffer:
   size: 8192

@@ -18,6 +18,7 @@ class HeartbeatMonitor:
         warning_after_sec: float,
         interval_sec: float,
         silence_timeout_sec: float = 0.0,
+        silence_reconnect_sec: float = 0.0,
     ) -> None:
         self._warning_after_sec = max(1.0, warning_after_sec)
         self._interval_sec = max(1.0, interval_sec)
@@ -28,6 +29,12 @@ class HeartbeatMonitor:
             if silence_timeout_sec > 0
             else max(2.0, self._warning_after_sec * 2)
         )
+        # silence_reconnect_sec: si la sesion sigue abierta pero pasan estos
+        # segundos sin eventos, hay que cerrarla y reconectar. El aviso de
+        # silencio (de arriba) solo cambia lo que ve el panel: no mueve el
+        # socket, que puede quedar "vivo" a medias y dejar el monitor en verde
+        # sin ningun dato. 0 = desactivado.
+        self._silence_reconnect_sec = max(0.0, silence_reconnect_sec)
         self._connected_since_monotonic: float | None = None
         self._last_status_monotonic = time.monotonic()
         self._last_event_monotonic = time.monotonic()
@@ -51,6 +58,30 @@ class HeartbeatMonitor:
 
     def mark_event(self) -> None:
         self._last_event_monotonic = time.monotonic()
+
+    @property
+    def silence_declared(self) -> bool:
+        """True cuando el latido ya declaro la sesion caida por silencio."""
+        return self._silence_declared
+
+    @property
+    def last_event_age_sec(self) -> float:
+        return max(0.0, time.monotonic() - self._last_event_monotonic)
+
+    @property
+    def reconnect_due(self) -> bool:
+        """True cuando hay que cerrar la sesion y reconectar por silencio.
+
+        Solo aplica a una sesion que llego a estar conectada (o que ya fue
+        declarada caida por silencio): mientras se espera la sala del live no
+        hay eventos esperables y esa espera tiene su propio circuito.
+        """
+        if self._silence_reconnect_sec <= 0.0:
+            return False
+        session_was_connected = self._connected_since_monotonic is not None or self._silence_declared
+        if not session_was_connected:
+            return False
+        return self.last_event_age_sec >= self._silence_reconnect_sec
 
     def snapshot(self) -> ConnectionHealth:
         now = time.monotonic()
@@ -96,6 +127,25 @@ class HeartbeatMonitor:
                     f"DESCONECTADO: sin eventos durante {snapshot.last_event_age_ms // 1000}s. "
                     f"La conexion con TikTok se ha perdido."
                 )
+                severity = "error"
+            elif self._silence_declared and self._connection_state == ConnectionState.DISCONNECTED:
+                # Ya se declaro la caida: mientras se espera la reconexion hay
+                # que decir lo que realmente pasa. "Verificando conexion..." seria
+                # mentira porque nadie esta verificando nada.
+                seconds_idle = snapshot.last_event_age_ms // 1000
+                remaining = int(round(self._silence_reconnect_sec - snapshot.last_event_age_ms / 1000.0))
+                if self._silence_reconnect_sec > 0 and remaining > 0:
+                    message = (
+                        f"Sin eventos durante {seconds_idle}s. "
+                        f"Reconectando automaticamente en {remaining}s."
+                    )
+                elif self._silence_reconnect_sec > 0:
+                    message = f"Sin eventos durante {seconds_idle}s. Reconectando..."
+                else:
+                    message = (
+                        f"DESCONECTADO: sin eventos durante {seconds_idle}s. "
+                        f"La conexion con TikTok se ha perdido."
+                    )
                 severity = "error"
             elif snapshot.last_event_age_ms > int(self._warning_after_sec * 1000):
                 seconds_idle = snapshot.last_event_age_ms // 1000

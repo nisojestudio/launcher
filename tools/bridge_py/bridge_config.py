@@ -76,7 +76,9 @@ class RetryPolicyConfig:
     base_delay_sec: float = 2.0
     max_delay_sec: float = 45.0
     not_live_delay_sec: float = 20.0
-    max_attempts: int = 5
+    # 0 = sin tope de intentos: el limite real lo ponen el presupuesto diario
+    # y el tope de reconexiones por hora, que esperan en vez de rendirse.
+    max_attempts: int = 0
     max_reconnect_per_hour: int = 10
     jitter_sec: float = 1.0
     # Cuanto tiempo esperar a que la cuenta empiece el vivo antes de rendirse.
@@ -87,6 +89,13 @@ class RetryPolicyConfig:
     key_cooldown_minutes: int = 0
     # Tope de espera cuando TODAS las keys estan en cuarentena (0 = sin tope).
     all_keys_cooldown_max_minutes: int = 30
+    # Aperturas de sesion que se pueden abrir por dia (UTC). 0 = sin tope.
+    daily_connection_budget: int = 50
+    # Parte de ese tope reservada para conexiones manuales del operador:
+    # las reconexiones automaticas nunca pueden comersela.
+    daily_manual_reserve: int = 10
+    # Donde persistir el contador diario entre reinicios ("" = solo memoria).
+    daily_budget_state_path: str = ""
 
 
 @dataclass(slots=True)
@@ -102,6 +111,10 @@ class ConnectionConfig:
     heartbeat_interval_sec: float = 15.0
     heartbeat_warning_after_sec: float = 60.0
     silence_timeout_sec: float = 0.0  # 0 = auto (warning * 2)
+    # Si la sesion sigue abierta pero pasan esta cantidad de segundos sin ningun
+    # evento, se cierra y se reconecta: el socket puede seguir "vivo" a medias y
+    # el panel se quedaria mostrando verde sin datos. 0 = desactivado.
+    silence_reconnect_sec: float = 300.0
 
     def effective_api_keys(self) -> list[str]:
         """Pool activo: la lista configurada mas la key unica como respaldo."""
@@ -288,6 +301,13 @@ def load_bridge_config(path: str | Path | None = None) -> BridgeConfig:
                 min_value=0.0,
                 max_value=3600.0,
             ),
+            silence_reconnect_sec=_parse_float(
+                _env("LIVEPANEL_BRIDGE_SILENCE_RECONNECT_SEC")
+                or connection.get("silence_reconnect_sec"),
+                300.0,
+                min_value=0.0,
+                max_value=86400.0,
+            ),
         ),
         retry_policy=RetryPolicyConfig(
             enabled=_parse_bool(
@@ -314,7 +334,7 @@ def load_bridge_config(path: str | Path | None = None) -> BridgeConfig:
             ),
             max_attempts=_parse_int(
                 _env("LIVEPANEL_TIKTOK_RETRY_MAX_ATTEMPTS") or retry_policy.get("max_attempts"),
-                5,
+                0,
                 min_value=0,
                 max_value=1000,
             ),
@@ -349,6 +369,24 @@ def load_bridge_config(path: str | Path | None = None) -> BridgeConfig:
                 30,
                 min_value=0,
                 max_value=1440,
+            ),
+            daily_connection_budget=_parse_int(
+                _env("LIVEPANEL_TIKTOK_DAILY_BUDGET") or retry_policy.get("daily_connection_budget"),
+                50,
+                min_value=0,
+                max_value=100000,
+            ),
+            daily_manual_reserve=_parse_int(
+                _env("LIVEPANEL_TIKTOK_DAILY_MANUAL_RESERVE")
+                or retry_policy.get("daily_manual_reserve"),
+                10,
+                min_value=0,
+                max_value=100000,
+            ),
+            daily_budget_state_path=_parse_text(
+                _env("LIVEPANEL_BRIDGE_BUDGET_STATE_PATH")
+                or retry_policy.get("daily_budget_state_path"),
+                "",
             ),
         ),
         buffer=BufferConfig(

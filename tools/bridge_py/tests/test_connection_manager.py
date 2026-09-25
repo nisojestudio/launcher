@@ -1,12 +1,18 @@
 from __future__ import annotations
 
 import asyncio
+import time
 import unittest
 from unittest import mock
 
 from bridge_config import BridgeConfig
 from bridge_client import build_chat_event
-from connection_manager import ConnectionManager, compute_retry_delay
+from connection_manager import (
+    ConnectionManager,
+    ReconnectRateLimiter,
+    compute_retry_delay,
+)
+from daily_budget import KIND_AUTO, KIND_MANUAL, DailyConnectionBudget
 from error_catalog import action_for, classify_close_code, classify_error_text
 from event_decoder import decode_canonical_event
 from metrics_registry import MetricsRegistry
@@ -589,6 +595,272 @@ class ConnectionManagerTests(unittest.IsolatedAsyncioTestCase):
                 panel_attached=panel_attached,
             )
             await manager.run(target_user="alice", max_events=1, max_seconds=0)
+
+
+class StabilityGuardTests(unittest.IsolatedAsyncioTestCase):
+    """Guardias de la fase de estabilidad: presupuesto, limite horario y silencio."""
+
+    # -- presupuesto diario ------------------------------------------------
+
+    async def test_daily_budget_exhaustion_stops_with_a_clear_message(self) -> None:
+        """Con el presupuesto agotado no se abre sesion: se explica y se para."""
+        FakeConnection.attempts = 0
+        FakeConnection.fail_first = True
+        FakeConnection.user_not_found = False
+        FakeConnection.hang_until_closed = False
+
+        config = bridge_config_with_api_key()
+        config.retry_policy.max_attempts = 0  # sin tope de intentos: manda el presupuesto
+        config.retry_policy.daily_connection_budget = 1
+        config.retry_policy.daily_manual_reserve = 1
+
+        statuses = []
+        messages: list[str] = []
+
+        async def status_callback(status) -> None:
+            statuses.append(status)
+            messages.append(status.message)
+
+        async def fast_sleep(_seconds: float) -> None:
+            return None
+
+        manager = ConnectionManager(
+            config=config,
+            logger=configure_logger(
+                name="livepanel.bridge.test.connection.budget",
+                log_path="tools/bridge_py/logs/test_connection_budget.jsonl",
+            ),
+            metrics=MetricsRegistry(),
+            event_callback=accepted_event,
+            status_callback=status_callback,
+        )
+
+        with mock.patch("connection_manager.TikToolsConnection", FakeConnection), mock.patch(
+            "connection_manager.asyncio.sleep",
+            side_effect=fast_sleep,
+        ):
+            exit_code = await manager.run(target_user="alice", max_events=1, max_seconds=0)
+
+        self.assertEqual(exit_code, 1)
+        # Solo llego a abrir la primera: la segunda apertura ya no cabia.
+        self.assertEqual(FakeConnection.attempts, 1)
+        self.assertTrue(
+            any(status.alert_code == "DAILY_BUDGET_EXHAUSTED" for status in statuses),
+            "el presupuesto agotado debe llegar al panel como alerta propia",
+        )
+        self.assertIn("presupuesto diario", messages[-1])
+
+    async def test_reconnects_are_charged_to_the_auto_bag(self) -> None:
+        """Intento 0 = manual, el resto = reconexiones automaticas."""
+        FakeConnection.attempts = 0
+        FakeConnection.fail_first = True
+        FakeConnection.user_not_found = False
+        FakeConnection.hang_until_closed = False
+
+        config = bridge_config_with_api_key()
+        config.retry_policy.max_attempts = 3
+
+        async def fast_sleep(_seconds: float) -> None:
+            return None
+
+        manager = ConnectionManager(
+            config=config,
+            logger=configure_logger(
+                name="livepanel.bridge.test.connection.budget_kinds",
+                log_path="tools/bridge_py/logs/test_connection_budget_kinds.jsonl",
+            ),
+            metrics=MetricsRegistry(),
+            event_callback=accepted_event,
+            status_callback=ignored_status,
+        )
+
+        with mock.patch("connection_manager.TikToolsConnection", FakeConnection), mock.patch(
+            "connection_manager.asyncio.sleep",
+            side_effect=fast_sleep,
+        ):
+            exit_code = await manager.run(target_user="alice", max_events=1, max_seconds=0)
+
+        self.assertEqual(exit_code, 0)
+        self.assertEqual(FakeConnection.attempts, 2)
+        budget = manager.budget
+        self.assertIsNotNone(budget)
+        self.assertEqual(budget.used_manual, 1)
+        self.assertEqual(budget.used_auto, 1)
+        self.assertEqual(budget.used_total, 2)
+
+    # -- limite de reconexiones por hora -----------------------------------
+
+    async def test_hourly_reconnect_limit_waits_instead_of_stopping(self) -> None:
+        """Sin hueco horario se espera: el bridge no se rinde y muere."""
+
+        class AlwaysFailingConnection(FakeConnection):
+            async def open(self) -> None:
+                type(self).attempts += 1
+                raise TikToolsConnectionError("NETWORK_ERROR", "Fallo temporal de red.")
+
+        AlwaysFailingConnection.attempts = 0
+
+        config = bridge_config_with_api_key()
+        config.retry_policy.max_attempts = 2
+        config.retry_policy.max_reconnect_per_hour = 1
+        config.retry_policy.base_delay_sec = 1.0
+        config.retry_policy.jitter_sec = 0.0
+
+        statuses = []
+
+        async def status_callback(status) -> None:
+            statuses.append(status)
+
+        manager = ConnectionManager(
+            config=config,
+            logger=configure_logger(
+                name="livepanel.bridge.test.connection.hourly",
+                log_path="tools/bridge_py/logs/test_connection_hourly.jsonl",
+            ),
+            metrics=MetricsRegistry(),
+            event_callback=accepted_event,
+            status_callback=status_callback,
+        )
+
+        # La espera del hueco dura mas que el backoff normal: si el manager la
+        # ignorara, el reintento saldria antes de liberarse el slot.
+        with mock.patch("connection_manager.TikToolsConnection", AlwaysFailingConnection), mock.patch.object(
+            ReconnectRateLimiter, "seconds_until_slot", return_value=3.0
+        ):
+            exit_code = await manager.run(target_user="alice", max_events=1, max_seconds=0)
+
+        self.assertEqual(exit_code, 1)
+        # Antes del cambio esto cortaba en el primer limite horario (1 apertura).
+        self.assertEqual(AlwaysFailingConnection.attempts, 3)
+        messages = [status.message for status in statuses]
+        self.assertTrue(any("por hora" in message for message in messages), messages)
+        # El reintento espera el hueco entero, no el backoff corto.
+        self.assertTrue(
+            any(status.retry_in_sec >= 3.0 for status in statuses),
+            "la espera del hueco horario debe llegar al status",
+        )
+        self.assertNotIn("limite de reconexiones por hora", messages[-1])
+        self.assertIn("Se dejo de reintentar", messages[-1])
+
+    def test_seconds_until_slot_waits_for_the_oldest_reconnect(self) -> None:
+        limiter = ReconnectRateLimiter(2)
+        limiter.record_reconnect("tiktools")
+        limiter.record_reconnect("tiktools")
+
+        self.assertFalse(limiter.can_reconnect("tiktools"))
+        wait = limiter.seconds_until_slot("tiktools")
+        self.assertGreater(wait, 0.0)
+        self.assertLessEqual(wait, 3600.0)
+
+        # La reconexion mas vieja sale de la ventana: hay hueco otra vez.
+        now = time.monotonic()
+        limiter._provider_timestamps["tiktools"] = [now - 3601.0, now]
+
+        self.assertTrue(limiter.can_reconnect("tiktools"))
+        self.assertEqual(limiter.seconds_until_slot("tiktools"), 0.0)
+
+    # -- reconexion por silencio (A3) --------------------------------------
+
+    async def test_open_session_without_events_is_reconnected(self) -> None:
+        """Sesion abierta sin eventos: se cierra y se reconecta sola."""
+
+        class SilentConnection(FakeConnection):
+            async def open(self) -> None:
+                type(self).attempts += 1
+
+                async def _wait() -> None:
+                    await self._closed_event.wait()
+
+                self._wait_task = asyncio.create_task(_wait())
+
+        SilentConnection.attempts = 0
+
+        config = bridge_config_with_api_key()
+        config.connection.silence_reconnect_sec = 0.3
+        config.retry_policy.jitter_sec = 0.0
+        config.retry_policy.base_delay_sec = 1.0
+        config.retry_policy.daily_connection_budget = 50
+        config.retry_policy.daily_manual_reserve = 10
+
+        alert_codes: list[str] = []
+
+        async def status_callback(status) -> None:
+            if status.alert_code:
+                alert_codes.append(status.alert_code)
+
+        manager = ConnectionManager(
+            config=config,
+            logger=configure_logger(
+                name="livepanel.bridge.test.connection.silence",
+                log_path="tools/bridge_py/logs/test_connection_silence.jsonl",
+            ),
+            metrics=MetricsRegistry(),
+            event_callback=accepted_event,
+            status_callback=status_callback,
+        )
+
+        with mock.patch("connection_manager.TikToolsConnection", SilentConnection):
+            await manager.run(target_user="alice", max_events=1, max_seconds=3)
+
+        self.assertGreaterEqual(
+            SilentConnection.attempts,
+            2,
+            "una sesion abierta sin eventos debe reconectarse, no quedarse quieta",
+        )
+        self.assertIn("SILENCE_TIMEOUT", alert_codes)
+        # Cada apertura se cobra en el presupuesto: la primera es manual y el
+        # resto son reconexiones automaticas.
+        budget = manager.budget
+        self.assertIsNotNone(budget)
+        self.assertEqual(budget.used_manual, 1)
+        self.assertEqual(budget.used_auto, SilentConnection.attempts - 1)
+
+    # -- estiramiento de la espera del vivo --------------------------------
+
+    def test_not_live_delay_uses_the_stretch_factor(self) -> None:
+        config = bridge_config_with_api_key()
+        config.retry_policy.not_live_delay_sec = 20.0
+
+        base = compute_retry_delay(config, "NOT_LIVE", 0)
+
+        self.assertEqual(base, 20.0)
+        self.assertEqual(compute_retry_delay(config, "NOT_LIVE", 0, auto_budget_stretch=2.0), 40.0)
+        self.assertEqual(compute_retry_delay(config, "NOT_LIVE", 0, auto_budget_stretch=4.0), 80.0)
+
+    def test_stretch_factor_follows_the_auto_bag(self) -> None:
+        manager = ConnectionManager(
+            config=bridge_config_with_api_key(),
+            logger=configure_logger(
+                name="livepanel.bridge.test.connection.stretch",
+                log_path="tools/bridge_py/logs/test_connection_stretch.jsonl",
+            ),
+            metrics=MetricsRegistry(),
+            event_callback=accepted_event,
+            status_callback=ignored_status,
+        )
+
+        manager._budget = DailyConnectionBudget(total_per_day=40, manual_reserve=0)
+        self.assertEqual(manager._auto_budget_stretch(), 1.0)
+
+        for _ in range(20):
+            manager._budget.record(KIND_AUTO)
+        self.assertEqual(manager._auto_budget_stretch(), 2.0)
+
+        for _ in range(11):
+            manager._budget.record(KIND_AUTO)
+        self.assertEqual(manager._auto_budget_stretch(), 4.0)
+
+    def test_manual_reserve_keeps_the_auto_bag_away(self) -> None:
+        """La bolsa manual no la tocan las reconexiones (reserva de 10)."""
+        budget = DailyConnectionBudget(total_per_day=50, manual_reserve=10)
+
+        for _ in range(40):
+            self.assertTrue(budget.can_open(KIND_AUTO))
+            budget.record(KIND_AUTO)
+
+        self.assertFalse(budget.can_open(KIND_AUTO))
+        self.assertEqual(budget.remaining_total, 10)
+        self.assertTrue(budget.can_open(KIND_MANUAL))
 
 
 if __name__ == "__main__":

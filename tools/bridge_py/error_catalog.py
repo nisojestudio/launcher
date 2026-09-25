@@ -129,6 +129,23 @@ CATALOG: dict[str, ErrorSpec] = {
         ACTION_RETRY,
         True,
     ),
+    "SILENCE_TIMEOUT": ErrorSpec(
+        "SILENCE_TIMEOUT",
+        "La sesion sigue abierta pero dejaron de llegar eventos. "
+        "Se reconecta para recuperar el flujo del live.",
+        SEVERITY_WARN,
+        ACTION_RETRY,
+        True,
+    ),
+    "DAILY_BUDGET_EXHAUSTED": ErrorSpec(
+        "DAILY_BUDGET_EXHAUSTED",
+        "Se agoto el presupuesto diario de conexiones con el proveedor. "
+        "El panel vuelve a conectar manana; si necesitas mas intentos hoy, "
+        "sube daily_connection_budget en bridge_config.yaml.",
+        SEVERITY_ERROR,
+        ACTION_NONE,
+        False,
+    ),
     "AGE_RESTRICTED": ErrorSpec(
         "AGE_RESTRICTED",
         "El live requiere una sesion autenticada de TikTok.",

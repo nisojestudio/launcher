@@ -155,19 +155,59 @@ AsyncEventDispatcher
 - `ACCESS_BLOCKED` o `RATE_LIMIT`: TikTok o el servicio de firmado rechazaron la sesion.
 - `INVALID_API_KEY` / `INVALID_JWT`: API key invalida o JWT malformado (Euler).
 - `API_SESSION_ENDED`: la key agotó su cuota o venció su plan (códigos `4401`, `4429`, `4555`). Con pool se rota a la siguiente credencial; sin pool, revisa o reemplaza la key en el panel.
+- `SILENCE_TIMEOUT`: la sesión seguía abierta pero dejaron de llegar eventos; el bridge la cierra y la reconecta para recuperar el flujo.
+- `DAILY_BUDGET_EXHAUSTED`: se gastaron las conexiones del día permitidas. Vuelve a conectar mañana o sube `retry_policy.daily_connection_budget`.
 - `BOOTSTRAP_FAILED`: falta dependencia `websockets` (instalar `requirements.txt`).
 - Si `TikTokLive` no esta en el entorno activo, el runner puede reutilizar el bridge legado via `--legacy-bridge-root`.
 - Cuando el runner se lanza desde el panel, `bridge runner stop` intenta primero un shutdown limpio por `POST /shutdown` y solo cae a terminacion forzada si el proceso no responde.
 
+## Presupuesto diario de conexiones
+
+El proveedor cobra un tope de conexiones por día (UTC). El bridge lo reparte en
+dos bolsas para que las reconexiones nunca se coman las conexiones del operador:
+
+```yaml
+retry_policy:
+  daily_connection_budget: 50   # total por día (0 = sin tope)
+  daily_manual_reserve: 10      # reservado para "Conectar" del operador
+  daily_budget_state_path: tools/bridge_py/logs/connection_budget.json
+```
+
+- Intento 0 de una sesión = **manual**; todo lo demás (caídas, silencio, espera
+  del vivo) = **automático**, con `total - manual_reserve` (40 de 50) de techo.
+- El contador se persiste en JSON: reiniciar el panel no regenera la cuota.
+  Fecha de referencia UTC; un archivo corrupto o de otro día arranca en cero.
+- Al agotarse, el bridge **para** con `DAILY_BUDGET_EXHAUSTED` y explica cuánto
+  se usó, en vez de quemar lo que queda.
+- Bajar la bolsa automática estira la espera del vivo (`×2` al 50%, `×4` al
+  25%) para que la ventana de espera llegue a durar lo que tiene que durar.
+- Se cobra justo antes de `open()`: una key inválida no llega a conectar y no
+  debe gastar una conexión.
+
+Métricas: `daily_budget_remaining` (y el snapshot completo en el log
+`daily connection budget loaded`).
+
 ## Rate Limiting por Proveedor
 
-El bridge limita reintentos a **10 por hora por proveedor** (configurable con `retry_policy.max_reconnect_per_hour`). Si tiktools falla 10 veces/hora, Euler puede seguir reintentando independientemente.
+El bridge limita reconexiones a **10 por hora por proveedor** (configurable con
+`retry_policy.max_reconnect_per_hour`). Si tiktools falla 10 veces/hora, Euler
+puede seguir reintentando independientemente.
+
+Al llegar al tope **no se rinde**: calcula cuándo se libera el hueco
+(`seconds_until_slot`), lo anuncia en el monitor ("se espera X min...") y
+espera. El contador se cobra al abrir la sesión, no al programarla, para que la
+espera no consuma el límite. Esperar el vivo o rotar de credencial siguen sin
+contar.
+
+`retry_policy.max_attempts` está en `0` (sin tope de intentos): los guardias
+reales son este límite horario y el presupuesto diario.
 
 ## Heartbeat y Silence Timeout
 
 - `connection.heartbeat_interval_sec`: intervalo de ping WebSocket (default 15s)
 - `connection.heartbeat_warning_after_sec`: alerta si no hay eventos (default 60s)
-- `connection.silence_timeout_sec`: desconectar si no hay eventos por N segundos (0 = auto = warning * 2)
+- `connection.silence_timeout_sec`: marcar desconectado si no hay eventos por N segundos (0 = auto = warning * 2)
+- `connection.silence_reconnect_sec`: **cerrar y reconectar** si la sesión sigue abierta y no llega ningún evento durante N segundos (default 300, 0 = desactivado). Evita el caso "socket vivo a medias": el panel dejaba de recibir datos pero el bridge no se caía solo nunca. Tras declarar la caída, el aviso indica la cuenta atrás de la reconexión.
 
 Aplicable a todos los proveedores (tiktools, euler, direct).
 
@@ -184,6 +224,10 @@ Aplicable a todos los proveedores (tiktools, euler, direct).
 | `LIVEPANEL_BRIDGE_HEARTBEAT_INTERVAL_SEC` | Heartbeat interval (default 15s) |
 | `LIVEPANEL_BRIDGE_HEARTBEAT_WARNING_AFTER_SEC` | Warning tras Ns sin eventos (default 60s) |
 | `LIVEPANEL_BRIDGE_SILENCE_TIMEOUT_SEC` | Desconectar tras Ns silencio (0=auto) |
+| `LIVEPANEL_BRIDGE_SILENCE_RECONNECT_SEC` | Reconectar tras Ns sin eventos con la sesión abierta (default 300, 0=off) |
+| `LIVEPANEL_TIKTOK_DAILY_BUDGET` | Conexiones permitidas por día (default 50, 0=sin tope) |
+| `LIVEPANEL_TIKTOK_DAILY_MANUAL_RESERVE` | Parte del tope reservada para el operador (default 10) |
+| `LIVEPANEL_BRIDGE_BUDGET_STATE_PATH` | Fichero del contador diario (vacío = solo en memoria) |
 | `LIVEPANEL_BRIDGE_SOUND_ALERTS_ENABLED` | `false` desactiva las alertas sonoras (default `true`) |
 | `LIVEPANEL_BRIDGE_SOUND_ALERTS_REQUIRE_PANEL` | `false` emite las alertas aunque no haya panel (default `true`) |
 

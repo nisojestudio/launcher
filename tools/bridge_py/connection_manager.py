@@ -3,11 +3,14 @@ from __future__ import annotations
 import asyncio
 import random
 import time
+from dataclasses import replace
 from datetime import datetime, timedelta, timezone
 from typing import Any, Awaitable, Callable
 
 from bridge_config import BridgeConfig
+from daily_budget import KIND_AUTO, KIND_MANUAL, DailyConnectionBudget
 from error_catalog import (
+    ACTION_NONE,
     ACTION_ROTATE_KEY,
     ACTION_WAIT_FOR_LIVE,
     action_for,
@@ -33,12 +36,18 @@ except ImportError:
 EventCallback = Callable[[CanonicalEvent], Awaitable[bool]]
 StatusCallback = Callable[[SessionStatus], Awaitable[None]]
 
+# Cada cuantos segundos se reemite el status mientras dura una espera larga.
+# El panel marca como obsoleto el status con mas de 45s de antiguedad, asi que
+# una espera de una hora sin refresco se veria como "bridge caido".
+STATUS_REFRESH_SEC = 30.0
+
 
 def compute_retry_delay(
     config: BridgeConfig,
     code: str,
     attempt_index: int,
     waiting_for_live_seconds: float = 0.0,
+    auto_budget_stretch: float = 1.0,
 ) -> float | None:
     """Delay antes del siguiente intento. None = no reintentar.
 
@@ -48,6 +57,10 @@ def compute_retry_delay(
       intentos ni el limite de reconexiones: el objetivo es conectar cuando el
       vivo empiece, no rendirse.
     - El resto de errores reintentables usa backoff exponencial con jitter.
+
+    `auto_budget_stretch` (> 1) estira la espera del vivo cuando la bolsa de
+    reconexiones automaticas se esta agotando: en vez de quemar las 40
+    aperturas en los primeros minutos, se reparten por toda la ventana.
     """
     if not config.retry_policy.enabled:
         return None
@@ -60,7 +73,9 @@ def compute_retry_delay(
         ) * 60.0
         if waiting_budget_seconds > 0 and waiting_for_live_seconds >= waiting_budget_seconds:
             return None
-        return max(1.0, config.retry_policy.not_live_delay_sec)
+        delay = max(1.0, config.retry_policy.not_live_delay_sec)
+        stretch = max(1.0, min(60.0, float(auto_budget_stretch or 1.0)))
+        return delay * stretch
 
     if not spec.retryable:
         return None
@@ -115,6 +130,23 @@ class ReconnectRateLimiter:
         self._provider_timestamps[provider] = timestamps
         return max(0, self._max_per_hour - len(timestamps))
 
+    def seconds_until_slot(self, provider: str) -> float:
+        """Segundos hasta que se libere un hueco de reconexion.
+
+        El limite por hora protege la cuota del proveedor, pero rendirse ahi
+        deja el bridge muerto hasta que el operador lo reinicie. Con esta
+        espera el bucle de reconexion duerme hasta liberar hueco y sigue.
+        """
+        now = time.monotonic()
+        cutoff = now - 3600.0
+        timestamps = sorted(t for t in self._provider_timestamps.get(provider, []) if t > cutoff)
+        self._provider_timestamps[provider] = timestamps
+        if len(timestamps) < self._max_per_hour:
+            return 0.0
+        # La reconexion entrante tambien ocupa un hueco: hay que esperar a que
+        # expire la mas vieja para no colar una undecima.
+        return max(1.0, timestamps[0] + 3600.0 - now)
+
 
 class ConnectionManager:
     def __init__(
@@ -140,11 +172,37 @@ class ConnectionManager:
         self._sound_requires_panel = config.sound_alerts.require_panel
         self._panel_attached = panel_attached
         self._last_played_state = ""
+        # Presupuesto diario de aperturas: se crea en run() para que cargue el
+        # contador persistido del dia justo cuando empieza la sesion.
+        self._budget: DailyConnectionBudget | None = None
         # Pool de credenciales: se rota cuando el proveedor agota la cuota.
         self._api_keys = self._config.connection.effective_api_keys()
         self._key_index = 0
         # Indice de key -> instante (monotonic) hasta el que queda en cuarentena.
         self._key_cooldown_until: dict[int, float] = {}
+
+    @property
+    def budget(self) -> DailyConnectionBudget | None:
+        """Presupuesto diario de la sesion actual (None antes de run())."""
+        return self._budget
+
+    def _auto_budget_stretch(self) -> float:
+        """Cuanto estirar la espera del vivo segun el presupuesto que queda.
+
+        Con 40 reconexiones diarias, esperar el vivo a 20s se las comeria en
+        menos de 15 minutos. A medida que baja la bolsa, la espera se duplica
+        (<= 50%) y se cuadriplica (<= 25%) para que la ventana de espera llegue
+        a durar lo que tiene que durar.
+        """
+        budget = self._budget
+        if budget is None:
+            return 1.0
+        ratio = budget.remaining_auto_ratio()
+        if ratio <= 0.25:
+            return 4.0
+        if ratio <= 0.50:
+            return 2.0
+        return 1.0
 
     def _panel_allows_sound(self) -> bool:
         """False cuando no hay panel a quien avisar.
@@ -223,10 +281,32 @@ class ConnectionManager:
         waiting_for_live_since = 0.0
         # Ultima fase emitida: el latido la reutiliza para no pisar "waiting".
         current_phase = "starting"
+        # El presupuesto se crea aca para cargar el contador del dia (persistido
+        # entre reinicios del panel): sin eso, cada "Conectar" regeneraria la
+        # cuota diaria y el proveedor la acabaria notando.
+        self._budget = DailyConnectionBudget(
+            total_per_day=self._config.retry_policy.daily_connection_budget,
+            manual_reserve=self._config.retry_policy.daily_manual_reserve,
+            state_path=self._config.retry_policy.daily_budget_state_path,
+        )
+        log_json(
+            self._logger,
+            "info",
+            "daily_budget",
+            "daily connection budget loaded",
+            **self._budget.snapshot(),
+        )
+        # Visible en /status desde el arranque, no solo tras la primera apertura.
+        self._metrics.set_gauge("daily_budget_remaining", float(self._budget.remaining_total))
+        # Cada intento fallido programa la reconexion: este flag dice si la
+        # siguiente apertura cuenta como reconexion (limite horario) o no.
+        # El primer intento de la sesion es manual, no cuenta.
+        count_reconnect = False
         heartbeat_monitor = HeartbeatMonitor(
             warning_after_sec=self._config.connection.heartbeat_warning_after_sec,
             interval_sec=self._config.connection.heartbeat_interval_sec,
             silence_timeout_sec=self._config.connection.silence_timeout_sec,
+            silence_reconnect_sec=self._config.connection.silence_reconnect_sec,
         )
         supervisor = SessionSupervisor(heartbeat_monitor=heartbeat_monitor)
 
@@ -250,6 +330,46 @@ class ConnectionManager:
                     log_json(self._logger, "info", "sound_alert", "play: reconnecting")
             self._last_played_state = state_key
             await self._status_callback(status)
+
+        async def sleep_with_updates(
+            delay: float,
+            base: SessionStatus,
+            message_for_left: Callable[[float], str],
+        ) -> None:
+            """Duerme la espera de reconexion refrescando el status.
+
+            El limite horario puede imponer una espera de hasta una hora. Sin
+            status nuevo, el panel la lee como "bridge caido" (45s de antiguedad
+            y ya marca obsoleto), asi que se reemite el estado con el tiempo que
+            falta. Esperas cortas van de un tirón: no hay nada que refrescar.
+            """
+            whole_chunks = int(delay // STATUS_REFRESH_SEC)
+            if whole_chunks <= 0:
+                await asyncio.sleep(delay)
+                return
+            deadline = time.monotonic() + delay
+            # Un refresco por bloque completo de STATUS_REFRESH_SEC, y el resto
+            # final cierra la espera sin emitir de mas.
+            for _ in range(whole_chunks + 1):
+                if self._stop_requested:
+                    return
+                left = deadline - time.monotonic()
+                if left <= 0:
+                    return
+                await asyncio.sleep(min(left, STATUS_REFRESH_SEC))
+                if self._stop_requested:
+                    return
+                left = deadline - time.monotonic()
+                if left <= 0:
+                    return
+                await emit_status(
+                    replace(
+                        base,
+                        message=message_for_left(left),
+                        retry_in_sec=left,
+                        timestamp_ms=utc_now_ms(),
+                    )
+                )
 
         while not self._stop_requested:
             connection: Any | None = None
@@ -285,6 +405,42 @@ class ConnectionManager:
                 remaining_seconds = remaining_runtime_seconds(started_at, max_seconds)
                 if remaining_seconds is not None and remaining_seconds <= 0:
                     final_message = f"max_seconds reached ({max_seconds})"
+                    break
+
+                # Presupuesto diario: sin hueco no se abre sesion. Parar con un
+                # mensaje claro es mejor que quemar la cuota que queda y que el
+                # proveedor corte a mitad del live.
+                open_kind = KIND_MANUAL if attempt == 0 else KIND_AUTO
+                budget = self._budget
+                if budget is not None and not budget.can_open(open_kind):
+                    reason = budget.denial_reason(open_kind)
+                    log_json(
+                        self._logger,
+                        "error",
+                        "daily_budget",
+                        "daily connection budget exhausted",
+                        reason=reason,
+                        kind=open_kind,
+                        attempt=attempt,
+                        **budget.snapshot(),
+                    )
+                    final_message = f"{message_for('DAILY_BUDGET_EXHAUSTED')} ({budget.describe()})."
+                    await emit_status(
+                        SessionStatus(
+                            target_user=target_user,
+                            connection_state=ConnectionState.FAULTED,
+                            room_id=room_id,
+                            message=final_message,
+                            timestamp_ms=utc_now_ms(),
+                            retry_count=attempt,
+                            severity=severity_for("DAILY_BUDGET_EXHAUSTED"),
+                            alert_code="DAILY_BUDGET_EXHAUSTED",
+                            alert_action=ACTION_NONE,
+                            phase="error",
+                            provider=self._config.connection_mode,
+                        )
+                    )
+                    exit_code = 1
                     break
 
                 heartbeat_monitor.set_state(ConnectionState.PREPARING, retry_count=attempt)
@@ -348,6 +504,26 @@ class ConnectionManager:
                         pool_size=len(self._api_keys),
                         target_user=target_user,
                     )
+
+                # Presupuesto y limite horario se cobran justo antes de abrir:
+                # una key invalida corta antes (INVALID_API_KEY) y no debe gastar
+                # una conexion que el proveedor nunca llega a ver.
+                if budget is not None:
+                    budget.record(open_kind)
+                    self._metrics.set_gauge(
+                        "daily_budget_remaining", float(budget.remaining_total)
+                    )
+                if count_reconnect:
+                    # La reconexion se cobra al abrirla, no al programarla: si
+                    # entre medias hay que esperar el hueco horario, ese tiempo
+                    # no debe consumir el limite.
+                    self._reconnect_limiter.record_reconnect(self._config.connection_mode)
+                    self._metrics.increment("reconnect_total")
+                    self._metrics.set_gauge(
+                        "reconnects_remaining",
+                        float(self._reconnect_limiter.remaining(self._config.connection_mode)),
+                    )
+                    count_reconnect = False
 
                 heartbeat_monitor.set_state(ConnectionState.CONNECTING, retry_count=attempt)
                 await connection.open()
@@ -458,6 +634,27 @@ class ConnectionManager:
                                     phase="connected",
                                     provider=self._config.connection_mode,
                                 )
+                            )
+
+                        # Sesion abierta pero sin eventos: el socket puede quedar
+                        # "vivo" a medias y ahi el bridge no se cae solo nunca
+                        # (el proveedor tampoco manda close). Se cierra y se
+                        # reconecta, cobrando 1 apertura del presupuesto diario.
+                        if heartbeat_monitor.reconnect_due:
+                            silence_age = heartbeat_monitor.last_event_age_sec
+                            log_json(
+                                self._logger,
+                                "warning",
+                                "connection_manager",
+                                "no events on an open session, forcing reconnect",
+                                silence_sec=round(silence_age, 1),
+                                threshold_sec=self._config.connection.silence_reconnect_sec,
+                                attempt=attempt,
+                            )
+                            raise TikToolsConnectionError(
+                                "SILENCE_TIMEOUT",
+                                f"Sin eventos durante {max(1, int(round(silence_age)))}s con la sesion abierta. "
+                                "Se reconecta para recuperar el flujo del live.",
                             )
 
                         if wait_task.done():
@@ -581,6 +778,7 @@ class ConnectionManager:
                     exc.code,
                     attempt,
                     waiting_for_live_seconds=waiting_for_live_seconds,
+                    auto_budget_stretch=self._auto_budget_stretch(),
                 )
                 # Motivo por el que la sesion cortaria ahora ("" = sigue reintentando).
                 stop_reason = ""
@@ -632,23 +830,26 @@ class ConnectionManager:
 
                 # El limite de reconexiones por hora protege la cuota del
                 # proveedor, pero esperar el vivo o rotar de credencial no la
-                # consumen.
+                # consumen. Rendirse ahi dejaba el bridge muerto hasta que el
+                # operador lo reiniciara: ahora se espera el hueco y se sigue.
+                hourly_wait_sec = 0.0
                 if not waiting_for_live and not rotating_key and not self._reconnect_limiter.can_reconnect(provider):
+                    hourly_wait_sec = self._reconnect_limiter.seconds_until_slot(provider)
+                    if hourly_wait_sec <= 0:
+                        # Sin hueco calculable (no deberia pasar): se reintenta
+                        # en un minuto en vez de abandonar.
+                        hourly_wait_sec = 60.0
+                    retry_delay = max(float(retry_delay), hourly_wait_sec)
                     log_json(
                         self._logger,
                         "warning",
                         "connection_manager",
-                        "reconnect rate limit reached",
+                        "reconnect rate limit reached, waiting for a free slot",
                         max_per_hour=self._config.retry_policy.max_reconnect_per_hour,
+                        wait_sec=round(hourly_wait_sec, 1),
                         attempt=attempt,
                         provider=provider,
                     )
-                    final_message = (
-                        "Se alcanzo el limite de reconexiones por hora. "
-                        "Espera unos minutos y vuelve a conectar."
-                    )
-                    exit_code = 1
-                    break
 
                 remaining_seconds = remaining_runtime_seconds(started_at, max_seconds)
                 if remaining_seconds is not None and remaining_seconds <= 0:
@@ -656,43 +857,62 @@ class ConnectionManager:
                     break
 
                 attempt += 1
-                if not waiting_for_live and not rotating_key:
-                    self._reconnect_limiter.record_reconnect(provider)
-                self._metrics.increment("reconnect_total")
-                self._metrics.set_gauge("reconnects_remaining", float(self._reconnect_limiter.remaining(provider)))
+                # La reconexion se cobra al abrirla, no al programarla: si hay
+                # que esperar el hueco horario, esa espera no gasta el limite.
+                count_reconnect = not waiting_for_live and not rotating_key
                 heartbeat_monitor.set_state(ConnectionState.RECONNECTING, retry_count=attempt, error=exc.message)
+                # El texto del aviso se reescribe con el tiempo que falta: la
+                # espera se refresca en cortes para que el panel no la lea como
+                # "bridge caido".
                 if rotating_key:
-                    retry_message = (
-                        f"Rotando de API key ({self._current_key_label()}). "
-                        f"Reconectando en {retry_delay:.0f}s."
-                    )
+                    def retry_message_for(left: float) -> str:
+                        return (
+                            f"Rotando de API key ({self._current_key_label()}). "
+                            f"Reconectando en {left:.0f}s."
+                        )
+
                     retry_phase = "waiting"
                 elif waiting_for_live:
-                    retry_message = (
-                        f"Esperando a que @{target_user} empiece el vivo. "
-                        f"Nuevo intento en {retry_delay:.0f}s."
-                    )
+                    def retry_message_for(left: float) -> str:
+                        return (
+                            f"Esperando a que @{target_user} empiece el vivo. "
+                            f"Nuevo intento en {left:.0f}s."
+                        )
+
                     retry_phase = "waiting"
-                else:
-                    retry_message = f"Reintentando conexion ({attempt}) en {retry_delay:.0f}s..."
+                elif hourly_wait_sec > 0:
+                    def retry_message_for(left: float) -> str:
+                        minutes = left / 60.0
+                        wait_text = f"{minutes:.0f} min" if minutes >= 1.0 else f"{left:.0f}s"
+                        return (
+                            f"Limite de {self._config.retry_policy.max_reconnect_per_hour} "
+                            f"reconexiones por hora: se espera {wait_text} para no gastar "
+                            f"de mas en {provider_label}."
+                        )
+
                     retry_phase = "connecting"
-                await emit_status(
-                    SessionStatus(
-                        target_user=target_user,
-                        connection_state=ConnectionState.RECONNECTING,
-                        room_id=connection.room_id if connection is not None else room_id,
-                        message=retry_message,
-                        timestamp_ms=utc_now_ms(),
-                        retry_count=attempt,
-                        severity=severity_for(exc.code),
-                        alert_code=exc.code,
-                        alert_action=error_action,
-                        phase=retry_phase,
-                        provider=provider,
-                        retry_in_sec=retry_delay,
-                        key_label=self._current_key_label(),
-                    )
+                else:
+                    def retry_message_for(left: float) -> str:
+                        return f"Reintentando conexion ({attempt}) en {left:.0f}s..."
+
+                    retry_phase = "connecting"
+
+                reconnect_status = SessionStatus(
+                    target_user=target_user,
+                    connection_state=ConnectionState.RECONNECTING,
+                    room_id=connection.room_id if connection is not None else room_id,
+                    message=retry_message_for(retry_delay),
+                    timestamp_ms=utc_now_ms(),
+                    retry_count=attempt,
+                    severity=severity_for(exc.code),
+                    alert_code=exc.code,
+                    alert_action=error_action,
+                    phase=retry_phase,
+                    provider=provider,
+                    retry_in_sec=retry_delay,
+                    key_label=self._current_key_label(),
                 )
+                await emit_status(reconnect_status)
                 log_json(
                     self._logger,
                     "info",
@@ -701,6 +921,7 @@ class ConnectionManager:
                     delay_sec=round(retry_delay, 2),
                     attempt=attempt,
                     code=exc.code,
+                    hourly_wait_sec=round(hourly_wait_sec, 1),
                 )
                 await supervisor.stop_heartbeat()
                 if connection is not None:
@@ -713,7 +934,7 @@ class ConnectionManager:
                 if sleep_delay <= 0:
                     final_message = f"max_seconds reached ({max_seconds})"
                     break
-                await asyncio.sleep(sleep_delay)
+                await sleep_with_updates(sleep_delay, reconnect_status, retry_message_for)
                 continue
             finally:
                 self._metrics.set_gauge("connected", 0)
