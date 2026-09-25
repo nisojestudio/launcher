@@ -7,6 +7,7 @@
 
 #include "bridge/tiktok_external_event_codec.hpp"
 #include "bridge/tiktok_external_event_replay.hpp"
+#include "bridge/tiktok_external_session_status.hpp"
 #include "platform/panel_app.hpp"
 #include "platform/panel_console.hpp"
 #include "platform/panel_view_model_builder.hpp"
@@ -181,6 +182,66 @@ int main() {
                     "chat=0, like=0, gift=0, follow=0, share=0, viewer_join=0, "
                     "viewer_count=0, live_start=0, live_end=0, moderation=0, custom_raw=0";
         }) != bridge_section->items.end());
+
+    // Verdad de estado (Fase 1): la alerta y la fase solo se limpian cuando la
+    // sesion realmente conecta, y al detener el runner no queda nada de la
+    // sesion anterior encolado.
+    const auto submit_session_status =
+        [&panel_app](
+            nlp3::bridge::TikTokExternalSessionConnectionState state,
+            const char* phase,
+            const char* alert_code) {
+            return panel_app.submit_external_session_status({
+                "external-panel-user-01",
+                "room-external-panel-001",
+                state,
+                "estado de sesion",
+                1710000007000,
+                phase,
+                "warn",
+                alert_code,
+                0.0,
+            });
+        };
+
+    // 1) Un fallo deja alerta y fase de espera en el snapshot.
+    NLP3_TEST_REQUIRE(submit_session_status(
+        nlp3::bridge::TikTokExternalSessionConnectionState::faulted,
+        "waiting",
+        "NOT_LIVE"));
+    NLP3_TEST_REQUIRE(panel_app.snapshot().external_bridge.last_alert_code == "NOT_LIVE");
+
+    // 2) Un status desconectado con la fase mintiendo "connected" NO borra la
+    //    alerta: el motivo del fallo tiene que sobrevivir al silencio.
+    NLP3_TEST_REQUIRE(submit_session_status(
+        nlp3::bridge::TikTokExternalSessionConnectionState::disconnected,
+        "connected",
+        ""));
+    const auto snapshot_during_silence = panel_app.snapshot();
+    NLP3_TEST_REQUIRE(snapshot_during_silence.external_bridge.last_alert_code == "NOT_LIVE");
+    NLP3_TEST_REQUIRE(snapshot_during_silence.external_bridge.last_alert_severity == "warn");
+
+    // 3) La sesion realmente conectada si limpia la alerta.
+    NLP3_TEST_REQUIRE(submit_session_status(
+        nlp3::bridge::TikTokExternalSessionConnectionState::connected,
+        "connected",
+        ""));
+    const auto snapshot_reconnected = panel_app.snapshot();
+    NLP3_TEST_REQUIRE(snapshot_reconnected.external_bridge.last_alert_code.empty());
+    NLP3_TEST_REQUIRE(snapshot_reconnected.external_bridge.last_phase == "connected");
+
+    // 4) Detener el runner limpia fase y alerta junto con el estado: la franja
+    //    no puede quedar en verde "Conectado" tras Desconectar.
+    NLP3_TEST_REQUIRE(submit_session_status(
+        nlp3::bridge::TikTokExternalSessionConnectionState::connected,
+        "connected",
+        "STREAM_DISCONNECTED"));
+    panel_app.stop_external_runner();
+    const auto snapshot_after_stop = panel_app.snapshot();
+    NLP3_TEST_REQUIRE(snapshot_after_stop.external_bridge.connection_state == "disconnected");
+    NLP3_TEST_REQUIRE(snapshot_after_stop.external_bridge.last_phase.empty());
+    NLP3_TEST_REQUIRE(snapshot_after_stop.external_bridge.last_alert_code.empty());
+    NLP3_TEST_REQUIRE(snapshot_after_stop.external_bridge.last_alert_severity.empty());
 
     std::filesystem::remove(record_path);
     std::filesystem::remove(config_path);

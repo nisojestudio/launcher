@@ -116,6 +116,28 @@ class HeartbeatMonitor:
                     message = "Esperando para reconectar con TikTok..."
                 severity = "info"
 
+            # Fase honesta del latido: mientras la sesion siga declarada caida
+            # por silencio, la fase la manda el estado real (error) y no
+            # phase_provider(), que devuelve "connected" congelado en
+            # connection_manager.current_phase y le mintia al panel.
+            # Solo en ese caso: cuando el connection_manager emita una fase nueva
+            # (waiting, connecting...) el provider vuelve a ser la fuente, asi que
+            # no se pisan fases legitimas como "waiting" (la declaracion de
+            # silencio solo puede ocurrir con estado CONNECTED, nunca esperando
+            # el vivo).
+            declared_down = (
+                self._silence_declared
+                and self._connection_state == ConnectionState.DISCONNECTED
+            )
+            if declared_down:
+                phase = self._phase_for_state()
+            else:
+                phase = (
+                    phase_provider()
+                    if phase_provider is not None
+                    else self._phase_for_state()
+                )
+
             await status_callback(
                 SessionStatus(
                     target_user=target_user,
@@ -127,9 +149,7 @@ class HeartbeatMonitor:
                     uptime_ms=snapshot.connected_since_ms,
                     last_event_timestamp_ms=0,
                     severity=severity,
-                    # La fase la decide el connection_manager: si esta esperando
-                    # el vivo, el latido no debe decir "conectando".
-                    phase=(phase_provider() if phase_provider is not None else self._phase_for_state()),
+                    phase=phase,
                 )
             )
             try:

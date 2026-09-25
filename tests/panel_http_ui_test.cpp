@@ -288,9 +288,24 @@ int main() {
         return 1;
     }
 
+    // El JS escribe estos tres nodos: sin ellos en el HTML la nota del motivo,
+    // el ultimo evento y la accion de reintento nunca llegaban a pantalla.
+    if (!require(html.find("id=\"connection-note\"") != std::string::npos, "html connection note")) return 1;
+    if (!require(html.find("id=\"status-last-event\"") != std::string::npos, "html last event tile")) return 1;
+    if (!require(html.find("id=\"reconnect-button\"") != std::string::npos, "html reconnect button")) return 1;
+
     const auto css = issue_request(panel_app, kPort, make_get_request("/app.css"));
     if (!require(css.find("HTTP/1.1 200 OK") != std::string::npos, "css 200")) return 1;
     if (!require(css.find("--bg: #09111d;") != std::string::npos, "css dark theme")) return 1;
+    // Varias clases de este archivo declaran display y pisaban al atributo
+    // hidden: sin esta regla el rectangulo de alertas del live se quedaba
+    // visible aunque no hubiera alertas.
+    if (!require(
+            css.find("[hidden]") != std::string::npos && css.find("display: none !important") != std::string::npos,
+            "css hidden beats display")) {
+        return 1;
+    }
+    if (!require(css.find(".connection-note") != std::string::npos, "css connection note")) return 1;
     if (!require(css.find(".hero-card") != std::string::npos, "css hero card")) return 1;
     if (!require(css.find(".game-showcase-card") != std::string::npos, "css game card")) return 1;
     if (!require(css.find(".app-titlebar") != std::string::npos, "css custom titlebar")) return 1;

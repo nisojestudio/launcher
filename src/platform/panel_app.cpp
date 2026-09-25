@@ -799,6 +799,12 @@ bool PanelApp::initialize(const std::string& config_path) {
         external_bridge_connection_state_.clear();
         external_bridge_last_status_message_.clear();
         external_bridge_last_status_timestamp_ms_ = 0;
+        // Estado de la sesion anterior: fase y alertas tambien se resetean aqui,
+        // o un reinicio arrastraba "connected"/codigo de alerta de la sesion vieja.
+        external_bridge_last_phase_.clear();
+        external_bridge_last_alert_code_.clear();
+        external_bridge_last_alert_severity_.clear();
+        external_bridge_retry_in_sec_ = 0.0;
         external_bridge_current_room_id_.clear();
         external_bridge_last_event_kind_.clear();
         external_bridge_last_event_actor_.clear();
@@ -1801,11 +1807,16 @@ bool PanelApp::submit_external_session_status(const bridge::TikTokExternalSessio
     external_bridge_last_status_timestamp_ms_ = status.timestamp_ms;
     external_bridge_last_phase_ = status.phase;
     // El latido no trae codigo de alerta: se conserva el ultimo aviso real para
-    // que el monitor no lo pierda, y se limpia solo cuando la sesion conecta.
+    // que el monitor no lo pierda, y se limpia solo cuando la sesion esta
+    // realmente conectada (el estado Y la fase lo confirman). Un status que diga
+    // "fase connected" mientras el estado sigue desconectado no puede borrar el
+    // motivo de la alerta.
     if (!status.alert_code.empty()) {
         external_bridge_last_alert_code_ = status.alert_code;
         external_bridge_last_alert_severity_ = status.severity;
-    } else if (status.phase == "connected") {
+    } else if (
+        status.connection_state == bridge::TikTokExternalSessionConnectionState::connected
+        && status.phase == "connected") {
         external_bridge_last_alert_code_.clear();
         external_bridge_last_alert_severity_.clear();
     }
@@ -1946,6 +1957,11 @@ void PanelApp::stop_external_runner() {
         external_bridge_last_status_message_ = "Runner stopped by panel";
         external_bridge_last_status_timestamp_ms_ = now_wall_clock_ms();
         external_bridge_current_room_id_.clear();
+        // La fase y la ultima alerta describen la sesion que acaba de morir:
+        // sin limpiarlas la franja seguia en verde "Conectado" tras Desconectar.
+        external_bridge_last_phase_.clear();
+        external_bridge_last_alert_code_.clear();
+        external_bridge_last_alert_severity_.clear();
     }
 }
 
@@ -2378,6 +2394,11 @@ void PanelApp::logout_access() noexcept {
     external_bridge_last_status_message_ = "Access session closed";
     external_bridge_last_status_timestamp_ms_ = now_wall_clock_ms();
     external_bridge_current_room_id_.clear();
+    // Mismo criterio que stop_external_runner: al cerrar la sesion de acceso no
+    // queda ninguna fase ni alerta de la sesion anterior encolada.
+    external_bridge_last_phase_.clear();
+    external_bridge_last_alert_code_.clear();
+    external_bridge_last_alert_severity_.clear();
     external_bridge_last_event_kind_.clear();
     external_bridge_last_event_actor_.clear();
     external_bridge_last_event_timestamp_ms_ = 0;

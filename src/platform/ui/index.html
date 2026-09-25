@@ -103,11 +103,16 @@
                 <span class="info-label">Sala del live</span>
                 <strong class="mono" id="live-room">Sala no disponible</strong>
               </article>
+              <article class="info-tile info-tile-wide">
+                <span class="info-label">&Uacute;ltimo evento</span>
+                <strong class="mono" id="status-last-event">Sin actividad</strong>
+              </article>
             </div>
 
             <div class="button-row">
               <button class="primary-button" id="connect-button" type="submit">Conectar</button>
               <button class="secondary-button" id="disconnect-button" type="button" hidden>Desconectar</button>
+              <button class="secondary-button" id="reconnect-button" type="button" hidden>Reintentar conexi&oacute;n</button>
             </div>
           </form>
 
@@ -119,6 +124,8 @@
             </div>
             <span class="live-status-timer mono" id="live-status-timer" hidden>00:00</span>
           </div>
+
+          <p class="connection-note" id="connection-note" data-tone="warn" hidden></p>
 
           <div class="live-alerts" id="live-alerts" hidden>
             <div class="live-alerts-header">
@@ -170,7 +177,7 @@
 
           <p class="activity-help-copy" hidden aria-hidden="true">Usa estos controles para probar el live sin conexi&oacute;n real.</p>
 
-          <div class="activity-control-shell" hidden aria-hidden="true">
+          <div class="activity-control-shell">
             <div class="activity-chat-row">
               <input id="activity-chat-input" type="text" autocomplete="off" spellcheck="false" placeholder="Chat...">
               <button class="icon-action-button" id="activity-chat-button" type="button" title="Enviar chat" aria-label="Enviar chat">&#128172;</button>

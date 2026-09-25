@@ -32,6 +32,15 @@
   box-sizing: border-box;
 }
 
+/* El atributo hidden manda siempre. Varias clases de este archivo declaran
+   display y, sin esta regla, el navegador seguia mostrando el elemento porque
+   la hoja del autor gana a la del navegador: el rectangulo de alertas del live
+   se quedaba visible aunque no hubiera alertas, y el campo de API key no se
+   ocultaba al cambiar de proveedor. */
+[hidden] {
+  display: none !important;
+}
+
 html,
 body {
   width: 100%;
@@ -1914,6 +1923,12 @@ body::-webkit-scrollbar-corner,
   grid-template-columns: repeat(2, minmax(0, 1fr));
 }
 
+/* Tercera ficha del estado (ultimo evento): ocupa la fila completa porque el
+   valor es largo y cortarlo romperia la lectura. */
+.connection-info-grid .info-tile-wide {
+  grid-column: 1 / -1;
+}
+
 .connection-callout {
   min-height: 72px;
   align-content: center;
@@ -2069,6 +2084,27 @@ body::-webkit-scrollbar-corner,
 }
 
 .live-status-strip[data-tone="danger"] .live-status-copy strong {
+  color: #fecaca;
+}
+
+/* Motivo visible de la conexion: que esta pasando ahora y que sigue.
+   Vive debajo de la franja de estado y solo aparece si aporta informacion. */
+.connection-note {
+  margin: -2px 0 0;
+  font-size: 12px;
+  line-height: 1.45;
+  color: var(--text-muted);
+}
+
+.connection-note[data-tone="live"] {
+  color: #86efac;
+}
+
+.connection-note[data-tone="warn"] {
+  color: #fde68a;
+}
+
+.connection-note[data-tone="danger"] {
   color: #fecaca;
 }
 

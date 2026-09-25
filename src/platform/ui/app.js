@@ -1020,29 +1020,108 @@
     }
   }
 
+  // ---------------------------------------------------------------------------
+  // Verdad de la sesion externa: fuente unica.
+  //
+  // `runnerRunning` solo dice que el proceso del bridge existe; NUNCA es
+  // sinonimo de "conexion viva". Para eso esta `connectionState === "connected"`.
+  //
+  // Watchdog de frescura: el bridge manda un status cada `heartbeat_interval_sec`
+  // (15s, tools/bridge_py/bridge_config.yaml). Si pasan 3 latidos (45s) sin
+  // status con la sesion diciendo "connected", el bridge dejo de reportar y la
+  // sesion deja de ser confiable.
+  const BRIDGE_STATUS_STALE_MS = 45000;
+  // connection_state que significan "la sesion termino/murio": una fase
+  // obsoleta ("connected") no puede anularlos.
+  const TERMINAL_CONNECTION_STATES = new Set([
+    "disconnected",
+    "stopped",
+    "faulted",
+    "config_error",
+  ]);
+
+  function bridgeStatusAgeMs(external) {
+    const timestampMs = Number(external?.lastStatusTimestampMs || 0);
+    if (!Number.isFinite(timestampMs) || timestampMs <= 0) {
+      return null;
+    }
+    return Math.max(0, Date.now() - timestampMs);
+  }
+
+  function isBridgeStatusStale(external) {
+    if (!external || String(external.connectionState || "") !== "connected") {
+      return false;
+    }
+    const ageMs = bridgeStatusAgeMs(external);
+    return ageMs !== null && ageMs > BRIDGE_STATUS_STALE_MS;
+  }
+
+  // Sesion viva: solo si el bridge dice connected Y el status sigue fresco.
+  function hasLiveSession(external) {
+    return !!external
+      && String(external.connectionState || "") === "connected"
+      && !isBridgeStatusStale(external);
+  }
+
+  function formatAgeShort(ageMs) {
+    const totalSeconds = Math.max(0, Math.floor(Number(ageMs || 0) / 1000));
+    if (totalSeconds < 60) {
+      return `${totalSeconds}s`;
+    }
+    const minutes = Math.floor(totalSeconds / 60);
+    if (minutes < 60) {
+      return `${minutes}m ${String(totalSeconds % 60).padStart(2, "0")}s`;
+    }
+    return `${Math.floor(minutes / 60)}h ${String(minutes % 60).padStart(2, "0")}m`;
+  }
+
   function livePhaseFromSnapshot(external) {
     if (!external) {
       return null;
     }
+    const connectionState = String(external.connectionState || "");
     // El bridge nuevo manda la fase explicita; el viejo solo connection_state.
     const phase = String(external.lastPhase || "");
-    if (phase === "waiting") return "waiting";
-    if (phase === "connected") return "connected";
-    if (phase === "starting") return "starting";
-    if (phase === "connecting") return "connecting";
-    if (phase === "error") return "error";
-
-    const connectionState = String(external.connectionState || "");
     const runnerRunning = !!external.runnerRunning;
+
+    // Watchdog: la sesion dice "connected" pero el bridge dejo de mandar status.
+    if (isBridgeStatusStale(external)) {
+      return "stale";
+    }
+
+    // Prioridad fase/estado:
+    // 1. Un connectionState terminal (disconnected|stopped|faulted|config_error)
+    //    manda: una fase "connected" obsoleta no lo puede anular. Las demas
+    //    fases (waiting|starting|connecting|error) si pueden prevalecer porque
+    //    describen el matiz dentro de la desconexion (ej. "esperando el vivo"
+    //    viene como faulted + waiting).
+    // 2. connectionState vacio (bridge viejo sin estado): se confia en la fase.
+    // 3. En el resto de los estados la fase describe el matiz, pero la fase
+    //    "connected" solo es valida si el estado tambien dice connected.
+    const stateIsTerminal = TERMINAL_CONNECTION_STATES.has(connectionState);
+    if (phase === "connected") {
+      if (!stateIsTerminal && (connectionState === "connected" || connectionState === "")) {
+        return "connected";
+      }
+    } else if (phase === "waiting") {
+      return "waiting";
+    } else if (phase === "starting") {
+      return "starting";
+    } else if (phase === "connecting") {
+      return "connecting";
+    } else if (phase === "error") {
+      return "error";
+    }
+
     if (connectionState === "connected") return "connected";
     if (connectionState === "connecting" || connectionState === "resolving_room") return "connecting";
     if (connectionState === "preparing") return "starting";
-    if (connectionState === "faulted") return "error";
+    if (connectionState === "faulted" || connectionState === "config_error") return "error";
     if (connectionState === "stopped" || connectionState === "disconnected") return runnerRunning ? "waiting" : "idle";
     return runnerRunning ? "launching" : null;
   }
 
-  function livePhaseView(phase) {
+  function livePhaseView(phase, external) {
     switch (phase) {
       case "starting":
         return { tone: "warn", label: "Iniciando", detail: "Validando el entorno del bridge de TikTok." };
@@ -1054,6 +1133,15 @@
         return { tone: "warn", label: "Esperando el vivo", detail: "La cuenta no esta en vivo todavia. El panel sigue intentando." };
       case "connected":
         return { tone: "live", label: "Conectado", detail: "Escuchando eventos del live en tiempo real." };
+      case "stale": {
+        const ageMs = bridgeStatusAgeMs(external);
+        const ageText = ageMs === null ? "" : ` (${formatAgeShort(ageMs)})`;
+        return {
+          tone: "danger",
+          label: `Sin datos del bridge${ageText}`,
+          detail: "La sesion dice conectada pero el bridge dej\u00f3 de enviar estado.",
+        };
+      }
       case "error":
         return { tone: "danger", label: "Error de conexion", detail: "Revisa las alertas de abajo para ver el motivo." };
       default:
@@ -1084,7 +1172,10 @@
     const external = state.payload?.snapshot?.externalBridge || {};
     const snapshotPhase = livePhaseFromSnapshot(external);
     const phase = state.liveStatusPhase || snapshotPhase || "idle";
-    const view = livePhaseView(snapshotPhase === "connected" ? "connected" : phase);
+    // La sesion viva y la falta de datos del bridge las decide el snapshot:
+    // no las puede ocultar la fase local que quedo del ultimo click de Conectar.
+    const snapshotWins = snapshotPhase === "connected" || snapshotPhase === "stale";
+    const view = livePhaseView(snapshotWins ? snapshotPhase : phase, external);
     const user = external.targetUser ? `@${external.targetUser}` : (state.liveStatusUser ? `@${state.liveStatusUser}` : "");
     if (els.liveStatusStrip) {
       els.liveStatusStrip.dataset.tone = view.tone;
@@ -1551,7 +1642,7 @@
     }
 
     const runnerIssue = humanizeRunnerIssue(external);
-    const connected = external.connectionState === "connected" || !!external.runnerRunning;
+    const connected = hasLiveSession(external);
     if (!connected && runnerIssue && (external.runnerLastError || external.connectionState === "faulted")) {
       const runnerIssueKey = [
         external.targetUser || "",
@@ -2016,7 +2107,9 @@
   function activitySummary(payload = state.payload) {
     const external = payload?.snapshot?.externalBridge || {};
     const auth = authSnapshot(payload);
-    const connected = external.connectionState === "connected" || !!external.runnerRunning;
+    const connected = hasLiveSession(external);
+    const stale = isBridgeStatusStale(external);
+    const ageMs = bridgeStatusAgeMs(external);
     const targetUser = external.targetUser ? `@${external.targetUser}` : "";
     const diagnosticsOk = payload?.diagnostics?.ok !== false;
     if (auth.required && !auth.authenticated) {
@@ -2024,6 +2117,13 @@
         tone: "danger",
         label: "Bloqueado",
         copy: "Valida tu acceso antes de usar el panel.",
+      };
+    }
+    if (stale) {
+      return {
+        tone: "danger",
+        label: "Sin datos",
+        copy: `El bridge dej\u00f3 de reportar el estado de la sesi\u00f3n hace ${formatAgeShort(ageMs)}.`,
       };
     }
     if (!diagnosticsOk && !connected) {
@@ -2169,7 +2269,12 @@
   function renderConnection(payload) {
     const external = payload?.snapshot?.externalBridge || {};
     const diagnosticsOk = !!payload?.diagnostics?.ok;
-    const connected = external.connectionState === "connected" || !!external.runnerRunning;
+    const connected = hasLiveSession(external);
+    const stale = isBridgeStatusStale(external);
+    const ageMs = bridgeStatusAgeMs(external);
+    // El proceso del bridge vivo solo habilita la accion Desconectar: no dice
+    // que la sesion este conectada (eso lo decide hasLiveSession).
+    const bridgeActive = connected || !!external.runnerRunning;
     const runtimeMissing = !!external.runtimeChecked && external.runtimeReady === false;
     const targetUser = external.targetUser ? `@${external.targetUser}` : "";
     const runnerIssue = humanizeRunnerIssue(external);
@@ -2177,7 +2282,11 @@
     let meta = "Bridge en espera";
     let tone = diagnosticsOk ? "warn" : "danger";
 
-    if (connected) {
+    if (stale) {
+      label = `Sin datos del bridge (${formatAgeShort(ageMs)})`;
+      meta = targetUser || "Sin latido del bridge";
+      tone = "danger";
+    } else if (connected) {
       label = "Conectado";
       meta = targetUser || "Live en curso";
       tone = "live";
@@ -2195,15 +2304,41 @@
       tone = "danger";
     }
 
-    const note = connected
-      ? (external.lastStatusMessage || "Conexi\u00f3n activa y escuchando eventos del live.")
-      : (runnerIssue || external.lastStatusMessage || "Ingresa un usuario y presiona Conectar.");
+    // La franja ya dice la fase; la nota dice el MOTIVO concreto (el ultimo
+    // mensaje del bridge) y la accion que sigue (reintento). Solo aparece si
+    // aporta algo: en reposo la franja es suficiente.
+    const retryInSec = Math.max(0, Number(external.retryInSec || 0));
+    // El reintento lo hace el bridge, asi que solo cuenta si el proceso existe.
+    const retryHint = retryInSec > 0 && external.runnerRunning
+      ? `Reintento autom\u00e1tico del bridge en ${Math.ceil(retryInSec)} s.`
+      : "";
+    let note = "";
+    let noteTone = "warn";
+    if (stale) {
+      note = `Sin datos del bridge: la \u00faltima actualizaci\u00f3n fue hace ${formatAgeShort(ageMs)}.`;
+      noteTone = "danger";
+    } else if (connected) {
+      note = external.lastStatusMessage || "";
+      noteTone = "live";
+    } else if (runnerIssue) {
+      note = runnerIssue;
+      noteTone = "danger";
+    } else if (external.lastStatusMessage) {
+      note = external.lastStatusMessage;
+    }
+    if (retryHint) {
+      note = `${note}${note ? " " : ""}${retryHint}`;
+    }
 
     setText(els.connectionStatusText, label);
     setText(els.connectionStatusMeta, compactText(runtimeMissing ? (runnerIssue || external.runtimeSummary || meta) : meta, meta));
     setText(els.connectionTargetUser, targetUser || "Sin cuenta conectada");
     setText(els.liveRoom, external.currentRoomId || "Sala no disponible");
     setText(els.connectionNote, note);
+    if (els.connectionNote) {
+      els.connectionNote.dataset.tone = noteTone;
+      els.connectionNote.hidden = !note;
+    }
 
     if (document.activeElement !== els.tiktokUser) {
       const desiredValue = external.targetUser ? `@${external.targetUser}` : els.tiktokUser.value;
@@ -2212,8 +2347,13 @@
       }
     }
 
-    els.disconnectButton.hidden = !connected;
-    els.connectButton.hidden = connected;
+    els.disconnectButton.hidden = !bridgeActive;
+    els.connectButton.hidden = bridgeActive;
+    // Reintentar solo tiene sentido con un usuario ya configurado y sin
+    // proceso vivo (si esta vivo, la accion es Desconectar).
+    if (els.reconnectButton) {
+      els.reconnectButton.hidden = bridgeActive || !external.targetUser;
+    }
     setPillTone(els.connectionPill, tone);
   }
 
@@ -2222,7 +2362,7 @@
     const session = metrics.hostSession || null;
     const external = payload?.snapshot?.externalBridge || {};
     const latestItem = latestRecentActivityItem(18);
-    const connected = external.connectionState === "connected" || !!external.runnerRunning;
+    const connected = hasLiveSession(external);
     const liveViewerCount = Math.max(0, Number(session?.lastEvent?.viewerCount || session?.viewerCount || 0));
     const activePlayers = Math.max(0, Number(metrics.activePlayers || 0));
     let viewers = liveViewerCount || activePlayers || 0;
@@ -2517,17 +2657,51 @@
   function renderSystemStatus(payload, metricsPayload) {
     const external = payload?.snapshot?.externalBridge || {};
     const metrics = metricsPayload || payload?.metrics || {};
-    const connected = external.connectionState === "connected" || !!external.runnerRunning;
-    const latency = latencyPresentation(metrics.pipelineLatencyMs || 0, connected);
+    const connected = hasLiveSession(external);
+    const stale = isBridgeStatusStale(external);
+    const ageMs = bridgeStatusAgeMs(external);
+    const latency = stale
+      ? {
+        text: `Sin datos${ageMs === null ? "" : ` (${formatAgeShort(ageMs)})`}`,
+        tone: "danger",
+        hidden: false,
+      }
+      : latencyPresentation(metrics.pipelineLatencyMs || 0, connected);
 
     setText(els.statusLatency, latency.text, { animate: true });
     if (els.titlebarLatencyPill) {
       els.titlebarLatencyPill.hidden = !!latency.hidden;
     }
-    setText(
-      els.statusLastEvent,
-      external.lastEventTimestampMs ? formatTime(external.lastEventTimestampMs) : "Sin actividad"
-    );
+    // Ultimo evento visto: es la otra mitad del diagnostico. Una sesion que
+    // dice conectada pero no trae eventos desde hace rato no esta sana, aunque
+    // la franja siga verde.
+    const lastEventTs = Number(external.lastEventTimestampMs || 0);
+    const lastEventAgeMs = lastEventTs ? Math.max(0, Date.now() - lastEventTs) : 0;
+    // Un salto mayor a un dia no es una edad real: es otro formato de reloj o un
+    // timestamp corrupto. Mostramos la hora pero no prometemos antiguedad.
+    const lastEventAgeOk = lastEventAgeMs > 0 && lastEventAgeMs < 86400000;
+    let lastEventText = "Sin actividad";
+    if (lastEventTs) {
+      lastEventText = formatTime(lastEventTs);
+      if (lastEventAgeOk) {
+        lastEventText += ` \u00b7 hace ${formatAgeShort(lastEventAgeMs)}`;
+      }
+    }
+    let lastEventTone = "";
+    if (connected) {
+      if (!lastEventTs) {
+        lastEventTone = "warn";
+      } else if (lastEventAgeOk) {
+        lastEventTone = lastEventAgeMs > 900000
+          ? "danger"
+          : (lastEventAgeMs > 300000 ? "warn" : "live");
+      }
+    }
+    setText(els.statusLastEvent, lastEventText);
+    els.statusLastEvent?.classList.remove("metric-live", "metric-warn", "metric-danger");
+    if (lastEventTone) {
+      els.statusLastEvent?.classList.add(`metric-${lastEventTone}`);
+    }
     els.statusLatency?.classList.remove("metric-live", "metric-warn", "metric-danger");
     els.statusLatency?.classList.add(`metric-${latency.tone}`);
     setPillTone(els.titlebarLatencyPill, latency.tone);
@@ -2537,12 +2711,15 @@
     const summary = activitySummary(payload);
     const external = payload?.snapshot?.externalBridge || {};
     const auth = authSnapshot(payload);
-    const connected = external.connectionState === "connected" || !!external.runnerRunning;
+    const connected = hasLiveSession(external);
+    const stale = isBridgeStatusStale(external);
     const diagnosticsOk = payload?.diagnostics?.ok !== false;
     const targetUser = external.targetUser ? `@${external.targetUser}` : "";
     let liveState = "Esperando tu cuenta";
     if (auth.required && !auth.authenticated) {
       liveState = "Bloqueado";
+    } else if (stale) {
+      liveState = `Sin datos del bridge (${formatAgeShort(bridgeStatusAgeMs(external))})`;
     } else if (connected) {
       liveState = "Escuchando eventos del live";
     } else if (!diagnosticsOk) {
